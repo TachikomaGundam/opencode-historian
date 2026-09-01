@@ -26,6 +26,7 @@ export interface BuildDeps {
   readonly client?: GqlClient;
   readonly translate?: TranslateFn;
   readonly fetchImpl?: typeof fetch;
+  readonly resultsDir?: string;
   readonly homeDir?: string;
 }
 
@@ -39,7 +40,7 @@ export function buildTools(opts: HistorianOptions, deps: BuildDeps = {}): Histor
     client ??= deps.client ?? createClient(opts, { fetchImpl: deps.fetchImpl, homeDir });
     return client;
   };
-  const toolDeps: ToolDeps = { getClient, options: opts, translate, homeDir };
+  const toolDeps: ToolDeps = { getClient, options: opts, translate, fetchImpl: deps.fetchImpl, resultsDir: deps.resultsDir, homeDir };
   return {
     historian_page_create: makeCreateTool(toolDeps),
     historian_page_update: makeUpdateTool(toolDeps),
