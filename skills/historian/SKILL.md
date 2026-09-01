@@ -49,7 +49,7 @@ description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）�
 | `agent-eval/` | HR 模型评测产出与方法论 |
 | `troubleshooting/` | 事件：症状、根因、修复、预防 |
 | `scratch/` | 临时会话笔记；持久发现日后提升 |
-| `_sandbox/` | 评测/测试区。仅当 brief 显式说"eval sandbox"时使用。沙箱页面一律 `isPublished: false`。 |
+| `_sandbox/` | 评测/测试区。仅当 brief 显式说"eval sandbox"时使用。沙箱页默认 `isPublished: false`（fixture 惯例）；当 brief 要求匿名可访问（如"两版 URL 都能开"）时跟随 brief 用默认 `true`。 |
 
 ### 值不值得写 — 入门门控
 

@@ -34,7 +34,11 @@ export type HistorianTools = Readonly<Record<string, ToolDefinition>>;
 
 export function buildTools(opts: HistorianOptions, deps: BuildDeps = {}): HistorianTools {
   const homeDir = deps.homeDir ?? homedir();
-  const translate = deps.translate ?? (deps.fetchImpl !== undefined ? makeTranslator(opts, { fetchImpl: deps.fetchImpl }) : undefined);
+  // Translator must exist with NO injected deps (production plugin path):
+  // gating on deps.fetchImpl degraded twins to pending(translator-not-wired)
+  // in production while tests/pilot got a live one — regression-tested.
+  const translate =
+    deps.translate ?? makeTranslator(opts, deps.fetchImpl !== undefined ? { fetchImpl: deps.fetchImpl } : {});
   let client: GqlClient | undefined;
   const getClient = (): GqlClient => {
     client ??= deps.client ?? createClient(opts, { fetchImpl: deps.fetchImpl, homeDir });

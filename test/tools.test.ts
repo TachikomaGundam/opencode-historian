@@ -21,6 +21,9 @@ import type { GqlClient } from '../src/wiki/client.js';
 import { TranslateError } from '../src/translate.js';
 import { classifyGenre, genreSkeleton, type Genre } from '../src/templates/genres.js';
 import { buildTools } from '../src/tools.js';
+import { makeAppendTool } from '../src/tools/write.js';
+import { makeTranslateSnippetTool } from '../src/tools/local.js';
+import type { ToolDeps } from '../src/tools/shared.js';
 
 const PATH = 'docs/index';
 const EN_URL = `http://localhost:3000/en/${PATH}`;
@@ -120,18 +123,6 @@ function makeWired(
   const home = homeDir ?? makeKeyHome();
   const tools = buildTools(OPTS, { fetchImpl: r.fetchImpl, homeDir: home, translate });
   return { tools, captured: r.captured, fetchCount: r.fetchCount };
-}
-
-/** Client-injected variant: translator NOT wired (no fetchImpl passed to
- *  buildTools — the mock fetch rides on the injected client instead). */
-function makeClientInjected(
-  fetchImpl: typeof fetch,
-  fetchCount: () => number,
-): { tools: Tools; fetchCount: () => number; captured: Captured[] } {
-  const { client } = makeClient(fetchImpl);
-  const home = makeKeyHome();
-  const tools = buildTools(OPTS, { client, homeDir: home });
-  return { tools, fetchCount, captured: [] };
 }
 
 /** Migrate variant: the tool also hits the LLM messages endpoint, so the fake
@@ -292,6 +283,52 @@ describe('historian_page_create', () => {
     expect(creates[1].locale).toBe('zh');
     expect(creates[1].title).toBe('译:Alpha');
     expect(fetchCount()).toBe(4);
+  });
+
+  it('no-deps buildTools feeds a live translator into createPage — twinStatus created, not pending (THE GAP)', async () => {
+    // Given: the exact production wiring — buildTools(OPTS, {}) with ZERO
+    // injected deps — and ONE global fetch stub dispatching both GraphQL and
+    // Anthropic-messages shapes (engine path is real, network is mocked)
+    const original = globalThis.fetch;
+    const captured: Captured[] = [];
+    globalThis.fetch = (async (input: unknown, init?: unknown): Promise<Response> => {
+      const body = JSON.parse(String((init as RequestInit | undefined)?.body)) as Record<string, unknown>;
+      if (typeof body.query === 'string') {
+        const vars = (body.variables ?? {}) as Record<string, unknown>;
+        captured.push({ query: body.query, variables: vars });
+        if (body.query.includes('create(')) {
+          return jsonResponse({
+            data: { pages: { create: { ...RESP_OK, page: { id: vars.locale === 'zh' ? 998 : 999, path: vars.path, locale: vars.locale } } } },
+          });
+        }
+        if (body.query.includes('singleByPath(')) {
+          return jsonResponse({ data: { pages: { singleByPath: vars.locale === 'zh' ? zhPage() : rawPage() } } });
+        }
+        throw new Error(`tools.test: unhandled gql query ${body.query}`);
+      }
+      if (typeof body.model === 'string' && Array.isArray(body.messages)) {
+        const userText = (body.messages[0] as { content: string }).content;
+        return jsonResponse({ content: [{ type: 'text', text: `译:${userText}` }] });
+      }
+      throw new Error('tools.test: unknown fetch body shape');
+    }) as typeof fetch;
+    try {
+      const tools = buildTools(OPTS, {});
+      // When: creating with twin:true (default) entirely on the no-deps build
+      const out = await run(tools.historian_page_create, { path: PATH, title: 'Alpha', content: '# Alpha\nbody', tags: ['t1'] });
+      // Then: the twin was ENGINE-translated and created — never the
+      // translator-not-wired pending degradation from the old deps.fetchImpl gate
+      expect(out.ok).toBe(true);
+      expect(out.twinStatus).toBe('created');
+      expect(out.twinId).toBe(998);
+      expect(out.urls).toEqual({ en: EN_URL, zh: ZH_URL });
+      const creates = varsOf(captured, 'create(');
+      expect(creates.map((c) => c.locale)).toEqual(['en', 'zh']);
+      expect(creates[1].title).toBe('译:Alpha');
+      expect(creates[1].content).toBe('译:# Alpha\nbody');
+    } finally {
+      globalThis.fetch = original;
+    }
   });
 
   it('twin:false skips the twin and sends exactly one create', async () => {
@@ -567,8 +604,9 @@ describe('historian_page_append', () => {
     expect(zhCreate.content).toBe('译:## New');
   });
 
-  it('missing zh twin + no sectionZh + translator NOT wired: reports zhStatus missing', async () => {
-    // Given: zh missing and no translator (client injected, no fetchImpl)
+  it('hand-built ToolDeps without translate: append reports zhStatus missing (engine no-translate branch)', async () => {
+    // Given: zh missing and a translate-less ToolDeps built by hand (no longer
+    // a buildTools mode since the no-deps fix — buildTools always wires one)
     const r = makeResponder({
       'singleByPath(': (vars) => {
         if (vars.locale !== 'zh') return { data: { pages: { singleByPath: rawPage() } } };
@@ -579,7 +617,9 @@ describe('historian_page_append', () => {
         data: { pages: { update: { ...RESP_OK, page: { id: vars.id, path: vars.path, locale: vars.locale } } } },
       }),
     });
-    const { tools, fetchCount } = makeClientInjected(r.fetchImpl, r.fetchCount);
+    const { client } = makeClient(r.fetchImpl);
+    const bareDeps: ToolDeps = { getClient: () => client, options: OPTS, homeDir: makeKeyHome() };
+    const tools = { historian_page_append: makeAppendTool(bareDeps) };
 
     // When: appending en with no sectionZh
     const out = await run(tools.historian_page_append, { path: PATH, section: '## New' });
@@ -589,7 +629,7 @@ describe('historian_page_append', () => {
     expect(out.zhStatus).toBe('missing');
     expect(typeof out.zhNote).toBe('string');
     expect(varsOf(r.captured, 'create(').length).toBe(0);
-    expect(fetchCount()).toBe(5);
+    expect(r.fetchCount()).toBe(5);
   });
 
   it('translator failure during twin bootstrap degrades zh to pending, primary still ok', async () => {
@@ -687,13 +727,43 @@ describe('historian_translate_snippet', () => {
     expect(typeof out.actionableHint).toBe('string');
   });
 
-  it('reports not-wired when no translator and no fetchImpl are configured', async () => {
-    // Given: client-injected build (translator never wired)
-    const r = makeResponder({});
-    const { tools } = makeClientInjected(r.fetchImpl, r.fetchCount);
+  it('no-deps buildTools wires a live translator through globalThis.fetch (the production plugin path)', async () => {
+    // Given: buildTools with ZERO injected deps (exactly what the plugin entry
+    // does at runtime) and a stub global fetch answering the Anthropic
+    // messages endpoint
+    const original = globalThis.fetch;
+    const requested: string[] = [];
+    globalThis.fetch = (async (input: unknown): Promise<Response> => {
+      requested.push(String(input));
+      return jsonResponse({ content: [{ type: 'text', text: '译:Hello' }] });
+    }) as typeof fetch;
+    try {
+      const tools = buildTools(OPTS, {});
+      // When: translating without any dep injection
+      const out = await run(tools.historian_translate_snippet, { text: 'Hello' });
+      // Then: a real engine call produced the text — never the not-wired envelope
+      expect(out.ok).toBe(true);
+      expect(out.translated).toBe('译:Hello');
+      expect(requested.length).toBe(1);
+      expect(requested[0]).toContain('/v1/messages');
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
 
+  it('defensive: hand-built ToolDeps without translate still yields the not-wired envelope', async () => {
+    // Given: a ToolDeps assembled with no translator (only reachable by direct
+    // construction — buildTools now always wires one)
+    const bareDeps: ToolDeps = {
+      getClient: () => {
+        throw new Error('unexpected client');
+      },
+      options: OPTS,
+      homeDir: makeKeyHome(),
+    };
+    const snippet = makeTranslateSnippetTool(bareDeps);
     // When: translating
-    const out = await run(tools.historian_translate_snippet, { text: 'Hello' });
+    const out = await run(snippet, { text: 'Hello' });
 
     // Then: explicit not-wired envelope, still ok:false (not a throw)
     expect(out.ok).toBe(false);
