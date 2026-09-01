@@ -17,7 +17,7 @@ opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具�
 
 两种安装方式经过实测验证。
 
-### 方式一：npm 包（推荐）
+### 方式一：npm 包（推荐（发布后））
 
 在 `opencode.json` 或 `opencode.jsonc` 的 `plugin` 数组中添加包名：
 
@@ -27,7 +27,7 @@ opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具�
 }
 ```
 
-当前 npm 已发布版本 0.1.0。OpenCode 启动时自动拉取并加载。
+发布准备状态：包已按 0.1.0 打包就绪（`npm pack` 验证通过），npm 发布需账号 2FA 一次性完成（`npm publish --access public --otp=<code>`）。在发布完成前，方式二 `file://` 为当前可用安装路径。
 
 ### 方式二：本地路径（开发用）
 
