@@ -38,6 +38,7 @@ export interface CreateInput {
   readonly content: string;
   readonly tags?: readonly string[];
   readonly isPublished?: boolean;
+  readonly isPrivate?: boolean;
   readonly twin?: boolean;
   readonly description?: string;
 }
@@ -57,10 +58,7 @@ export interface UpdatePatch {
   readonly scriptJs?: string;
 }
 
-export interface UpdateResult extends LocalePair {
-  readonly pageId: number;
-  readonly page: PageRecord;
-}
+export interface UpdateResult extends LocalePair { readonly pageId: number; readonly page: PageRecord; }
 
 export interface WriteResult extends LocalePair { readonly pageId: number; }
 
@@ -185,7 +183,7 @@ export async function createPage(deps: PageDeps, input: CreateInput): Promise<Cr
     description: input.description ?? '',
     editor: 'markdown',
     isPublished: input.isPublished ?? true,
-    isPrivate: false,
+    isPrivate: input.isPrivate ?? false,
     tags: [...(input.tags ?? [])],
   };
   await gql(deps.client, CREATE_MUTATION, base);
