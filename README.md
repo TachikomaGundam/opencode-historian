@@ -46,12 +46,12 @@ opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具�
 插件注入的 skill 会注册 `/historian` 命令。验证方法：
 
 ```bash
-opencode run --command historian --prompt "historian_map show"
+opencode run --command historian --message "historian_map show"
 ```
 
 如果工具列表中出现 `historian_page_create` 等 10 个工具，安装成功。
 
-> **升级提示**：如果你之前使用过 historian v2 的扁平 skill 文件（如 `~/.config/opencode/skills/historian.md`），需要先重命名为 `.v2-disabled` 或移到别处。插件通过 config hook 自动注入 v3 skill，两个同名 skill 不能共存。
+> **升级提示**：如果你之前使用过 historian v2 的扁平 skill 文件（如 `~/.config/opencode/skills/historian.md`），需要先重命名为 `historian.md.v2-disabled` 或移到别处。插件通过 config hook 自动注入 v3 skill，两个同名 skill 不能共存。
 
 ## 配置 / Configuration
 
@@ -161,7 +161,7 @@ en: http://<host>/ops/example
 zh: http://<host>/zh/ops/example
 ```
 
-**地图视图**：`historian_map show` 输出包含 Locale 和 Twin 列，展示每个路径的双语对应关系。本地镜像文件保存在 `_meta/page-map` 缓存页中。
+**地图视图**：`historian_map show` 输出包含 Locale 和 Twin 列，展示每个路径的双语对应关系。本地镜像文件保存在 `~/.config/opencode/historian-map.json`（`getMap` 读取，带过期秒数）；`_meta/page-map` 是 wiki 端的缓存页，由 `historian_map` refresh 写入。
 
 ## 写作质量体系 / Quality System
 
@@ -178,18 +178,18 @@ zh: http://<host>/zh/ops/example
 
 ### 10 项自检门
 
-每页写入后过一遍自检清单（完整条目见 `skills/historian/references/self-review-checklist.md`）：
+每页写入后过一遍自检清单（源码 `src/templates/genres.ts` `selfReviewChecklist()`，参考文件 `skills/historian/references/rules.md` + `genres.md`）。dry-run 阶段评 1–8，apply 后评 9–10。genre-specific 条目对不匹配的页型记 N/A=PASS：
 
-1. 页型标注正确
-2. 双语孪生存在
-3. 路径符合 sections 规范
-4. 无禁止元素（`{{toc}}`、`:::`、YAML frontmatter）
-5. 表格有表头
-6. 代码块标注语言
-7. 链接可解析
-8. 无占位符残留
-9. 来源/引用标注
-10. 格式与页型骨架一致
+1. **导言占比 10–15%**：导言 ≈ 正文的 10–15%，每个重要小节在导言至少占一句
+2. **句长上限**：中文句 ≤20 字、英文句 ≤25 词
+3. **表格判据**：≥3 字段的结构化枚举入表，成对数据用描述列表
+4. **对比表来源列**（G2）：对比表/枚举表每行有来源列，行序固定、无合并单元格
+5. **时间线来源列**（G1）：时间线每行有来源列，仅日志可证事实
+6. **行动项五要素**（G1）：类型|负责人|期限|验证|状态 五列，措施是行内容
+7. **无杂项筐**：除 参见/附录 之外没有 "其他/杂项" 类 catch-all 小节
+8. **无溢美词**：领先/强大/灵活/高效 等 bare claim 改事实或删除
+9. **双语 URL 已回报**（写后核销）：报告含 /en/ 与 /zh/ 两个可访问 URL
+10. **孪生已建或 zh_status:pending 声明**（写后核销）：twin created OR zh_status pending recorded and declared in report
 
 ### SYN 20 规则
 
@@ -214,7 +214,6 @@ zh: http://<host>/zh/ops/example
 * `{{toc}}`（目录由主题配置自动生成）
 * `:::` 容器（wiki.js 不解析）
 * YAML frontmatter（API 创建页面不经过 frontmatter 解析）
-* `[[path|label]]` 链接语法（用标准 markdown `[Label](/path)` 替代）
 
 ### API 陷阱与插件应对
 
@@ -225,11 +224,11 @@ wiki.js GraphQL API 有 9 个常见陷阱。插件在内部处理了每一个（
 | `pages.update` 是整页替换，不是增量合并 | 工具内部做 read-modify-write |
 | `pages.create` 返回值缺部分字段 | 创建后立即 readback 拿完整数据 |
 | `responseResult` 嵌套结构，需取 `.id` | 解析层统一提取，上层拿到的是直接值 |
-| 空 content 被拒绝 | 骨架模板始终包含占位符内容 |
+| 空 content 被拒绝 | 引擎 pre-check `ContentEmptyError`；不传 content 时走 template-only 模式，不发 GraphQL 写请求 |
 | 移动页面不能用 update 改路径 | 用独立的 `pages.move` mutation |
 | `singleByPath` 必须传 locale | 所有查询强制带 locale 参数 |
-| 上传附件字段名必须是 `upload` | 内部固定字段名 |
-| `isPublished: false` 的页面在前端报 404 | 创建草稿时在工具输出中标注 |
+| 上传附件字段名必须是 `mediaUpload` | 内部固定字段名（`src/wiki/assets.ts`） |
+| `isPublished: false` 的页面匿名访问报 404/403 | 创建草稿时在工具输出中标注 |
 | 路径不能以 locale 前缀开头 | `validatePath` 拒绝 `zh/...` 形式的输入 |
 
 ## 从 historian v2 迁移 / Migrating from v2
@@ -263,7 +262,7 @@ wiki.js GraphQL API 有 9 个常见陷阱。插件在内部处理了每一个（
 
 ### 升级步骤
 
-1. 重命名旧 skill 文件：`mv ~/.config/opencode/skills/historian.md ~/.config/opencode/skills/historian.v2-disabled`
+1. 重命名旧 skill 文件：`mv ~/.config/opencode/skills/historian.md ~/.config/opencode/skills/historian.md.v2-disabled`
 2. 在 `opencode.json[c]` 的 `plugin` 数组中添加 `opencode-historian`
 3. 重启 opencode，`/historian` 命令可用即表示 v3 skill 已注入
 
@@ -287,7 +286,7 @@ harness repo（与本插件仓库同工作区）提供 7 个行为验收场景�
 
 ```bash
 npm run build       # tsc 编译到 dist/
-npm test            # vitest run（251 tests, 12 files）
+npm test            # vitest run（272 tests, 13 files）
 npm pack --dry-run  # 检查打包文件列表
 ```
 
