@@ -55,6 +55,29 @@ export interface PageSearchResponse {
   readonly totalHits: number;
 }
 
+/** One pages.list row (live-introspected: tags arrive as flat strings, unlike
+ *  Page's nested PageTag objects; privateNS is null unless the page lives in a
+ *  private namespace). */
+export interface PageListItem {
+  readonly id: number;
+  readonly path: string;
+  readonly locale: Locale;
+  readonly title: string;
+  readonly description: string;
+  readonly contentType: string;
+  readonly isPublished: boolean;
+  readonly isPrivate: boolean;
+  readonly privateNS: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly tags: readonly string[];
+}
+
+export interface ListPagesOptions {
+  readonly locale?: Locale;
+  readonly tags?: readonly string[];
+}
+
 // --- GraphQL shapes (introspection-verified) --------------------------------
 
 const READ_FIELDS =
@@ -62,6 +85,8 @@ const READ_FIELDS =
 
 const READ_QUERY = `query r($path: String!, $locale: String!) { pages { singleByPath(path: $path, locale: $locale) { ${READ_FIELDS} } } }`;
 const SEARCH_QUERY = `query q($query: String!, $path: String, $locale: String) { pages { search(query: $query, path: $path, locale: $locale) { results { id title description path locale } suggestions totalHits } } }`;
+const LIST_FIELDS = 'id path locale title description contentType isPublished isPrivate privateNS createdAt updatedAt tags';
+const LIST_QUERY = `query l($locale: String, $tags: [String!]) { pages { list(locale: $locale, tags: $tags) { ${LIST_FIELDS} } } }`;
 
 // --- Raw→typed mapping (the boundary parse) ---------------------------------
 
@@ -120,6 +145,39 @@ export function mapPage(raw: RawPageShape): PageRecord {
   };
 }
 
+interface RawListPageShape {
+  readonly id: unknown;
+  readonly path: unknown;
+  readonly locale: unknown;
+  readonly title: unknown;
+  readonly description: unknown;
+  readonly contentType: unknown;
+  readonly isPublished: unknown;
+  readonly isPrivate: unknown;
+  readonly privateNS: unknown;
+  readonly createdAt: unknown;
+  readonly updatedAt: unknown;
+  readonly tags: unknown;
+}
+
+export function mapListItem(raw: RawListPageShape): PageListItem {
+  const privateNS = raw.privateNS;
+  return {
+    id: num(raw.id),
+    path: str(raw.path),
+    locale: normalizeLocale(str(raw.locale)),
+    title: str(raw.title),
+    description: str(raw.description),
+    contentType: str(raw.contentType),
+    isPublished: bool(raw.isPublished),
+    isPrivate: bool(raw.isPrivate),
+    privateNS: typeof privateNS === 'string' && privateNS !== '' ? privateNS : null,
+    createdAt: str(raw.createdAt),
+    updatedAt: str(raw.updatedAt),
+    tags: mapTags(raw.tags),
+  };
+}
+
 // --- readPage ---------------------------------------------------------------
 
 /** Read a page by (path, locale). A missing page — wiki.js answers with a
@@ -137,6 +195,19 @@ export async function readPage(client: GqlClient, path: string, locale: Locale):
     if (err instanceof GraphQLError && err.message.includes('does not exist')) return null;
     throw err;
   }
+}
+
+// --- listPages --------------------------------------------------------------
+
+/** Full unbounded fetch of pages.list, optionally scoped to one locale and/or
+ *  tags (the list query has NO responseResult — failures surface as top-level
+ *  errors and are rethrown by the gql layer). */
+export async function listPages(client: GqlClient, opts?: ListPagesOptions): Promise<readonly PageListItem[]> {
+  const data = await gql<{ pages: { list: readonly RawListPageShape[] } }>(client, LIST_QUERY, {
+    locale: opts?.locale ?? null,
+    tags: opts?.tags !== undefined && opts.tags.length > 0 ? [...opts.tags] : null,
+  });
+  return data.pages.list.map(mapListItem);
 }
 
 // --- searchPages ------------------------------------------------------------
