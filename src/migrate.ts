@@ -35,6 +35,9 @@ export interface MigrateDeps {
 export interface ReformatArgs {
   readonly path: string;
   readonly genre?: Genre;
+  /** Pilot revise-loop seam (todo 15): corrective hints appended into the
+   *  restyle user prompt when a previous draft failed checklist items. */
+  readonly reviseHints?: readonly string[];
 }
 
 export type ReformatOutcome =
@@ -102,6 +105,18 @@ export function reformatPromptFor(genre: Genre, lang: GenreLang, original: strin
   ].join('\n');
 }
 
+/** Append pilot revise-loop hints to the restyle user prompt (todo 15 seam);
+ *  absent hints leave the prompt byte-identical to the pre-seam form. */
+function appendReviseHints(prompt: string, hints: readonly string[] | undefined): string {
+  if (hints === undefined || hints.length === 0) return prompt;
+  return [
+    prompt,
+    '',
+    'REVISE HINTS (the restructure MUST satisfy every hint):',
+    ...hints.map((h) => `- ${h}`),
+  ].join('\n');
+}
+
 // --- reformatPageDraft ------------------------------------------------------
 
 /** Dry-run engine: read → classify (explicit genre wins) → LLM restyle →
@@ -115,12 +130,13 @@ export async function reformatPageDraft(deps: MigrateDeps, args: ReformatArgs): 
   }
   const classified = classifyGenre({ title: source.title, body: source.content });
   const genre = args.genre ?? classified.genre;
+  const user = appendReviseHints(reformatPromptFor(genre, source.locale, source.content), args.reviseHints);
   let draft: string;
   try {
     draft = await callMessages(
       deps.options,
       { fetchImpl: deps.fetchImpl },
-      { system: reformatSystemFor(source.locale), user: reformatPromptFor(genre, source.locale, source.content) },
+      { system: reformatSystemFor(source.locale), user },
     );
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err : new Error(String(err)) };

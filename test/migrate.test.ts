@@ -166,6 +166,29 @@ describe('reformatPageDraft', () => {
     expect(user).toContain('TARGET GENRE SKELETON (G3, en):');
     expect(user).toContain('ORIGINAL CONTENT TO RESTRUCTURE:');
     expect(user).toContain(SOURCE_CONTENT);
+    expect(user).not.toContain('REVISE HINTS');
+  });
+
+  it('appends reviseHints into the restyle user prompt and omits the section when none are passed', async () => {
+    // Given: an en page with an explicit G3 genre
+    const duel = makeDuel(
+      { 'singleByPath(': (vars) => ({ data: { pages: { singleByPath: vars.locale === 'zh' ? null : pageFixture() } } }) },
+      { text: DRAFT },
+    );
+    const { deps } = makeDeps(duel);
+
+    // When: dry-run with revise hints
+    const out = await reformatPageDraft(deps, { path: PATH, genre: 'G3', reviseHints: ['中文句长 ≤20 字，拆短句', 'timeline rows must carry a source'] });
+
+    // Then: every hint rides the user prompt under the machine marker, in order
+    expect(out.ok).toBe(true);
+    expect(duel.llmCalls).toHaveLength(1);
+    const user = duel.llmCalls[0]!.user;
+    expect(user).toContain('REVISE HINTS (the restructure MUST satisfy every hint):');
+    expect(user).toContain('- 中文句长 ≤20 字，拆短句');
+    expect(user).toContain('- timeline rows must carry a source');
+    expect(user.indexOf('中文句长 ≤20 字，拆短句')).toBeLessThan(user.indexOf('timeline rows must carry a source'));
+    expect(user.indexOf('ORIGINAL CONTENT TO RESTRUCTURE:')).toBeLessThan(user.indexOf('REVISE HINTS'));
   });
 
   it('restyles same-language for a zh source and flags the missing en twin', async () => {
