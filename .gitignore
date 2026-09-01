@@ -2,3 +2,6 @@ node_modules/
 dist/
 .qa/*
 !.qa/.gitkeep
+
+# todo 14: pre-image backup files (restore program of record) live here
+results/

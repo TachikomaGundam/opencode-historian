@@ -12,7 +12,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { OPTS, makeClient, makeKeyHome, jsonResponse } from './client-fixtures.js';
@@ -131,6 +132,36 @@ function makeClientInjected(
   const home = makeKeyHome();
   const tools = buildTools(OPTS, { client, homeDir: home });
   return { tools, fetchCount, captured: [] };
+}
+
+/** Migrate variant: the tool also hits the LLM messages endpoint, so the fake
+ *  fetch routes gql fragments AND llm bodies (dual mode). */
+function makeMigrateWired(
+  handlers: Record<string, (vars: Record<string, unknown>, query: string) => unknown>,
+  llmText: string,
+  translate?: (text: string, from: string, to: string) => Promise<string>,
+  homeDir?: string,
+  resultsDir?: string,
+): { tools: Tools; captured: Captured[]; fetchCount: () => number } {
+  const captured: Captured[] = [];
+  let count = 0;
+  const fetchImpl = (async (input: unknown, init?: unknown): Promise<Response> => {
+    count++;
+    const body = JSON.parse(String((init as RequestInit | undefined)?.body)) as Record<string, unknown>;
+    if (typeof body.query === 'string') {
+      const query = body.query as string;
+      captured.push({ query, variables: (body.variables ?? {}) as Record<string, unknown> });
+      const fragment = Object.keys(handlers).find((f) => query.includes(f));
+      if (fragment === undefined) throw new Error(`tools.test: unhandled query ${query}`);
+      return jsonResponse(handlers[fragment]((body.variables ?? {}) as Record<string, unknown>, query));
+    }
+    if (typeof body.model === 'string' && Array.isArray(body.messages)) {
+      return jsonResponse({ content: [{ type: 'text', text: llmText }] });
+    }
+    throw new Error('tools.test: unknown fetch body shape');
+  }) as typeof fetch;
+  const tools = buildTools(OPTS, { fetchImpl, homeDir: homeDir ?? makeKeyHome(), translate, resultsDir });
+  return { tools, captured, fetchCount: () => count };
 }
 
 async function run(toolDef: ToolDefinition, args: ToolArgs): Promise<Record<string, unknown>> {
@@ -909,46 +940,73 @@ describe('historian_move', () => {
 // --- historian_migrate -------------------------------------------------------
 
 describe('historian_migrate', () => {
-  it('apply=true is refused as not-implemented BEFORE any fetch (todo 14 owns apply)', async () => {
-    // Given: fetch spy that fails loudly
-    const { tools, fetchCount } = makeWired({});
+  const DRAFT = '## Final\n\ndrafted.';
 
-    // When: requesting an apply
+  it('apply=true runs the full engine: reformat + backup + per-locale upsert + checkpoint', async () => {
+    // Given: existing en+zh pages, mock translator, writable tmp home + results dir
+    const home = makeKeyHome();
+    const resultsDir = mkdtempSync(join(tmpdir(), 'tools-migrate-'));
+    const { tools, captured, fetchCount } = makeMigrateWired(
+      {
+        'singleByPath(': (vars) => ({ data: { pages: { singleByPath: vars.locale === 'zh' ? zhPage() : rawPage() } } }),
+        'single(': (vars) => ({ data: { pages: { single: vars.id === 998 ? zhPage() : rawPage() } } }),
+        'update(': () => ({ data: { pages: { update: RESP_OK } } }),
+      },
+      DRAFT,
+      async (t: string) => TWIN_TEXT(t),
+      home,
+      resultsDir,
+    );
+
+    // When: applying
     const out = await run(tools.historian_migrate, { path: PATH, apply: true });
 
-    // Then: structured not-implemented envelope; zero network
-    expect(out.ok).toBe(false);
-    expect(out.error).toBe('not-implemented');
-    expect(out.errorKind).toBe('NotImplementedError');
-    expect(out.note).toBe('todo 14 owns apply');
-    expect(fetchCount()).toBe(0);
+    // Then: applied entries, backup + checkpoint persisted, URL mandate honored
+    expect(out.ok).toBe(true);
+    expect(out.mode).toBe('apply');
+    expect(out.applied).toHaveLength(2);
+    expect(out.applied[0]).toMatchObject({ locale: 'en', action: 'updated' });
+    expect(out.applied[0].urls).toEqual({ en: EN_URL, zh: ZH_URL });
+    expect(out.backupPath).toContain('pilot-backup-docs-');
+    const updates = captured.filter((c) => c.query.includes('update('));
+    expect(updates).toHaveLength(2);
+    expect(updates.map((c) => c.variables.content)).toEqual([DRAFT, TWIN_TEXT(DRAFT)]);
+    const cp = JSON.parse(readFileSync(join(home, '.config', 'opencode', 'historian-migrate.json'), 'utf8')) as {
+      paths: Record<string, unknown>;
+    };
+    expect(cp.paths[PATH]).toBeDefined();
+    expect(fetchCount()).toBeGreaterThan(2);
   });
 
-  it('dry-run (no apply): echoes content, suggests an explicit genre, previews the checklist', async () => {
-    // Given: an existing legacy page
-    const { tools, fetchCount } = makeWired({
-      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage() } } }),
-    });
+  it('dry-run (no apply): echoes content, suggests an explicit genre, previews the checklist on the draft', async () => {
+    // Given: an existing legacy page without a zh twin
+    const { tools, fetchCount } = makeMigrateWired({
+      'singleByPath(': (vars) => ({ data: { pages: { singleByPath: vars.locale === 'zh' ? null : rawPage() } } }),
+    }, DRAFT);
 
     // When: running the dry-run with an explicit genre
     const out = await run(tools.historian_migrate, { path: PATH, genre: 'G4' });
 
-    // Then: nothing is written; the preview carries genre + full content echo
+    // Then: nothing is written; the preview carries genre, full content echo and the LLM draft
     expect(out.ok).toBe(true);
     expect(out.mode).toBe('dry-run');
     expect(out.suggestedGenre).toBe('G4');
     expect(out.confidence).toBe('explicit');
     expect(out.content).toBe('# Alpha\nbody');
+    expect(out.draft).toBe(DRAFT);
+    expect(out.alreadyConforms).toBe(false);
+    expect(out.missingTwin).toBe(true);
     expect((out.checklist as unknown[]).length).toBe(10);
+    expect((out.checklistResults as unknown[]).length).toBe(10);
     expect(out.urls).toEqual({ en: EN_URL, zh: ZH_URL });
-    expect(fetchCount()).toBe(1);
+    expect(fetchCount()).toBe(3);
   });
 
   it('dry-run without a genre classifies the page via the engine', async () => {
-    // Given: an existing legacy page
-    const { tools } = makeWired({
-      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage() } } }),
-    });
+    // Given: an existing legacy page (with its zh twin)
+    const { tools } = makeMigrateWired({
+      'singleByPath(': (vars) => ({ data: { pages: { singleByPath: vars.locale === 'zh' ? zhPage() : rawPage() } } }),
+    }, DRAFT);
 
     // When: running the dry-run with no explicit genre
     const out = await run(tools.historian_migrate, { path: PATH });
@@ -957,18 +1015,19 @@ describe('historian_migrate', () => {
     const expected = classifyGenre({ title: 'Alpha', body: '# Alpha\nbody' });
     expect(out.suggestedGenre).toBe(expected.genre);
     expect(out.signals).toEqual(expected.signals);
+    expect(out.missingTwin).toBe(false);
   });
 
   it('dry-run on a missing page returns a PageNotFoundError envelope', async () => {
     // Given: page does not exist in en or zh
-    const { tools, fetchCount } = makeWired({
+    const { tools, fetchCount } = makeMigrateWired({
       'singleByPath(': () => ({ errors: [{ message: 'This page does not exist.' }] }),
-    });
+    }, DRAFT);
 
     // When: running the dry-run
     const out = await run(tools.historian_migrate, { path: PATH });
 
-    // Then: structured not-found envelope; exactly one probe per locale (en, then zh)
+    // Then: structured not-found envelope; exactly one probe per locale (en, then zh); no LLM call
     expect(out.ok).toBe(false);
     expect(out.errorKind).toBe('PageNotFoundError');
     expect(fetchCount()).toBe(2);

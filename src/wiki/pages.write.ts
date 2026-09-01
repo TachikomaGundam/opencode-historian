@@ -134,6 +134,12 @@ interface MutableState {
   readonly editor: string;
 }
 
+/** Full mutable state of one page (single(id)) — exported for the migrate
+ *  engine (todo 14), whose pre-image backup must capture publishStartDate/
+ *  publishEndDate alongside the readPage fields (the pilot restore replays
+ *  the backup through updatePage; RMW needs the write-side field contract). */
+export type { MutableState };
+
 function mapState(raw: RawMutablePageShape): MutableState {
   return {
     id: num(raw.id),
@@ -153,7 +159,10 @@ function mapState(raw: RawMutablePageShape): MutableState {
   };
 }
 
-async function readState(client: GqlClient, id: number): Promise<MutableState> {
+/** Read the full mutable state of one page by id (threshold for the
+ *  read-modify-write in updatePage; also the migrate engine's pre-image
+ *  source — see {@link MutableState}). */
+export async function readPageState(client: GqlClient, id: number): Promise<MutableState> {
   try {
     const data = await gql<{ pages: { single: RawMutablePageShape | null } }>(client, SINGLE_QUERY, { id });
     if (data.pages.single === null) throw new PageNotFoundError(`page ${id} does not exist`);
@@ -224,7 +233,7 @@ export async function createPage(deps: PageDeps, input: CreateInput): Promise<Cr
 /** Full read-modify-write: the mutation payload ALWAYS carries every mutable
  *  field from the read, merged with the patch (pitfalls #1 + #2). */
 export async function updatePage(deps: PageDeps, id: number, patch: UpdatePatch): Promise<UpdateResult> {
-  const current = await readState(deps.client, id);
+  const current = await readPageState(deps.client, id);
   const vars = {
     id,
     path: current.path,

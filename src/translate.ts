@@ -150,11 +150,69 @@ export interface TranslateDeps {
   readonly glossary?: Record<string, string>;
 }
 
-export function makeTranslator(opts: HistorianOptions, deps?: TranslateDeps): TranslateFn {
+/** One raw Anthropic-compatible messages call: caller-supplied system + user
+ *  prompt, shared URL/auth/timeout/error-taxonomy with the translation engine.
+ *  The migrate reformatter (todo 14) reuses this path with its own prompt; a
+ *  reformat call is never chunked (a restyle must see the whole page). */
+export interface MessagesCall {
+  readonly system: string;
+  readonly user: string;
+  readonly maxTokens?: number;
+}
+
+export async function callMessages(
+  opts: HistorianOptions,
+  deps: TranslateDeps | undefined,
+  call: MessagesCall,
+): Promise<string> {
   const url = normalizeMessagesUrl(opts.translate.endpoint);
   const key = opts.translate.apiKey;
   const fetchImpl = deps?.fetchImpl ?? fetch;
   const timeoutMs = deps?.timeoutMs ?? DEFAULT_TRANSLATE_TIMEOUT_MS;
+  const maxTokens = call.maxTokens ?? LONG_MAX_TOKENS;
+  let res: Response;
+  try {
+    res = await fetchImpl(url, {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': ANTHROPIC_VERSION,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: opts.translate.model,
+        max_tokens: maxTokens,
+        system: call.system,
+        messages: [{ role: 'user', content: call.user }],
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (err) {
+    if (isAbortError(err)) {
+      throw new TranslateError('timeout', `request to ${url} timed out after ${timeoutMs}ms`);
+    }
+    throw new TranslateError(
+      'network',
+      `request to ${url} failed: ${redact(err instanceof Error ? err.message : String(err), key)}`,
+    );
+  }
+  const rawBody = redact(await readTextSafely(res), key);
+  if (res.status < 200 || res.status >= 300) {
+    throw new TranslateError('http', `HTTP ${res.status} from ${url}: ${snippetOf(rawBody)}`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawBody);
+  } catch {
+    throw new TranslateError('malformed', `non-json response from ${url}: ${snippetOf(rawBody)}`);
+  }
+  if (isRecord(parsed) && parsed.stop_reason === 'max_tokens') {
+    throw new TranslateError('truncated', `response stop_reason 'max_tokens' from ${url}`);
+  }
+  return pickResponseText(parsed);
+}
+
+export function makeTranslator(opts: HistorianOptions, deps?: TranslateDeps): TranslateFn {
   const glossary = deps?.glossary;
 
   return async (text, from, to): Promise<string> => {
@@ -168,46 +226,11 @@ export function makeTranslator(opts: HistorianOptions, deps?: TranslateDeps): Tr
 
   async function translateChunk(chunk: string, from: Locale, to: Locale): Promise<string> {
     const maxTokens = chunk.length < SHORT_TEXT_CHARS ? SHORT_MAX_TOKENS : LONG_MAX_TOKENS;
-    let res: Response;
-    try {
-      res = await fetchImpl(url, {
-        method: 'POST',
-        headers: {
-          'x-api-key': key,
-          'anthropic-version': ANTHROPIC_VERSION,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: opts.translate.model,
-          max_tokens: maxTokens,
-          system: buildSystemPrompt(from, to, glossary),
-          messages: [{ role: 'user', content: chunk }],
-        }),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-    } catch (err) {
-      if (isAbortError(err)) {
-        throw new TranslateError('timeout', `request to ${url} timed out after ${timeoutMs}ms`);
-      }
-      throw new TranslateError(
-        'network',
-        `request to ${url} failed: ${redact(err instanceof Error ? err.message : String(err), key)}`,
-      );
-    }
-    const rawBody = redact(await readTextSafely(res), key);
-    if (res.status < 200 || res.status >= 300) {
-      throw new TranslateError('http', `HTTP ${res.status} from ${url}: ${snippetOf(rawBody)}`);
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(rawBody);
-    } catch {
-      throw new TranslateError('malformed', `non-json response from ${url}: ${snippetOf(rawBody)}`);
-    }
-    if (isRecord(parsed) && parsed.stop_reason === 'max_tokens') {
-      throw new TranslateError('truncated', `response stop_reason 'max_tokens' from ${url}`);
-    }
-    return pickResponseText(parsed);
+    return callMessages(opts, deps, {
+      system: buildSystemPrompt(from, to, glossary),
+      user: chunk,
+      maxTokens,
+    });
   }
 }
 

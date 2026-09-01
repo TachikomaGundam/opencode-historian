@@ -4,9 +4,9 @@
  * JSON envelope helpers and the error → envelope mapping.
  *
  * The tools layer is a thin adapter: all wiki logic lives in the engine
- * modules (src/wiki/*, src/map.ts, src/templates/*, src/translate.ts) and is
- * reused verbatim — no business logic is duplicated here; migrate's apply
- * path is deliberately a stub (todo 14 owns it).
+ * modules (src/wiki/*, src/map.ts, src/templates/*, src/translate.ts,
+ * src/migrate*.ts) and is reused verbatim — no business logic is duplicated
+ * here.
  */
 
 import type { ToolResult } from '@opencode-ai/plugin';
@@ -24,6 +24,8 @@ export interface ToolDeps {
   readonly getClient: () => GqlClient;
   readonly options: HistorianOptions;
   readonly translate?: TranslateFn;
+  readonly fetchImpl?: typeof fetch;
+  readonly resultsDir?: string;
   readonly homeDir: string;
 }
 
@@ -79,18 +81,6 @@ export function confirmRequiredJson(toolName: string, got: unknown): ToolResult 
     errorKind: 'ConfirmRequiredError',
     message: `${toolName} requires confirm:"yes" (got ${JSON.stringify(got)})`,
     actionableHint: 'Re-run the tool with confirm:"yes" to acknowledge the destructive action.',
-  });
-}
-
-/** migrate apply: owned by todo 14 — the stub refuses before any fetch. */
-export function notImplementedJson(feature: string, note: string): ToolResult {
-  return dump({
-    ok: false,
-    error: 'not-implemented',
-    errorKind: 'NotImplementedError',
-    message: `${feature} is not implemented in this release`,
-    note,
-    actionableHint: 'Use the dry-run mode; the apply path is owned by a later release.',
   });
 }
 

@@ -1,14 +1,16 @@
 /**
  * historian_delete + historian_move + historian_migrate: destructive ops are
- * gated on confirm:"yes" BEFORE any fetch; migrate is a dry-run stub in this
- * release — apply is owned by todo 14 (the return shape is designed so the
- * apply path can grow in place without a schema change).
+ * gated on confirm:"yes" BEFORE any fetch; migrate runs the todo-14 engine —
+ * dry-run (LLM restyle + deterministic checklist, no writes) or apply
+ * (pre-image backup first, per-locale upsert, checkpoint, verification).
  */
 
 import { tool, type ToolDefinition } from '@opencode-ai/plugin';
-import { deletePage, movePage, PageNotFoundError, readPage } from '../wiki/pages.js';
-import { classifyGenre, selfReviewChecklist } from '../templates/genres.js';
-import { confirmRequiredJson, errEnvelope, notImplementedJson, okJson, reportUrls, urlPair, URL_MANDATE, pageDeps, type ToolDeps } from './shared.js';
+import { deletePage, movePage } from '../wiki/pages.js';
+import { selfReviewChecklist } from '../templates/genres.js';
+import { confirmRequiredJson, errEnvelope, okJson, urlPair, URL_MANDATE, pageDeps, type ToolDeps } from './shared.js';
+import { reformatPageDraft } from '../migrate.js';
+import { applyMigration } from '../migrate-apply.js';
 
 const s = tool.schema;
 
@@ -91,47 +93,74 @@ export function makeMoveTool(deps: ToolDeps): ToolDefinition {
 const MIGRATE_ARGS = {
   path: s.string(),
   genre: s.enum(GENRES).optional().describe('Explicit genre; absent → engine classification of the page content'),
-  apply: s.boolean().default(false).describe('apply is NOT implemented in this release — refused before any fetch'),
+  apply: s.boolean().default(false).describe('true → apply the migration: pre-image backup first, per-locale upsert, checkpoint'),
 } as const;
 
 const MigrateArgsSchema = s.object(MIGRATE_ARGS);
 
 // --- historian_migrate -------------------------------------------------------
 
+/** MigrateDeps built from the tool deps; the engine reaches the LLM through
+ *  the injected fetchImpl (mocked in tests, real fetch in production). */
+function migrateDeps(deps: ToolDeps) {
+  return {
+    client: deps.getClient(),
+    options: deps.options,
+    translate: deps.translate,
+    fetchImpl: deps.fetchImpl,
+    homeDir: deps.homeDir,
+    resultsDir: deps.resultsDir,
+  };
+}
+
 export function makeMigrateTool(deps: ToolDeps): ToolDefinition {
   return tool({
     description:
-      `Migration DRY-RUN for a legacy page: reads the page (en, or zh fallback), suggests a genre ` +
-      `(explicit arg wins, else engine classification) and previews the 10-item self-review checklist. ` +
-      `Nothing is written — apply is owned by a later release. ${URL_MANDATE}.`,
+      `Migration of a legacy page into a genre skeleton: reads the page (en, or zh fallback), ` +
+      `reformats it via the LLM to the suggested genre (explicit arg wins, else engine classification) ` +
+      `and scores the 10-item self-review checklist on the DRAFT. Dry-run writes nothing. ` +
+      `apply=true persists: pre-image backup FIRST (results/pilot-backup-<section>-<date>.json), then ` +
+      `a per-locale upsert (missing twin auto-created via the translation engine) and a path-level ` +
+      `checkpoint (re-apply of unchanged content is a no-op). ${URL_MANDATE}.`,
     args: MIGRATE_ARGS,
     execute: async (raw) => {
       const args = MigrateArgsSchema.parse(raw);
-      if (args.apply) {
-        return notImplementedJson('migrate apply', 'todo 14 owns apply');
-      }
-      try {
-        const en = await readPage(deps.getClient(), args.path, 'en');
-        const page = en ?? (await readPage(deps.getClient(), args.path, 'zh'));
-        if (page === null) {
-          return errEnvelope(new PageNotFoundError(`page '${args.path}' does not exist (checked en and zh locales)`));
-        }
-        const classified = classifyGenre({ title: page.title, body: page.content });
-        const suggestedGenre = args.genre ?? classified.genre;
+      const engine = migrateDeps(deps);
+      const dry = await reformatPageDraft(engine, { path: args.path, genre: args.genre });
+      if (!dry.ok) return errEnvelope(dry.error);
+      if (!args.apply) {
         return okJson({
           mode: 'dry-run',
-          path: page.path,
-          locale: page.locale,
-          suggestedGenre,
-          confidence: args.genre !== undefined ? 'explicit' : classified.confidence,
-          signals: args.genre !== undefined ? [] : classified.signals,
-          content: page.content,
-          checklist: selfReviewChecklist(suggestedGenre),
-          urls: reportUrls(deps.options.baseUrl, page.path, page.locale),
+          path: args.path,
+          locale: dry.sourceLocale,
+          suggestedGenre: dry.genre,
+          genre: dry.genre,
+          confidence: dry.confidence,
+          signals: dry.signals,
+          content: dry.sourceContent,
+          draft: dry.draft,
+          alreadyConforms: dry.alreadyConforms,
+          missingTwin: dry.missingTwin,
+          checklist: selfReviewChecklist(dry.genre),
+          checklistResults: dry.checklistResults,
+          urls: dry.urls,
         });
-      } catch (err) {
-        return errEnvelope(err);
       }
+      const out = await applyMigration(engine, { path: args.path, genre: dry.genre, draft: dry.draft });
+      if (!out.ok) return errEnvelope(out.error);
+      return okJson({
+        mode: 'apply',
+        path: args.path,
+        genre: dry.genre,
+        alreadyConforms: dry.alreadyConforms,
+        applied: out.applied,
+        backupPath: out.backupPath,
+        skipped: out.skipped,
+        urls: dry.urls,
+        note:
+          `Pre-image backed up at ${out.backupPath}; restore = replay that file (historian_page_update ` +
+          `with its fields, historian_delete for locales recorded null) or the wiki.js history view.`,
+      });
     },
   });
 }
