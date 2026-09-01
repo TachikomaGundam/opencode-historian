@@ -1,0 +1,210 @@
+/**
+ * Configuration model for the opencode-historian plugin.
+ *
+ * The plugin keeps a zero-runtime-dependency surface: no zod, no bun, only
+ * node builtins. Secrets are resolved from explicit sources (raw plugin
+ * options, env vars, the machine's opencode.jsonc) and never from the network.
+ *
+ * Home directory and env are injectable parameters on every resolver so unit
+ * tests drive fixtures in tmp dirs — the real ~/.config is never touched by
+ * the suite (see test/config.test.ts).
+ */
+
+import { homedir } from 'node:os';
+import { readFileSync } from 'node:fs';
+import { parseJsonc, isRecord } from './jsonc.js';
+import { ConfigError } from './jsonc.js';
+
+// Contract re-exports: consumers (client.ts, translate.ts) import these from
+// './config.js'.
+export { ConfigError } from './jsonc.js';
+export type { ConfigErrorCode } from './jsonc.js';
+
+// --- Public types -----------------------------------------------------------
+
+/** Fully resolved plugin options. All fields are non-optional; = what the
+ *  rest of the plugin (client, translate engine) consumes. */
+export interface HistorianOptions {
+  readonly baseUrl: string;
+  /** Raw path; may contain a leading `~`, which `readWikiApiKey` expands at
+   *  read time (the key file is not read during option resolution). */
+  readonly apiKeyPath: string;
+  readonly translate: Readonly<{
+    readonly endpoint: string;
+    readonly model: string;
+    readonly apiKey: string;
+  }>;
+  readonly sections: readonly string[];
+  readonly locales: readonly string[];
+}
+
+/** Raw, user-supplied plugin options (the opencode PluginOptions shape).
+ *  Every field optional — unresolved fields fall back to defaults / env. */
+export interface HistorianPluginOptions {
+  readonly baseUrl?: string;
+  readonly apiKeyPath?: string;
+  readonly translate?: Readonly<{
+    readonly endpoint?: string;
+    readonly model?: string;
+    readonly apiKey?: string;
+  }>;
+  readonly sections?: readonly string[];
+  readonly locales?: readonly string[];
+}
+
+// --- Defaults (single source of truth for the plan's contract) --------------
+
+export const DEFAULT_BASE_URL = 'http://localhost:3000';
+export const DEFAULT_API_KEY_PATH = '~/.wikijs-api-key';
+export const DEFAULT_TRANSLATE_ENDPOINT =
+  'https://gateway.example.net/apps/anthropic';
+export const DEFAULT_TRANSLATE_MODEL = 'qwen3.7-plus';
+export const DEFAULT_SECTIONS = [
+  'ops',
+  'inference-notes',
+  'llm-server',
+  'perf-notes',
+  'opencode',
+  'agent-eval',
+  'troubleshooting',
+  'scratch',
+  '_sandbox',
+] as const;
+export const DEFAULT_LOCALES = ['en', 'zh'] as const;
+
+// --- Resolution -------------------------------------------------------------
+
+/**
+ * Resolve raw plugin options against defaults, env vars and the machine's
+ * `~/.config/opencode/opencode.jsonc` into a fully typed HistorianOptions.
+ *
+ * Translation key priority (highest wins):
+ *   1. raw.translate.apiKey
+ *   2. env DASHSCOPE_API_KEY
+ *   3. jsonc provider["my-provider"].options.apiKey
+ *   4. throw ConfigError('missing translation key')
+ *
+ * There is deliberately NO anthropic fallback leg (removed by plan — the
+ * machine has no such provider; the only live key for the default endpoint
+ * lives under my-provider).
+ */
+export function resolveOptions(
+  raw: Partial<HistorianPluginOptions>,
+  env: NodeJS.ProcessEnv = process.env,
+  homeDir: string = homedir(),
+): HistorianOptions {
+  const translateApiKey = resolveTranslationApiKey(raw, env, homeDir);
+  return {
+    baseUrl: raw.baseUrl ?? DEFAULT_BASE_URL,
+    apiKeyPath: raw.apiKeyPath ?? DEFAULT_API_KEY_PATH,
+    translate: {
+      endpoint: raw.translate?.endpoint ?? DEFAULT_TRANSLATE_ENDPOINT,
+      model: raw.translate?.model ?? DEFAULT_TRANSLATE_MODEL,
+      apiKey: translateApiKey,
+    },
+    sections: raw.sections ?? DEFAULT_SECTIONS,
+    locales: raw.locales ?? DEFAULT_LOCALES,
+  };
+}
+
+function resolveTranslationApiKey(
+  raw: Partial<HistorianPluginOptions>,
+  env: NodeJS.ProcessEnv,
+  homeDir: string,
+): string {
+  const rawKey = raw.translate?.apiKey;
+  if (isNonEmpty(rawKey)) return rawKey;
+
+  const envKey = env.DASHSCOPE_API_KEY;
+  if (isNonEmpty(envKey)) return envKey;
+
+  const jsoncKey = readBailianApiKeyFromJsonc(homeDir);
+  if (isNonEmpty(jsoncKey)) return jsoncKey;
+
+  throw new ConfigError(
+    'missing-translation-key',
+    'Missing translation api key: set plugin option translate.apiKey, ' +
+      'export DASHSCOPE_API_KEY, or add provider["my-provider"].options.apiKey ' +
+      `to ${opencodeJsoncPath(homeDir)}.`,
+  );
+}
+
+/**
+ * Read the wiki.js api key. Priority: key file (path from options.apiKeyPath,
+ * `~` expanded) first; env WIKIJS_API_KEY as fallback; ConfigError otherwise.
+ * The key file content is trimmed (a trailing newline is common).
+ */
+export function readWikiApiKey(
+  options: HistorianOptions,
+  env: NodeJS.ProcessEnv = process.env,
+  homeDir: string = homedir(),
+): string {
+  const expandedPath = expandHome(options.apiKeyPath, homeDir);
+  let fileKey: string | undefined;
+  try {
+    fileKey = readFileSync(expandedPath, 'utf8').trim();
+  } catch {
+    fileKey = undefined; // fall through to env leg; the thrown error names the path
+  }
+  if (isNonEmpty(fileKey)) return fileKey;
+
+  const envKey = env.WIKIJS_API_KEY;
+  if (isNonEmpty(envKey)) return envKey;
+
+  throw new ConfigError(
+    'missing-wiki-api-key',
+    `Missing wiki.js api key: create '${expandedPath}' containing the token ` +
+      '(one line, trimmed on read) or export WIKIJS_API_KEY.',
+  );
+}
+
+// --- jsonc source leg -------------------------------------------------------
+
+function opencodeJsoncPath(homeDir: string): string {
+  return `${homeDir}/.config/opencode/opencode.jsonc`;
+}
+
+/** Read provider["my-provider"].options.apiKey from the machine config.
+ *  Missing file or missing key -> undefined (a later leg decides); malformed
+ *  file -> ConfigError. Commented-out apiKey lines never survive stripping. */
+function readBailianApiKeyFromJsonc(homeDir: string): string | undefined {
+  const path = opencodeJsoncPath(homeDir);
+  let content: string;
+  try {
+    content = readFileSync(path, 'utf8');
+  } catch {
+    return undefined; // no config file -> simply not a key source
+  }
+
+  const parsed: unknown = parseJsonc(content, path);
+  if (!isRecord(parsed)) {
+    throw new ConfigError(
+      'invalid-jsonc',
+      `Invalid opencode config '${path}': top-level value must be a JSON object.`,
+    );
+  }
+
+  const provider = parsed.provider;
+  if (!isRecord(provider)) return undefined; // no providers at all -> not a key source
+  const provider-x = provider['my-provider'];
+  if (!isRecord(provider-x)) return undefined;
+  const options = provider-x.options;
+  if (!isRecord(options)) return undefined;
+  const apiKey = options.apiKey;
+
+  return typeof apiKey === 'string' && apiKey.trim() !== '' ? apiKey : undefined;
+}
+
+// --- small helpers ----------------------------------------------------------
+
+function isNonEmpty(value: string | undefined): value is string {
+  return value !== undefined && value.trim() !== '';
+}
+
+/** Expand a leading `~` in a path against homeDir. Only `~` and `~/...` are
+ *  supported (no `~user` forms). */
+function expandHome(p: string, homeDir: string): string {
+  if (p === '~') return homeDir;
+  if (p.startsWith('~/')) return `${homeDir}/${p.slice(2)}`;
+  return p;
+}
