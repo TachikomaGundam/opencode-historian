@@ -204,6 +204,38 @@ describe('gql payload layer (wiki.js responseResult convention, pitfall #3)', ()
     expectNoKeyLeak(err);
   });
 
+  it('maps errorCode not.authorized with empty message to PermissionError via pattern on errorCode', async () => {
+    // Given: wiki.js returns `not.authorized` as errorCode with no human message.
+    // The canonical fixup matches the errorCode via the PERMISSION_PATTERN —
+    // a buggy implementation relying only on the message leg would throw
+    // WikiError instead of PermissionError here.
+    const body = {
+      data: {
+        pages: {
+          create: {
+            responseResult: {
+              succeeded: false,
+              errorCode: 'not.authorized',
+              slug: 'x',
+              message: '',
+            },
+          },
+        },
+      },
+    };
+    const { client } = makeClient(() => Promise.resolve(jsonResponse(body)));
+    // When
+    const err = await catchError(gql(client, 'query { x }', {}));
+    // Then
+    expect(err).toBeInstanceOf(PermissionError);
+    expect(err).toBeInstanceOf(WikiError);
+    expect((err as PermissionError).errorCode).toBe('not.authorized');
+    expect((err as PermissionError).slug).toBe('x');
+    // The fallback message must name the errorCode (wiki.js gave us no text).
+    expect(err.message).toContain('not.authorized');
+    expectNoKeyLeak(err);
+  });
+
   it('also detects the flat `data.<root>.responseResult` wrapper shape', async () => {
     // Given
     const body = {
