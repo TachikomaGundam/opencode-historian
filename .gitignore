@@ -4,4 +4,6 @@ dist/
 !.qa/.gitkeep
 
 # todo 14: pre-image backup files (restore program of record) live here
-results/
+results/*
+!results/pilot-*.md
+!results/pilot-backup-*.json
