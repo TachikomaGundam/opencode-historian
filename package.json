@@ -1,0 +1,36 @@
+{
+  "name": "opencode-historian",
+  "version": "0.1.0",
+  "description": "opencode plugin that manages a wiki.js knowledge base with bilingual pages, genre templates, and migration tooling.",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "skills",
+    "scripts"
+  ],
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4",
+    "zod": "^3.23.8"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  }
+}
