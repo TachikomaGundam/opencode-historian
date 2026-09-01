@@ -117,7 +117,7 @@ export function createClient(
 
 // --- Helpers ----------------------------------------------------------------
 
-const PERMISSION_PATTERN = /permission|forbidden|denied|unauthorized|access/i;
+const PERMISSION_PATTERN = /permission|forbidden|denied|unauthorized|not\.authorized|access/i;
 
 function isAbortError(err: unknown): boolean {
   return (
