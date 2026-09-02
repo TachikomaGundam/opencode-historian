@@ -2,14 +2,14 @@
 /**
  * Pilot migration driver (plan todo 15). Staged, resumable, auditable:
  *
- *   node scripts/pilot-run.mjs select              # live inventory + candidate scoring (read-only)
- *   node scripts/pilot-run.mjs before              # snapshot .qa/before-map.json, open window
- *   node scripts/pilot-run.mjs page <path> [--force]  # ≤3-round draft loop (read-only)
- *   node scripts/pilot-run.mjs apply <path>        # backup-first upsert + post-apply verify
- *   node scripts/pilot-run.mjs after               # refreshMapCache + snapshot .qa/after-map.json
- *   node scripts/pilot-run.mjs diff                # .qa/15-diff.txt + assertions (a)(b)(c)
- *   node scripts/pilot-run.mjs report              # results/pilot-<section>-<date>.md
- *   node scripts/pilot-run.mjs status              # current state summary
+ *   node tools/pilot-run.mjs select              # live inventory + candidate scoring (read-only)
+ *   node tools/pilot-run.mjs before              # snapshot .qa/before-map.json, open window
+ *   node tools/pilot-run.mjs page <path> [--force]  # ≤3-round draft loop (read-only)
+ *   node tools/pilot-run.mjs apply <path>        # backup-first upsert + post-apply verify
+ *   node tools/pilot-run.mjs after               # refreshMapCache + snapshot .qa/after-map.json
+ *   node tools/pilot-run.mjs diff                # .qa/15-diff.txt + assertions (a)(b)(c)
+ *   node tools/pilot-run.mjs report              # results/pilot-<section>-<date>.md
+ *   node tools/pilot-run.mjs status              # current state summary
  *
  * All engine calls go through the SHIPPED dist build (npm run build first).
  * Every wiki mutation and every LLM call is appended to .qa/15.txt with the
