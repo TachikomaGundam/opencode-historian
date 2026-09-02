@@ -15,7 +15,8 @@ opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具�
 
 ## 仓库 / Repository
 
-<https://github.com/TachikomaGundam/opencode-historian>
+源代码仓库由维护者自管；本包的公开分发渠道是 npm registry（`opencode-wiki-historian`）。
+Source repository is managed by the maintainer; the public distribution channel for this package is the npm registry (`opencode-wiki-historian`).
 
 ## 安装 / Installation
 
@@ -70,10 +71,10 @@ opencode run --command historian --message "historian_map show"
       "baseUrl": "http://your-wiki:3000",
       "apiKeyPath": "~/.wikijs-api-key",
       "translate": {
-        "endpoint": "https://your-gateway.example.com/apps/anthropic",
+        "endpoint": "https://<your-anthropic-compatible-gateway>/v1",
         "model": "qwen3.7-plus",
         "apiKey": "<YOUR_KEY>",
-        "providerKey": "your-jsonc-provider"
+        "providerKey": "my-provider"
       },
       "sections": ["team-notes", "infra"],
       "locales": ["en", "zh"]
@@ -93,7 +94,7 @@ opencode run --command historian --message "historian_map show"
 | `translate.endpoint` | string | 未配置（见下方链） | 翻译 API 端点 |
 | `translate.model` | string | `qwen3.7-plus` | 翻译模型 |
 | `translate.apiKey` | string | 见下方链 | 翻译 API 密钥 |
-| `translate.providerKey` | string | `my-provider`（示例兼容值） | jsonc 兜底腿读取的 provider 名 |
+| `translate.providerKey` | string | 未配置 | jsonc 兜底腿读取的 provider 名；须显式设置才会启用该腿 |
 | `sections` | string[] | `[]`（不限制） | 插件可操作的 wiki 路径前缀白名单 |
 | `locales` | string[] | `["en", "zh"]` | 启用的语言列表 |
 
@@ -107,7 +108,7 @@ opencode run --command historian --message "historian_map show"
 
 1. 配置对象中的 `translate.apiKey` 字段
 2. 环境变量 `DASHSCOPE_API_KEY`
-3. opencode jsonc 配置中 `provider["<translate.providerKey>"].options.apiKey`（默认 providerKey 为 `my-provider`，可按部署改配）
+3. opencode jsonc 配置中 `provider["<translate.providerKey>"].options.apiKey`（仅当显式设置 `translate.providerKey` 时读取；包内不内置默认 provider 名）
 4. 均无则抛出 `ConfigError('missing-translation-key')`
 
 **wiki.js API key**，按优先级：
@@ -291,11 +292,11 @@ harness repo（与本插件仓库同工作区）提供 7 个行为验收场景�
 
 ```bash
 npm run build       # tsc 编译到 dist/
-npm test            # vitest run（272 tests, 13 files）
+npm test            # vitest run（280 tests, 13 files）
 npm pack --dry-run  # 检查打包文件列表
 ```
 
-打包文件（`files` 字段）：`dist`、`skills`、`scripts`。加上 npm 自动包含的 `README.md` 和 `LICENSE`。
+打包文件（`files` 字段）：`dist`、`skills`。加上 npm 自动包含的 `README.md` 和 `LICENSE`。`tools/`（pilot-run、finish-publish、install-skill）为仓库开发工具，不随包分发。
 
 ## 许可证
 
