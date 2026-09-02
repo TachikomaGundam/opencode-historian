@@ -1,8 +1,8 @@
 /**
- * Page-genre system: bilingual G1–G4 templates, deterministic genre
+ * Page-genre system: bilingual G1–G5 templates, deterministic genre
  * classification, and the 10-item self-review gate (plan todo 9).
  *
- * The four genres (digest "Genre templates", cross-cultural-wiki-writing):
+ * The five genres (digest "Genre templates", cross-cultural-wiki-writing):
  *   G1 事件/复盘页  — incident postmortem (summary → metadata → background →
  *                    timeline → impact → root cause → remediation → action
  *                    items → lessons → appendix)
@@ -14,6 +14,10 @@
  *   G4 概念/原理页  — concept / explanation (definition+rationale →
  *                    importance-ordered aspects → how it works →
  *                    attribution/opinion)
+ *   G5 现状卡/账本页 — current-state ledger (status block → deployed
+ *                    components table with per-row last-verified dates →
+ *                    integration → invalidation policy → agent-executable
+ *                    verification commands → append-only change log)
  *
  * Every skeleton embeds the harness rubric dimension-C anatomy (status block,
  * one-line scope, Related Pages tail) and wiki.js expression pieces only —
@@ -30,6 +34,8 @@ import {
   G3_ZH,
   G4_EN,
   G4_ZH,
+  G5_EN,
+  G5_ZH,
 } from './skeletons.js';
 
 // Contract re-exports: raw skeleton data stays reachable through the barrel
@@ -43,15 +49,17 @@ export {
   G3_ZH,
   G4_EN,
   G4_ZH,
+  G5_EN,
+  G5_ZH,
 } from './skeletons.js';
 
 // --- Public types -----------------------------------------------------------
 
-export type Genre = 'G1' | 'G2' | 'G3' | 'G4';
+export type Genre = 'G1' | 'G2' | 'G3' | 'G4' | 'G5';
 export type GenreLang = 'en' | 'zh';
 export type Confidence = 'high' | 'medium' | 'low';
 
-export const GENRES: readonly Genre[] = ['G1', 'G2', 'G3', 'G4'];
+export const GENRES: readonly Genre[] = ['G1', 'G2', 'G3', 'G4', 'G5'];
 
 export interface ClassifyInput {
   readonly title: string;
@@ -83,6 +91,7 @@ const SKELETONS: Readonly<Record<Genre, Readonly<Record<GenreLang, string>>>> = 
   G2: { en: G2_EN, zh: G2_ZH },
   G3: { en: G3_EN, zh: G3_ZH },
   G4: { en: G4_EN, zh: G4_ZH },
+  G5: { en: G5_EN, zh: G5_ZH },
 };
 
 /** Full markdown skeleton for a genre × language pair. Pure string data —
@@ -108,6 +117,9 @@ const GENRE_KEYWORDS: Readonly<Record<Genre, readonly string[]>> = {
   G2: ['对比', '选型', 'vs', 'versus', 'compare', 'benchmark', 'alternatives'],
   G3: ['清单', '列表', 'inventory', 'checklist', 'catalog', '命令速查'],
   G4: ['原理', '为什么', 'how it works', '概念', '机制'],
+  // Deployed-state cues only — bare 部署/版本 would collide with G3 "部署清单"
+  // and general changelog talk, regressing existing corpus classifications.
+  G5: ['现状卡', '当前状态', '已部署', '部署物', '现役', '上线', '端口', '上次核实', '失效策略', '验证命令', 'current state', 'deployed', 'last verified', 'running now'],
 };
 
 function escapeRegex(s: string): string {
@@ -182,18 +194,43 @@ export function classifyGenre(input: ClassifyInput): ClassifyResult {
  *  - content items (1–3, 7, 8)     — scored on the rewritten draft (dry-run);
  *  - genre-specific items (4–6)    — N/A=PASS when the page's genre is not in
  *    appliesTo (G2 pages only have a source column; only G1 pages have
- *    timeline sources and the action-item five essentials);
+ *    timeline sources and the action-item five essentials; G5 pages swap in
+ *    the ledger variants: per-row last-verified, verification commands, no
+ *    narrative prose);
  *  - post-write items (9, 10)      — scored after apply + written into the
  *    pilot report (never scored pre-write, where they are FAIL by
  *    construction).
  * `genre` is validated (unknown values throw) so callers cannot silently
  * score against a partial gate.
  */
+/** G5 swaps the genre-specific items 4–6 for ledger gates; everything else
+ *  (1–3, 7–10) is shared with the base gate. */
+const G5_CHECKLIST_VARIANTS: Readonly<Record<number, ChecklistItem>> = {
+  4: {
+    id: 4,
+    label: '部署物清单每行带「上次核实于/Last verified」列，缺日期即过期（ledger component rows carry a last-verified date）',
+    kind: 'genre-specific',
+    appliesTo: ['G5'],
+  },
+  5: {
+    id: 5,
+    label: '验证方法节存在：每个组件对应一条 agent 可直接执行的复核命令（verification section: an executable re-check command per component）',
+    kind: 'genre-specific',
+    appliesTo: ['G5'],
+  },
+  6: {
+    id: 6,
+    label: '无叙事正文：现状卡 = 状态块 + 表格，叙述历史链向 G1 事件页（table+status page: no narrative prose bodies; history links to G1 pages）',
+    kind: 'genre-specific',
+    appliesTo: ['G5'],
+  },
+};
+
 export function selfReviewChecklist(genre: Genre): readonly ChecklistItem[] {
   if (!GENRES.includes(genre)) {
     throw new Error(`unknown genre: ${genre}`);
   }
-  return [
+  const items: readonly ChecklistItem[] = [
     {
       id: 1,
       label: '导言占比 10–15%：导言 ≈ 正文的 10–15%，每个重要小节在导言至少占一句（lead ≈10–15% of body; every major section ≥1 sentence in lead）',
@@ -255,4 +292,8 @@ export function selfReviewChecklist(genre: Genre): readonly ChecklistItem[] {
       appliesTo: 'all',
     },
   ];
+  if (genre === 'G5') {
+    return items.map((item) => G5_CHECKLIST_VARIANTS[item.id] ?? item);
+  }
+  return items;
 }
