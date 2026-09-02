@@ -251,3 +251,4 @@ export async function getMap(deps: MapDeps, homeDir?: string): Promise<MapSnapsh
     : Math.max(0, Math.floor((Date.now() - parsed) / 1000));
   return { rows: mirror.rows, stats: mirror.stats, generatedAt: mirror.generatedAt, staleSeconds };
 }
+
