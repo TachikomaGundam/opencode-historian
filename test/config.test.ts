@@ -190,7 +190,15 @@ describe('resolveOptions defaults', () => {
     expect(opts.translate.providerKey).toBe(''); // opt-in only: no default provider
     expect(opts.sections).toEqual([]);
     expect(opts.locales).toEqual(['en', 'zh']);
+    expect(opts.readingLoop).toBe(true);
     void opts satisfies HistorianOptions;
+  });
+
+  it('readingLoop defaults true and honors an explicit false', () => {
+    const on = resolveOptions({ translate: { apiKey: 'sk-env' } }, NO_ENV, makeHomeDir());
+    expect(on.readingLoop).toBe(true);
+    const off = resolveOptions({ readingLoop: false, translate: { apiKey: 'sk-env' } }, NO_ENV, makeHomeDir());
+    expect(off.readingLoop).toBe(false);
   });
 
   it('resolves translate.endpoint from env HISTORIAN_TRANSLATE_ENDPOINT when raw option is absent', () => {

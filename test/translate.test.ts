@@ -27,6 +27,7 @@ const OPTS: HistorianOptions = {
   },
   sections: ['_sandbox'],
   locales: ['en', 'zh'],
+  readingLoop: true,
 };
 
 function jsonResponse(body: unknown, status = 200): Response {
