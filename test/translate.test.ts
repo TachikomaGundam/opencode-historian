@@ -28,6 +28,7 @@ const OPTS: HistorianOptions = {
   sections: ['_sandbox'],
   locales: ['en', 'zh'],
   readingLoop: true,
+  capture: { enabled: false },
 };
 
 function jsonResponse(body: unknown, status = 200): Response {
