@@ -20,9 +20,10 @@ const OPTS: HistorianOptions = {
   baseUrl: 'http://localhost:3000',
   apiKeyPath: '~/.wikijs-api-key',
   translate: {
-    endpoint: 'https://gateway.example.net/apps/anthropic',
+    endpoint: 'https://translate.example.com/apps/anthropic',
     model: 'qwen3.7-plus',
     apiKey: KEY,
+    providerKey: 'my-provider',
   },
   sections: ['_sandbox'],
   locales: ['en', 'zh'],
@@ -68,7 +69,7 @@ function okText(text: string): Response {
 
 describe('normalizeMessagesUrl', () => {
   it.each([
-    ['https://gateway.example.net/apps/anthropic', 'https://gateway.example.net/apps/anthropic/v1/messages'],
+    ['https://translate.example.com/apps/anthropic', 'https://translate.example.com/apps/anthropic/v1/messages'],
     ['https://translate.example.com', 'https://translate.example.com/v1/messages'],
     ['https://translate.example.com/', 'https://translate.example.com/v1/messages'],
     ['https://translate.example.com/apps/anthropic/v1', 'https://translate.example.com/apps/anthropic/v1'],
@@ -166,7 +167,7 @@ describe('makeTranslator', () => {
     expect(out).toBe('译文');
     expect(calls).toHaveLength(1);
     const { url, init } = calls[0];
-    expect(url).toBe('https://gateway.example.net/apps/anthropic/v1/messages');
+    expect(url).toBe('https://translate.example.com/apps/anthropic/v1/messages');
     const headers = init.headers as Record<string, string>;
     expect(headers['x-api-key']).toBe(KEY);
     expect(headers['anthropic-version']).toBe('2023-06-01');
@@ -270,5 +271,23 @@ describe('makeTranslator', () => {
     const err = await catchError(translate('hi', 'en', 'zh'));
     // Then
     expect((err as TranslateError).message).toContain('300000');
+  });
+});
+describe('unset endpoint (no baked-in gateway default)', () => {
+  it('rejects with cause config and never calls fetch when endpoint is empty', async () => {
+    // Given
+    let calls = 0;
+    const fetchImpl = (() => {
+      calls += 1;
+      return Promise.resolve(jsonResponse({ content: [{ type: 'text', text: 'x' }] }));
+    }) as unknown as typeof fetch;
+    const unconfigured: HistorianOptions = { ...OPTS, translate: { ...OPTS.translate, endpoint: '' } };
+    // When
+    const err = await catchError(makeTranslator(unconfigured, { fetchImpl })('hello', 'en', 'zh'));
+    // Then
+    expect(err).toBeInstanceOf(TranslateError);
+    expect((err as TranslateError).cause).toBe('config');
+    expect(err.message).toContain('translate.endpoint not configured');
+    expect(calls).toBe(0);
   });
 });

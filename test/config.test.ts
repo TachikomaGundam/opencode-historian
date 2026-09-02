@@ -47,7 +47,7 @@ const REALISTIC_JSONC = `{
       "npm": "@ai-sdk/anthropic",
       "name": "Alibaba Cloud Model Studio",
       "options": {
-        "baseURL": "https://gateway.example.net/apps/anthropic/v1", // https:// in this string must survive
+        "baseURL": "https://gw.example.test/apps/anthropic/v1", // https:// in this string must survive
         "note": "/* not a block comment */ // not a line comment",
         "apiKey": "sk-jsonc-live",
       },
@@ -137,36 +137,77 @@ describe('resolveOptions translation-key priority matrix', () => {
   });
 });
 
+describe('resolveOptions translate.providerKey (jsonc trust leg)', () => {
+  it('reads the apiKey from the configured provider, not the hardcoded default', () => {
+    const homeDir = makeHomeDir();
+    writeJsonc(
+      homeDir,
+      `{
+  "provider": {
+    "my-gateway": { "options": { "apiKey": "sk-my-gw" } },
+    "my-provider": { "options": { "apiKey": "sk-default-not-used" } }
+  }
+}`,
+    );
+    const opts = resolveOptions({ translate: { providerKey: 'my-gateway' } }, NO_ENV, homeDir);
+    expect(opts.translate.apiKey).toBe('sk-my-gw');
+    expect(opts.translate.providerKey).toBe('my-gateway');
+  });
+
+  it('names the configured providerKey in the missing-key error', () => {
+    const homeDir = makeHomeDir();
+    writeJsonc(
+      homeDir,
+      `{ "provider": { "my-provider": { "options": { "apiKey": "sk-x" } } } }`,
+    );
+    expect(() =>
+      resolveOptions({ translate: { providerKey: 'absent-provider' } }, NO_ENV, homeDir),
+    ).toThrow(/provider\["absent-provider"\]/);
+  });
+});
+
 describe('resolveOptions defaults', () => {
   it('lands every documented default when raw options are empty and env supplies the key', () => {
     const opts = resolveOptions({}, { DASHSCOPE_API_KEY: 'sk-env' }, makeHomeDir());
     expect(opts.baseUrl).toBe('http://localhost:3000');
     expect(opts.apiKeyPath).toBe('~/.wikijs-api-key');
-    expect(opts.translate.endpoint).toBe(
-      'https://gateway.example.net/apps/anthropic',
-    );
+    expect(opts.translate.endpoint).toBe('');
     expect(opts.translate.model).toBe('qwen3.7-plus');
-    expect(opts.sections).toEqual([
-      'ops',
-      'inference-notes',
-      'llm-server',
-      'perf-notes',
-      'opencode',
-      'agent-eval',
-      'troubleshooting',
-      'scratch',
-      '_sandbox',
-    ]);
+    expect(opts.translate.providerKey).toBe('my-provider');
+    expect(opts.sections).toEqual([]);
     expect(opts.locales).toEqual(['en', 'zh']);
     void opts satisfies HistorianOptions;
+  });
+
+  it('resolves translate.endpoint from env HISTORIAN_TRANSLATE_ENDPOINT when raw option is absent', () => {
+    const opts = resolveOptions(
+      {},
+      { DASHSCOPE_API_KEY: 'sk-env', HISTORIAN_TRANSLATE_ENDPOINT: 'http://gw.env.test/v1' },
+      makeHomeDir(),
+    );
+    expect(opts.translate.endpoint).toBe('http://gw.env.test/v1');
+  });
+
+  it('raw translate.endpoint beats env HISTORIAN_TRANSLATE_ENDPOINT', () => {
+    const opts = resolveOptions(
+      { translate: { endpoint: 'http://raw.test/v1' } },
+      { DASHSCOPE_API_KEY: 'sk-env', HISTORIAN_TRANSLATE_ENDPOINT: 'http://gw.env.test/v1' },
+      makeHomeDir(),
+    );
+    expect(opts.translate.endpoint).toBe('http://raw.test/v1');
   });
 
   it('raw overrides are reflected in the resolved options', () => {
     const raw: HistorianPluginOptions = {
       baseUrl: 'http://elsewhere:4321',
       apiKeyPath: '/opt/secrets/wiki.key',
-      translate: { endpoint: 'http://tts:9000/v1', model: 'qwen-other', apiKey: 'sk-raw' },
-      sections: ['agent-eval'],
+      translate: {
+        endpoint: 'http://tts:9000/v1',
+        model: 'qwen-other',
+        apiKey: 'sk-raw',
+        providerKey: 'my-provider',
+      },
+      sections: ['team-notes'],
       locales: ['en'],
     };
     const opts = resolveOptions(raw, NO_ENV, makeHomeDir());
@@ -174,7 +215,8 @@ describe('resolveOptions defaults', () => {
     expect(opts.apiKeyPath).toBe('/opt/secrets/wiki.key');
     expect(opts.translate.endpoint).toBe('http://tts:9000/v1');
     expect(opts.translate.model).toBe('qwen-other');
-    expect(opts.sections).toEqual(['agent-eval']);
+    expect(opts.translate.providerKey).toBe('my-provider');
+    expect(opts.sections).toEqual(['team-notes']);
     expect(opts.locales).toEqual(['en']);
   });
 });
