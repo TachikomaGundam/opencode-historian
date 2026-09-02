@@ -875,6 +875,57 @@ describe('historian_map', () => {
     expect((out.rows as Array<Record<string, unknown>>)[0].url).toBe(EN_URL);
   });
 
+  it('timeline aggregates mirror rows by ISO week with days window, prefix filter and url footer', async () => {
+    // Given: a mirror with a fresh en+zh twin pair, a stale row and an
+    // out-of-section row; fetch fails loudly, so only the mirror is read.
+    const home = makeKeyHome();
+    mkdirSync(join(home, '.config', 'opencode'), { recursive: true });
+    const now = Date.now();
+    const row = (id: number, locale: string, path: string, agoDays: number): Record<string, unknown> => ({
+      id,
+      locale,
+      path,
+      title: '502 故障复盘',
+      updatedAt: new Date(now - agoDays * 86_400_000).toISOString(),
+      url: `http://localhost:3000/en/${path}`,
+      twinUrl: null,
+      twinId: null,
+    });
+    writeFileSync(
+      join(home, '.config', 'opencode', 'historian-map.json'),
+      `${JSON.stringify({
+        generatedAt: new Date(now).toISOString(),
+        rows: [
+          row(76, 'en', PATH, 0.1),
+          row(77, 'zh', PATH, 0.2),
+          row(78, 'en', 'ops/stale', 40),
+          row(79, 'en', 'other/zone', 0.3),
+        ],
+        stats: { rows: 4, paths: 4, perLocale: { en: 3, zh: 1 }, missingTwinPaths: [] },
+      })}\n`,
+      'utf8',
+    );
+    const { tools, fetchCount } = makeWired({}, undefined, home);
+
+    // When: asking for the last day of updates in the docs section
+    const out = await run(tools.historian_map, { action: 'timeline', days: 1, path: 'docs' });
+
+    // Then: only the fresh in-section twins remain, zh+en distinct, dual form,
+    // bilingual cache urls echoed, zero network touched.
+    expect(out.ok).toBe(true);
+    expect(out.action).toBe('timeline');
+    expect(out.rows).toBe(2);
+    const weeks = out.weeks as Array<{ week: string; items: Array<Record<string, unknown>> }>;
+    expect(weeks.flatMap((w) => w.items.map((i) => i.locale))).toEqual(['en', 'zh']);
+    expect((out.markdown as string)).toContain('| 日期 | 章节 | 路径 | 标题 | 页型 |');
+    expect((out.markdown as string)).toContain('G1');
+    expect(out.urls).toEqual({
+      en: 'http://localhost:3000/en/_meta/page-map',
+      zh: 'http://localhost:3000/zh/_meta/page-map',
+    });
+    expect(fetchCount()).toBe(0);
+  });
+
   it('refresh rebuilds the map and upserts the _meta/page-map cache page', async () => {
     // Given: a wiki listing both locales; cache page absent at first
     let cacheCreated = false;
