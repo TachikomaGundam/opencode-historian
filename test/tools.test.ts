@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { OPTS, makeClient, makeKeyHome, jsonResponse } from './client-fixtures.js';
-import type { GqlClient } from '../src/wiki/client.js';
+import { HttpError, type GqlClient } from '../src/wiki/client.js';
 import { TranslateError } from '../src/translate.js';
 import { classifyGenre, genreSkeleton, type Genre } from '../src/templates/genres.js';
 import { buildTools } from '../src/tools.js';
@@ -1101,5 +1101,40 @@ describe('historian_migrate', () => {
     expect(out.ok).toBe(false);
     expect(out.errorKind).toBe('PageNotFoundError');
     expect(fetchCount()).toBe(2);
+  });
+
+  it('wraps a PathValidationError from the engine in the uniform error envelope (no raw throw)', async () => {
+    // Given: a migrate-wired toolset (engine reachable)
+    const { tools } = makeMigrateWired({}, DRAFT);
+
+    // When: migrating a reserved-path page (zh/ prefix)
+    const raw = await tools.historian_migrate.execute({ path: 'zh/evil' } as never, {} as never);
+    const text = typeof raw === 'string' ? raw : String((raw as { output: string }).output);
+    const out = JSON.parse(text) as Record<string, unknown>;
+
+    // Then: structured envelope, not a thrown error
+    expect(out.ok).toBe(false);
+    expect(out.errorKind).toBe('PathValidationError');
+    expect(typeof out.actionableHint).toBe('string');
+    expect(text).not.toMatch(/\n\s*at /);
+  });
+
+  it('wraps an HttpError from the transport in the uniform error envelope (no raw throw)', async () => {
+    // Given: a fetchImpl that always rejects with HttpError
+    const fetchImpl = (async () => {
+      throw new HttpError('network down', 0, '', 'http://localhost:3000/api');
+    }) as typeof fetch;
+    const tools = buildTools(OPTS, { fetchImpl, homeDir: makeKeyHome() });
+
+    // When: running migrate (any valid path)
+    const raw = await tools.historian_migrate.execute({ path: PATH } as never, {} as never);
+    const text = typeof raw === 'string' ? raw : String((raw as { output: string }).output);
+    const out = JSON.parse(text) as Record<string, unknown>;
+
+    // Then: structured envelope with HttpError kind, no stack trace
+    expect(out.ok).toBe(false);
+    expect(out.errorKind).toBe('HttpError');
+    expect(typeof out.actionableHint).toBe('string');
+    expect(text).not.toMatch(/\n\s*at /);
   });
 });

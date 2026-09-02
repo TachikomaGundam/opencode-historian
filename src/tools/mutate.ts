@@ -125,42 +125,46 @@ export function makeMigrateTool(deps: ToolDeps): ToolDefinition {
     args: MIGRATE_ARGS,
     execute: async (raw) => {
       const args = MigrateArgsSchema.parse(raw);
-      const engine = migrateDeps(deps);
-      const dry = await reformatPageDraft(engine, { path: args.path, genre: args.genre });
-      if (!dry.ok) return errEnvelope(dry.error);
-      if (!args.apply) {
+      try {
+        const engine = migrateDeps(deps);
+        const dry = await reformatPageDraft(engine, { path: args.path, genre: args.genre });
+        if (!dry.ok) return errEnvelope(dry.error);
+        if (!args.apply) {
+          return okJson({
+            mode: 'dry-run',
+            path: args.path,
+            locale: dry.sourceLocale,
+            suggestedGenre: dry.genre,
+            genre: dry.genre,
+            confidence: dry.confidence,
+            signals: dry.signals,
+            content: dry.sourceContent,
+            draft: dry.draft,
+            alreadyConforms: dry.alreadyConforms,
+            missingTwin: dry.missingTwin,
+            checklist: selfReviewChecklist(dry.genre),
+            checklistResults: dry.checklistResults,
+            urls: dry.urls,
+          });
+        }
+        const out = await applyMigration(engine, { path: args.path, genre: dry.genre, draft: dry.draft });
+        if (!out.ok) return errEnvelope(out.error);
         return okJson({
-          mode: 'dry-run',
+          mode: 'apply',
           path: args.path,
-          locale: dry.sourceLocale,
-          suggestedGenre: dry.genre,
           genre: dry.genre,
-          confidence: dry.confidence,
-          signals: dry.signals,
-          content: dry.sourceContent,
-          draft: dry.draft,
           alreadyConforms: dry.alreadyConforms,
-          missingTwin: dry.missingTwin,
-          checklist: selfReviewChecklist(dry.genre),
-          checklistResults: dry.checklistResults,
+          applied: out.applied,
+          backupPath: out.backupPath,
+          skipped: out.skipped,
           urls: dry.urls,
+          note:
+            `Pre-image backed up at ${out.backupPath}; restore = replay that file (historian_page_update ` +
+            `with its fields, historian_delete for locales recorded null) or the wiki.js history view.`,
         });
+      } catch (err) {
+        return errEnvelope(err);
       }
-      const out = await applyMigration(engine, { path: args.path, genre: dry.genre, draft: dry.draft });
-      if (!out.ok) return errEnvelope(out.error);
-      return okJson({
-        mode: 'apply',
-        path: args.path,
-        genre: dry.genre,
-        alreadyConforms: dry.alreadyConforms,
-        applied: out.applied,
-        backupPath: out.backupPath,
-        skipped: out.skipped,
-        urls: dry.urls,
-        note:
-          `Pre-image backed up at ${out.backupPath}; restore = replay that file (historian_page_update ` +
-          `with its fields, historian_delete for locales recorded null) or the wiki.js history view.`,
-      });
     },
   });
 }
