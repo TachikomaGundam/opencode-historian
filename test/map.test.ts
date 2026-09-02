@@ -5,7 +5,10 @@
  * sorting, per-locale list fan-out, markdown rendering (pipe escaping, '—' for
  * missing twins, Updated At passthrough), the `_meta/page-map` cache upsert
  * (full-RMW keeps the existing isPrivate/isPublished/tags), the local mirror
- * write, and getMap's staleness + missing/corrupt-mirror fallback. Requests
+ * write, and getMap's staleness + missing/corrupt-mirror fallback. buildChronology
+ * (src/chronology.ts) is covered with pure in-memory rows: ISO week
+ * grouping/order, Monday-start + week-year boundaries, days window, prefix filter.
+ * Requests
  * are mocked and dispatched by query fragment ('list(', 'singleByPath(',
  * 'single(', 'update(', 'create(') — an unknown shape throws so the suite
  * fails loudly instead of asserting on garbage.
@@ -16,6 +19,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildPageMap, getMap, mirrorPath, refreshMapCache, renderMapMarkdown } from '../src/map.js';
+import { buildChronology, filterRowsByPath } from '../src/chronology.js';
 import type { MapRow } from '../src/map.js';
 import { makeClient, jsonResponse, OPTS } from './client-fixtures.js';
 
@@ -567,5 +571,109 @@ describe('getMap', () => {
     expect(snap.generatedAt).toBeNull();
     expect(snap.staleSeconds).toBeNull();
     expect(snap.stats.rows).toBe(4);
+  });
+});
+
+// --- buildChronology ----------------------------------------------------------
+
+function crow(path: string, locale: MapRow['locale'], updatedAt: string, title = 'Note', id = 1): MapRow {
+  return { id, locale, path, title, updatedAt, url: `http://example.com/en/${path}`, twinUrl: null, twinId: null };
+}
+
+describe('buildChronology', () => {
+  it('groups rows by ISO week, weeks and items newest-first, zh+en kept distinct', () => {
+    const rows = [
+      crow('_sandbox/b', 'zh', '2026-08-30T23:00:00.000Z', '贝塔'),
+      crow('_sandbox/a', 'en', '2026-08-31T02:00:00.000Z', 'Alpha'),
+      crow('_sandbox/a', 'zh', '2026-09-01T09:00:00.000Z', '阿尔法'),
+      crow('_sandbox/c', 'en', '2026-08-28T10:00:00.000Z', 'Gamma'),
+    ];
+    const { weeks } = buildChronology(rows);
+    expect(weeks.map((w) => w.week)).toEqual(['2026-W36', '2026-W35']);
+    expect(weeks[0]!.items.map((i) => [i.path, i.locale])).toEqual([['_sandbox/a', 'zh'], ['_sandbox/a', 'en']]);
+    expect(weeks[1]!.items.map((i) => i.updatedAt)).toEqual([
+      '2026-08-30T23:00:00.000Z',
+      '2026-08-28T10:00:00.000Z',
+    ]);
+  });
+
+  it('Monday-start weeks: Sunday and Monday land in different ISO weeks', () => {
+    const { weeks } = buildChronology([
+      crow('x/mon', 'en', '2026-08-31T00:00:01.000Z'),
+      crow('x/sun', 'en', '2026-08-30T23:59:59.000Z'),
+    ]);
+    expect(weeks.map((w) => w.week)).toEqual(['2026-W36', '2026-W35']);
+    expect(weeks[0]!.items[0]!.path).toBe('x/mon');
+    expect(weeks[1]!.items[0]!.path).toBe('x/sun');
+  });
+
+  it('ISO week-year edges: 2025-12-29 → 2026-W01, 2027-01-01 → 2026-W53', () => {
+    const { weeks } = buildChronology([
+      crow('x/newyear', 'en', '2027-01-01T12:00:00.000Z'),
+      crow('x/late-dec', 'en', '2025-12-29T12:00:00.000Z'),
+    ]);
+    expect(weeks.map((w) => w.week)).toEqual(['2026-W53', '2026-W01']);
+  });
+
+  it('days window bounds the set relative to opts.now', () => {
+    const rows = [
+      crow('x/fresh', 'en', '2026-09-01T00:00:00.000Z'),
+      crow('x/stale', 'en', '2026-08-20T00:00:00.000Z'),
+    ];
+    const now = new Date('2026-09-02T00:00:00.000Z');
+    const scoped = buildChronology(rows, { days: 7, now });
+    expect(scoped.weeks.flatMap((w) => w.items.map((i) => i.path))).toEqual(['x/fresh']);
+    expect(buildChronology(rows, { now }).weeks.flatMap((w) => w.items).length).toBe(2);
+  });
+
+  it('empty rows → no weeks, empty markdown', () => {
+    const { weeks, markdown } = buildChronology([]);
+    expect(weeks).toEqual([]);
+    expect(markdown).toBe('');
+  });
+
+  it('unparseable timestamps are dropped', () => {
+    const { weeks } = buildChronology([
+      crow('x/good', 'en', '2026-09-01T00:00:00.000Z'),
+      crow('x/bad', 'en', 'not-a-date'),
+    ]);
+    expect(weeks.flatMap((w) => w.items).map((i) => i.path)).toEqual(['x/good']);
+  });
+
+  it('markdown carries date|section|path|title|genre rows mirroring the JSON', () => {
+    const rows = [
+      crow('ops/502', 'zh', '2026-08-31T02:00:00.000Z', '搜索 502 故障复盘'),
+      crow('notes/|pipe|', 'en', '2026-08-31T01:00:00.000Z', 'Plain note'),
+    ];
+    const { weeks, markdown } = buildChronology(rows);
+    expect(markdown).toContain('## 2026-W36');
+    expect(markdown).toContain('| 日期 | 章节 | 路径 | 标题 | 页型 |');
+    expect(markdown).toContain('| 2026-08-31 | ops | ops/502 | 搜索 502 故障复盘 | G1 |');
+    expect(markdown).toContain('| 2026-08-31 | notes | notes/\\|pipe\\| | Plain note | — |');
+    const dataRows = markdown.split('\n').filter((l) => /^\| 20/.test(l));
+    expect(dataRows.length).toBe(weeks.flatMap((w) => w.items).length);
+  });
+});
+
+describe('filterRowsByPath', () => {
+  const rows = [
+    crow('ops', 'en', '2026-09-01T00:00:00.000Z'),
+    crow('ops/db', 'en', '2026-09-01T00:00:00.000Z'),
+    crow('ops/db/deep', 'zh', '2026-09-01T00:00:00.000Z'),
+    crow('ops2/x', 'en', '2026-09-01T00:00:00.000Z'),
+    crow('other/y', 'en', '2026-09-01T00:00:00.000Z'),
+  ];
+
+  it('matches the section itself, its subtree, and nested paths — not lookalikes', () => {
+    expect(filterRowsByPath(rows, 'ops').map((r) => r.path)).toEqual([
+      'ops',
+      'ops/db',
+      'ops/db/deep',
+    ]);
+  });
+
+  it('matches an exact deep path and yields nothing for absent prefixes', () => {
+    expect(filterRowsByPath(rows, 'ops/db/deep').map((r) => r.path)).toEqual(['ops/db/deep']);
+    expect(filterRowsByPath(rows, 'absent')).toEqual([]);
   });
 });

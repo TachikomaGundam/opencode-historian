@@ -7,8 +7,9 @@
 
 import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { TranslateError } from '../translate.js';
-import { getMap, refreshMapCache, type MapDeps } from '../map.js';
-import { errEnvelope, okJson, URL_MANDATE, type ToolDeps } from './shared.js';
+import { buildChronology, filterRowsByPath } from '../chronology.js';
+import { getMap, refreshMapCache, CACHE_PATH, type MapDeps } from '../map.js';
+import { errEnvelope, okJson, reportUrls, URL_MANDATE, type ToolDeps } from './shared.js';
 
 const s = tool.schema;
 
@@ -67,7 +68,9 @@ export function makeTranslateSnippetTool(deps: ToolDeps): ToolDefinition {
 }
 
 const MAP_ARGS = {
-  action: s.enum(['show', 'refresh']).default('show'),
+  action: s.enum(['show', 'refresh', 'timeline']).default('show'),
+  days: s.number().int().positive().optional().describe('timeline: keep only rows updated within the last N days'),
+  path: s.string().optional().describe('timeline: section/path prefix filter (e.g. ops)'),
 } as const;
 
 const MapArgsSchema = s.object(MAP_ARGS);
@@ -77,9 +80,12 @@ const MapArgsSchema = s.object(MAP_ARGS);
 export function makeMapTool(deps: ToolDeps): ToolDefinition {
   return tool({
     description:
-      `Inspect (show) or rebuild (refresh) the en/zh page map with its local mirror + _meta/page-map cache page. ` +
+      `Inspect (show), rebuild (refresh), or aggregate recent updates (timeline) over the en/zh page map ` +
+      `with its local mirror + _meta/page-map cache page. ` +
       `show reads the local mirror (zero writes); refresh rebuilds from the wiki and writes the mirror + cache page ` +
-      `(idempotent — the engine upserts via full RMW). ${URL_MANDATE}.`,
+      `(idempotent — the engine upserts via full RMW); timeline groups mirror rows by ISO week (newest first, ` +
+      `optional days window + section/path prefix filter) into a human markdown table + machine-readable weeks JSON. ` +
+      `${URL_MANDATE}.`,
     args: MAP_ARGS,
     execute: async (raw) => {
       const args = MapArgsSchema.parse(raw);
@@ -90,6 +96,20 @@ export function makeMapTool(deps: ToolDeps): ToolDefinition {
           return okJson({ action: 'refresh', stats: result.stats, cacheUrl: result.cacheUrl });
         }
         const snapshot = await getMap(mapDeps, deps.homeDir);
+        if (args.action === 'timeline') {
+          const rows = args.path === undefined ? snapshot.rows : filterRowsByPath(snapshot.rows, args.path);
+          const chrono = buildChronology(rows, { days: args.days });
+          return okJson({
+            action: 'timeline',
+            days: args.days ?? null,
+            pathPrefix: args.path ?? null,
+            generatedAt: snapshot.generatedAt,
+            rows: rows.length,
+            weeks: chrono.weeks,
+            markdown: chrono.markdown,
+            urls: reportUrls(deps.options.baseUrl, CACHE_PATH, 'en'),
+          });
+        }
         return okJson({
           action: 'show',
           generatedAt: snapshot.generatedAt,
