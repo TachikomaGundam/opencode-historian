@@ -459,3 +459,110 @@ export const G4_EN: string = `# Page Title (placeholder: replace with the real t
 ## Related Pages
 
 <!-- List real page paths that link here and back. -->`;
+
+/** G5 — 现状卡/部署现状账本页 (current-state ledger), zh. Status + tables only:
+ *  one authoritative snapshot of what is deployed/running NOW, per-row
+ *  last-verified dates, agent-executable re-check commands. Narrative history
+ *  belongs to G1 event pages, linked from 变更记录. */
+export const G5_ZH: string = `# 页面标题（占位：写完后替换为实际标题，须与页面 title 一致）
+
+**状态/Status**: Active <!-- or Superseded-by: <path> / Deprecated --> · **日期/Date**: YYYY-MM-DD
+
+**本页回答：** 当前部署状态（占位：写明范围）
+
+> **提示**
+> 现状卡只存事实快照：一行一个部署物。
+> 叙述性历史写进 G1 事件页，从变更记录链过去。
+{.is-info}
+
+## 部署物清单
+
+| 组件 | 版本 | 端口/路径 | 端点 | 依赖 | 上次核实于 |
+| --- | --- | --- | --- | --- | --- |
+| example-api | 1.2.3 | 8000 | http://example.com:8000/health | postgres | YYYY-MM-DD |
+
+<!-- 每行须能被验证方法当场复核。核实日期不得留空。 -->
+
+## 依赖与集成
+
+| 集成对象 | 方向 | 用途 | 失效影响 |
+| --- | --- | --- | --- |
+
+<!-- 只列正在生效的集成。已解除的记入变更记录。 -->
+
+## 失效策略
+
+<!-- 写明使本卡过期的事件。例：版本变更、端口调整、依赖下线。 -->
+<!-- 复查节奏：默认每 30 天逐行重跑验证命令。 -->
+
+## 验证方法
+
+| 组件 | 复核命令 | 预期结果 |
+| --- | --- | --- |
+| example-api | \`curl -s http://example.com:8000/health\` | HTTP 200 |
+
+<!-- 命令须 agent 可直接执行。禁止登录机器看看式模糊描述。 -->
+
+## 变更记录
+
+| 日期 | 变更 | 依据 |
+| --- | --- | --- |
+| YYYY-MM-DD | 初版快照 | — |
+
+<!-- 追加式小表：只记影响清单行的变更。完整历史写 G1 事件页并互链。 -->
+
+## 相关页面
+
+<!-- 列出互链的真实页面路径。事故史放 G1 页并在依据列引用。 -->`;
+
+/** G5 — current-state ledger, en (section-for-section twin of G5_ZH). */
+export const G5_EN: string = `# Page Title (placeholder: replace with the real title, must match the page title)
+
+**状态/Status**: Active <!-- or Superseded-by: <path> / Deprecated --> · **日期/Date**: YYYY-MM-DD
+
+**This page answers:** what is deployed and running right now (placeholder: name the system and scope)
+
+> **Tip**
+> A ledger stores fact snapshots, not prose: one deployed component per row.
+> Narrative history belongs in G1 event pages, linked from the change log.
+{.is-info}
+
+## Deployed Components
+
+| Component | Version | Port/Path | Endpoint | Depends on | Last verified |
+| --- | --- | --- | --- | --- | --- |
+| example-api | 1.2.3 | 8000 | http://example.com:8000/health | postgres | YYYY-MM-DD |
+
+<!-- Every row must be re-checkable by a command in Verification. Never leave the date blank. -->
+
+## Dependencies and Integration
+
+| Counterpart | Direction | Purpose | Impact if gone |
+| --- | --- | --- | --- |
+
+<!-- List only integrations in force. Record removed ones in the change log. -->
+
+## Invalidation Policy
+
+<!-- Name the events that stale this card: version bumps, port moves, dependency retirements. -->
+<!-- Review cadence: re-run every verification command every 30 days by default. -->
+
+## Verification
+
+| Component | Re-check command | Expected result |
+| --- | --- | --- |
+| example-api | \`curl -s http://example.com:8000/health\` | HTTP 200 |
+
+<!-- Commands must be agent-executable as written. Vague steps like log in and look are forbidden. -->
+
+## Change Log
+
+| Date | Change | Evidence |
+| --- | --- | --- |
+| YYYY-MM-DD | initial snapshot | — |
+
+<!-- Append-only mini table for list-affecting changes. Full history lives in G1 event pages. -->
+
+## Related Pages
+
+<!-- List the real page paths that link here and back. Event histories go in G1 pages, cited in Evidence. -->`;

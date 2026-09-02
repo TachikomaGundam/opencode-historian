@@ -13,13 +13,13 @@ import { errEnvelope, okJson, urlPair, URL_MANDATE, pageDeps, type ToolDeps } fr
 
 const s = tool.schema;
 
-const GENRES = ['G1', 'G2', 'G3', 'G4'] as const;
+const GENRES = ['G1', 'G2', 'G3', 'G4', 'G5'] as const;
 
 const ARGS_SHAPE = {
   path: s.string().describe('Wiki path, e.g. docs/guides/foo (first segment must NOT look like a locale code)'),
   title: s.string().describe('Page title'),
   content: s.string().optional().describe('Page body (markdown). ABSENT → local template mode, nothing written'),
-  genre: s.enum(GENRES).optional().describe('Genre hint: G1..G4 (template mode / classification)'),
+  genre: s.enum(GENRES).optional().describe('Genre hint: G1..G5 (template mode / classification)'),
   locale: s.enum(['en', 'zh']).default('en'),
   isPublished: s.boolean().default(true),
   tags: s.array(s.string()).default([]),

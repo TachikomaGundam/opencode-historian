@@ -14,7 +14,7 @@ import { applyMigration } from '../migrate-apply.js';
 
 const s = tool.schema;
 
-const GENRES = ['G1', 'G2', 'G3', 'G4'] as const;
+const GENRES = ['G1', 'G2', 'G3', 'G4', 'G5'] as const;
 
 const DELETE_ARGS = {
   path: s.string(),
