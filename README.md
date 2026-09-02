@@ -27,9 +27,11 @@ opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具�
 
 ```jsonc
 {
-  "plugin": ["opencode-historian"]
+  "plugin": ["opencode-wiki-historian"]
 }
 ```
+
+> 注：npm 包名为 opencode-wiki-historian（opencode-historian 已被注册表上一无关同名包占用）；仓库与插件 id 仍为 opencode-historian。
 
 发布准备状态：包已按 0.1.0 打包就绪（`npm pack` 验证通过），npm 发布需账号 2FA 一次性完成（`npm publish --access public --otp=<code>`）。在发布完成前，方式二 `file://` 为当前可用安装路径。
 
@@ -64,7 +66,7 @@ opencode run --command historian --message "historian_map show"
 ```jsonc
 {
   "plugin": [
-    ["opencode-historian", {
+    ["opencode-wiki-historian", {
       "baseUrl": "http://your-wiki:3000",
       "apiKeyPath": "~/.wikijs-api-key",
       "translate": {
@@ -79,7 +81,7 @@ opencode run --command historian --message "historian_map show"
 }
 ```
 
-不传选项时等同 `["opencode-historian"]`，使用全部默认值。
+不传选项时等同 `["opencode-wiki-historian"]`，使用全部默认值。
 
 ### 选项全表
 
@@ -267,7 +269,7 @@ wiki.js GraphQL API 有 9 个常见陷阱。插件在内部处理了每一个（
 ### 升级步骤
 
 1. 重命名旧 skill 文件：`mv ~/.config/opencode/skills/historian.md ~/.config/opencode/skills/historian.md.v2-disabled`
-2. 在 `opencode.json[c]` 的 `plugin` 数组中添加 `opencode-historian`
+2. 在 `opencode.json[c]` 的 `plugin` 数组中添加 `opencode-wiki-historian`
 3. 重启 opencode，`/historian` 命令可用即表示 v3 skill 已注入
 
 ## 运维 / Operations
