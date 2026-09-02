@@ -13,6 +13,10 @@ opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具�
 * 页面地图缓存与本地镜像
 * 试点与评测均通过：pilot 7 页迁移 PASS，eval 7/7 场景首跑全过
 
+## 仓库 / Repository
+
+<https://github.com/TachikomaGundam/opencode-historian>
+
 ## 安装 / Installation
 
 两种安装方式经过实测验证。
