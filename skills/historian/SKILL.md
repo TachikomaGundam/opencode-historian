@@ -234,8 +234,8 @@ historian_map action=refresh
 - **分诊**: incident postmortem → incidents/ → create (无现存页面覆盖该主题)
 - **页型**: G1 事件复盘
 - **链接**: backlink from `wiki-index`, cross-link to `ops/wiki`
-- **en URL**: http://localhost:3000/<path>
-- **zh URL**: http://localhost:3000/zh/<path>
+- **en URL**: http://<your-wiki>:3000/<path>
+- **zh URL**: http://<your-wiki>:3000/zh/<path>
 - **遗留**: <延期事项或问题 — 或 "无">
 ```
 

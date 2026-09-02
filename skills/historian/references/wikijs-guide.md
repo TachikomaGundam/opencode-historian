@@ -8,8 +8,8 @@ wiki.js 的多语言靠 **namespacing**（路径前缀）实现，不是浏览�
 
 | 场景 | URL | 说明 |
 |------|-----|------|
-| 英文页 | `http://localhost:3000/ops/wiki` | 默认 locale 无路径前缀 |
-| 中文页 | `http://localhost:3000/zh/ops/wiki` | 加 `zh/` 前缀 |
+| 英文页 | `http://<your-wiki>:3000/ops/wiki` | 默认 locale 无路径前缀 |
+| 中文页 | `http://<your-wiki>:3000/zh/ops/wiki` | 加 `zh/` 前缀 |
 | 语言切换 | 页面右上角 language switcher | 仅在 Admin > Locales 开启了多 locale + namespacing 后才显示 |
 
 **前置条件**（缺一不可）：
