@@ -7,3 +7,4 @@ dist/
 results/*
 results/*.json
 local/
+tools/redlines.local.json
