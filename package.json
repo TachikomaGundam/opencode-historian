@@ -1,6 +1,6 @@
 {
   "name": "opencode-wiki-historian",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "opencode plugin that manages a wiki.js knowledge base with bilingual pages, genre templates, and migration tooling.",
   "type": "module",
   "license": "MIT",
