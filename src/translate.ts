@@ -12,7 +12,13 @@ import { isRecord } from './jsonc.js';
 
 // --- Error taxonomy ---------------------------------------------------------
 
-export type TranslateErrorCause = 'network' | 'http' | 'malformed' | 'truncated' | 'timeout';
+export type TranslateErrorCause =
+  | 'network'
+  | 'http'
+  | 'malformed'
+  | 'truncated'
+  | 'timeout'
+  | 'config';
 
 export class TranslateError extends Error {
   readonly cause: TranslateErrorCause;
@@ -165,6 +171,13 @@ export async function callMessages(
   deps: TranslateDeps | undefined,
   call: MessagesCall,
 ): Promise<string> {
+  if (opts.translate.endpoint.trim() === '') {
+    throw new TranslateError(
+      'config',
+      'translate.endpoint not configured — set plugin option translate.endpoint ' +
+        'or export HISTORIAN_TRANSLATE_ENDPOINT.',
+    );
+  }
   const url = normalizeMessagesUrl(opts.translate.endpoint);
   const key = opts.translate.apiKey;
   const fetchImpl = deps?.fetchImpl ?? fetch;
