@@ -2,16 +2,89 @@
 
 > OpenCode 插件：双语 wiki.js 知识库管理 / Bilingual wiki curator as an OpenCode plugin.
 
-opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具打包成一个 OpenCode 插件，让 AI agent 能直接管理双语知识库。
+opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具打包成一个 OpenCode 插件，让 AI agent 能直接管理双语知识库。它为什么存在、文风从哪里来、怎么一句话开始用，见下文「史官宣言」。
 
 功能一览:
 
-* 10 个 `historian_*` 工具，覆盖创建、更新、追加、翻译、搜索、阅读、地图、迁移、删除、移动
-* Skill v3 随插件自动注入（config hook），无需手动安装 skill 文件
-* G1 至 G4 页型契约，每种页型对应专属骨架模板
+* 10 个 `historian_*` 工具，覆盖创建、更新、追加、翻译、搜索、阅读、地图/时间轴、迁移、删除、移动
+* Skill v4 随插件自动注入（config hook），无需手动安装 skill 文件
+* G1 至 G5 页型契约，每种页型对应专属骨架模板
 * 双语孪生页面（en/zh）自动翻译，翻译引擎可配置
-* 页面地图缓存与本地镜像
+* 页面地图缓存、本地镜像与时间轴聚合视图
+* 开工前置查阅回路（reading loop，默认开）+ `/historian-capture` 会话留痕（默认关）
 * 试点与评测均通过：pilot 7 页迁移 PASS，eval 7/7 场景首跑全过
+
+## 史官宣言 / The Historian's Manifest
+
+### 灵感 / Inspiration
+
+这个插件的写作规则不是发明的，是从五种语言文化的 wiki 工程传统加一种运维文化里蒸馏出来的（调研全文见仓库内 `docs/research/cross-cultural-wiki-writing-digest.md`，每条主张附原文引用）：
+
+| 文化 | 给史官的贡献 |
+|---|---|
+| 中文 | 序言不可侵犯（多数读者只读序言，要点前置）；可供查证（举证责任在添加内容的一方）；金字塔原理的结论先行；阮一峰式行文纪律（句 ≤40 字、一文一事）；企业事件复盘模板（摘要→背景→时间线→影响量化→根因→改进，改进措施是复盘最重要的部分，行动项必须带负责人、期限与验证方式） |
+| 英文 | WP:LEAD 导言自足、篇幅按重要性分配；Good Article 六项质量门；Diátaxis 四象限（tutorial / how-to / reference / explanation，模式混杂是文档烂的根源，参考页要像地图一样镜像系统结构）；Google 技术写作"≥3 个相关字段就上表格"；SRE blameless postmortem |
+| 德文 | 条目开头先定义、门外汉可懂、一文一概念反碎片化、禁止"杂项"小节；引证义务 Belegpflicht："宁要格式错的引注，不要没有引注"；评价必须归属到人，不带情绪（sine ira et studio） |
+| 法文 | 中立、非个人化、清晰、精确、易懂、有教学性六种品质；溢美词强制转成事实（用排名、奖项、销量替代"最伟大的"这类断言）；耐久过滤：明天就会过时的内容不值得写 |
+| 俄文 | ХС/ИС 条目门槛（导言普通读者可懂、术语最少、不少于 10 行）；二手权威来源优先于一手（АИ）；每种观点按影响力分配篇幅、禁止虚假平衡（ВЕС）；风格要求精确、简明、无歧义，同时保持内容饱和 |
+
+SRE postmortem 文化单独值得点名：它把"事件"当一等文档对待，过程/原因/后果/改进四段式正是 `/historian-capture` 命令的输出协议（`src/index.ts` 的 capture 模板），而"改进项要有负责人和可验证终态"落在了 G1 行动项表格里。
+
+把这些文化做成插件的直接动因，是一个机构记忆问题：这台机器由一个人加一群 AI agent 操作。会话结束，终端滚动条就没了；上下文压缩，细节就丢了。部署过什么、发生过什么事故、踩过什么坑、做过什么决定，三个月后人和 AI 都无从查起。史官要解决的，就是让这台机器的历史变得可检索。
+
+### 目的 / Purpose
+
+让"这台机器上部署过什么、发生过什么、踩过什么坑、做过什么决定"成为人和 AI 都可索引、可引用、可审计的一等知识：
+
+* 知识落进结构化双语 wiki 页，而不是一次性的会话回复
+* 每个写操作强制回报 en + zh 双 URL（`URL_MANDATE`，`src/tools/shared.ts:39`），引用链可回溯
+* wiki 成为任何 agent 会话开工前先查的权威来源，而不是锁在某个会话里的私有记忆
+
+### 作用 / What it does
+
+五柱页型契约，加上读写两条自动化回路：
+
+| 能力 | 机制 | 落点 |
+|---|---|---|
+| 五柱页型 | G1 事件复盘 / G2 对比选型 / G3 清单索引 / G4 概念原理 / G5 现状账本，写前声明页型，套固定骨架、过来源列检查 | `src/templates/genres.ts`，skill Phase 1.5 |
+| 双视图 | 地图视图（en/zh 对应关系，Locale/Twin 列）+ 时间轴视图（ISO 周分组，支持 `days` 窗口与 `path` 前缀过滤，人读周表 + 机读 weeks JSON） | `historian_map` 的 `action:'show'` / `action:'timeline'` |
+| 迁移与评分门禁 | 存量页按骨架重排：dry-run 评分在前，`apply=true` 自动 pre-image 备份；每页写入后过 10 项自检门 | `historian_migrate`，`selfReviewChecklist()` |
+| 前置查阅回路 | 向每次请求的 system 提示注入"先查 wiki"指令：动这台机器的部署/历史/坑/决定之前先 `historian_search`、查 timeline、核对 G5 卡的核实日期，引用查过的页面 URL | `readingLoop` 选项（默认 `true`），`src/index.ts` 的 `experimental.chat.system.transform` 钩子 |
+| 主动留痕 | `/historian-capture` 命令把当前会话总结成 G1 事件页；开启 `capture.enabled` 后额外在会话空闲时弹一次提醒，仅提醒，绝不自动写页 | `src/index.ts` 的 `config` / `event` 钩子 |
+
+G5 现状卡回答"现在跑着什么"，timeline 回答"最近两周变了什么"。比如问"`service-a` 现在监听哪个端口"，应当命中现状账本里的一行（形如 `example.com:8000`，带上次核实日期与验证命令），而不是某次会话的聊天记录。这两样合起来，wiki 才从文档堆变成可查询的运维账本。
+
+### 使用方式 / Usage
+
+端到端最短路径（适配你自己 wiki 的六步完整指南见 `skills/historian/references/adapting-your-own-wiki.md`）：
+
+1. **安装**：`opencode.json[c]` 的 `plugin` 数组加 `"opencode-wiki-historian"`（npm 发布后）或 `"file:///home/<you>/workspace/opencode-historian"`（本地开发），细节见下文「安装」。
+2. **配置**：最小三个选项；翻译腿可以不配，双语孪生会优雅降级为 pending：
+
+   ```jsonc
+   ["opencode-wiki-historian", {
+     "baseUrl": "http://<your-wiki>:3000",
+     "apiKeyPath": "~/.wikijs-api-key",
+     "sections": ["team-notes/"]
+   }]
+   ```
+
+3. **口述写史**：对 opencode 说自然语言，史官完成分诊→放置→页型→骨架→自检→写入，并回报双语 URL：
+
+   > `service-a` 今天 OOM 重启，根因是缓存没设上限，已加告警，记下来。
+
+   → 分诊为事件复盘，声明 G1 → `historian_page_create`（`genre: "G1"`）→ 回报 `http://<your-wiki>:3000/team-notes/<slug>` 与它的 `/zh/` 孪生页。
+4. **检索与整理**：`historian_search` 按主题查；`historian_map` 的 `show` 看双语地图、`timeline`（可选 `days` / `path`）看最近变动；存量页不合规用 `historian_migrate` 先 dry-run 再 apply。
+5. **开关**：严格 OpenAI 兼容后端（如 vLLM，会拒绝多条 system 消息）把 `"readingLoop": false` 关掉；想要空闲留痕提醒就 `"capture": { "enabled": true }`，`/historian-capture` 命令本身与开关无关、始终注册。
+
+### 解耦声明 / Decoupling
+
+插件与任何一台机器的 wiki 内容零耦合：
+
+* `sections` 默认空列表 = 不设路径前缀限制，实际写权限由 wiki.js token 的 page rules 决定；包内不携带任何真实主机、真实章节分类学或页面数据
+* 翻译腿零内置地址：解析链只有 `translate.endpoint` 选项 → 环境变量 `HISTORIAN_TRANSLATE_ENDPOINT` → 未配置，未配置时孪生降级 pending，不发任何网络请求
+* `tools/privacy-audit.mjs` 对 `npm pack` 清单里的每个随包文件跑隐私红线 regex（真实主机 / 本机路径 / 本机章节名 / 密钥形态 / 个人身份），任何命中即非零退出、拦住发布；已接入 `prepublishOnly`（build → test → audit）
+* 随包文本里的示例全部占位符化：`http://<your-wiki>:3000`、`team-notes/`、`example.com`
 
 ## 仓库 / Repository
 
@@ -58,7 +131,7 @@ opencode run --command historian --message "historian_map show"
 
 如果工具列表中出现 `historian_page_create` 等 10 个工具，安装成功。
 
-> **升级提示**：如果你之前使用过 historian v2 的扁平 skill 文件（如 `~/.config/opencode/skills/historian.md`），需要先重命名为 `historian.md.v2-disabled` 或移到别处。插件通过 config hook 自动注入 v3 skill，两个同名 skill 不能共存。
+> **升级提示**：如果你之前使用过 historian v2 的扁平 skill 文件（如 `~/.config/opencode/skills/historian.md`），需要先重命名为 `historian.md.v2-disabled` 或移到别处。插件通过 config hook 自动注入 v4 skill，两个同名 skill 不能共存。
 
 ## 配置 / Configuration
 
@@ -97,6 +170,8 @@ opencode run --command historian --message "historian_map show"
 | `translate.providerKey` | string | 未配置 | jsonc 兜底腿读取的 provider 名；须显式设置才会启用该腿 |
 | `sections` | string[] | `[]`（不限制） | 插件可操作的 wiki 路径前缀白名单 |
 | `locales` | string[] | `["en", "zh"]` | 启用的语言列表 |
+| `readingLoop` | boolean | `true` | 向每次请求注入"先查 wiki"的开工前置查阅 advisory；拒绝多条 system 消息的严格 OpenAI 兼容后端（如 vLLM）须设 `false` |
+| `capture.enabled` | boolean | `false` | 开启后会话空闲时弹一次 `/historian-capture` 留痕提醒；仅提醒，不自动写页 |
 
 `translate.endpoint` 解析链（优先级从高到低）：`translate.endpoint` 选项 → 环境变量 `HISTORIAN_TRANSLATE_ENDPOINT` → 未配置。包内**不**内置任何网关地址；未配置时翻译调用直接以 `translate.endpoint not configured` 失败（见降级行为）。
 
@@ -169,11 +244,13 @@ zh: http://<host>/zh/ops/example
 
 **地图视图**：`historian_map show` 输出包含 Locale 和 Twin 列，展示每个路径的双语对应关系。本地镜像文件保存在 `~/.config/opencode/historian-map.json`（`getMap` 读取，带过期秒数）；`_meta/page-map` 是 wiki 端的缓存页，由 `historian_map` refresh 写入。
 
+**时间轴视图**：`historian_map action:'timeline'` 把镜像行按 ISO 周分组（可选 `days` 窗口与 `path` 前缀过滤），输出人读周表 + 机读 `weeks` JSON，回答"最近哪些页面变过"。
+
 ## 写作质量体系 / Quality System
 
-### G1 至 G4 页型
+### G1 至 G5 页型
 
-插件根据内容形态把每页归入四种页型之一，每种有专属骨架模板：
+插件根据内容形态把每页归入五种页型之一，每种有专属骨架模板：
 
 | 页型 | 用途 | 骨架结构 |
 |---|---|---|
@@ -181,17 +258,18 @@ zh: http://<host>/zh/ops/example
 | G2 对比 | 技术选型、方案比较 | 来源声明 + 对比表格 + 结论 |
 | G3 清单 | 操作步骤、检查项 | 可勾选的检查项列表 |
 | G4 概念 | 架构说明、原理讲解 | 概念定义 → 图示 → 示例 |
+| G5 现状账本 | 此刻的部署/运行态，回答"现在跑着什么" | 状态块 → 部署物清单（每行带「上次核实于」+ 验证命令）→ 失效策略，禁止叙事正文 |
 
 ### 10 项自检门
 
-每页写入后过一遍自检清单（源码 `src/templates/genres.ts` `selfReviewChecklist()`，参考文件 `skills/historian/references/rules.md` + `genres.md`）。dry-run 阶段评 1–8，apply 后评 9–10。genre-specific 条目对不匹配的页型记 N/A=PASS：
+每页写入后过一遍自检清单（源码 `src/templates/genres.ts` `selfReviewChecklist()`，参考文件 `skills/historian/references/rules.md` + `genres.md`）。dry-run 阶段评 1–8，apply 后评 9–10。genre-specific 条目对不匹配的页型记 N/A=PASS；G5 页的第 4–6 项换成账本变体（`G5_CHECKLIST_VARIANTS`）：
 
 1. **导言占比 10–15%**：导言 ≈ 正文的 10–15%，每个重要小节在导言至少占一句
 2. **句长上限**：中文句 ≤20 字、英文句 ≤25 词
 3. **表格判据**：≥3 字段的结构化枚举入表，成对数据用描述列表
-4. **对比表来源列**（G2）：对比表/枚举表每行有来源列，行序固定、无合并单元格
-5. **时间线来源列**（G1）：时间线每行有来源列，仅日志可证事实
-6. **行动项五要素**（G1）：类型|负责人|期限|验证|状态 五列，措施是行内容
+4. **对比表来源列**（G2）：对比表/枚举表每行有来源列，行序固定、无合并单元格；G5 变体：部署物清单每行带「上次核实于」列
+5. **时间线来源列**（G1）：时间线每行有来源列，仅日志可证事实；G5 变体：验证方法含可执行复核命令
+6. **行动项五要素**（G1）：类型|负责人|期限|验证|状态 五列，措施是行内容；G5 变体：无叙事正文，只有状态块 + 表格
 7. **无杂项筐**：除 参见/附录 之外没有 "其他/杂项" 类 catch-all 小节
 8. **无溢美词**：领先/强大/灵活/高效 等 bare claim 改事实或删除
 9. **双语 URL 已回报**（写后核销）：报告含 /en/ 与 /zh/ 两个可访问 URL
@@ -270,7 +348,7 @@ wiki.js GraphQL API 有 9 个常见陷阱。插件在内部处理了每一个（
 
 1. 重命名旧 skill 文件：`mv ~/.config/opencode/skills/historian.md ~/.config/opencode/skills/historian.md.v2-disabled`
 2. 在 `opencode.json[c]` 的 `plugin` 数组中添加 `opencode-wiki-historian`
-3. 重启 opencode，`/historian` 命令可用即表示 v3 skill 已注入
+3. 重启 opencode，`/historian` 命令可用即表示 v4 skill 已注入
 
 ## 运维 / Operations
 
@@ -292,7 +370,7 @@ harness repo（与本插件仓库同工作区）提供 7 个行为验收场景�
 
 ```bash
 npm run build       # tsc 编译到 dist/
-npm test            # vitest run（280 tests, 13 files）
+npm test            # vitest run（331 tests, 15 files）
 npm pack --dry-run  # 检查打包文件列表
 ```
 
