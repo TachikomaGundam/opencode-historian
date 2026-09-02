@@ -6,9 +6,13 @@
  *
  * The server() hook resolves plugin options and returns:
  *   - config: mutates cfg.skills.paths to ship the bundled skills/ directory
+ *     and registers the /historian-capture command (todo 9)
  *   - tool: 10 historian_* tools wired by buildTools(opts)
  *   - experimental.chat.system.transform: pushes the historian-first reading
  *     loop advisory onto output.system[] (gated by opts.readingLoop)
+ *   - event: on session.idle emits ONE capture reminder toast per session
+ *     (gated by opts.capture.enabled; reminder-only — the page write happens
+ *     through /historian-capture -> historian_page_create, never here)
  *
  * Defensive: if resolveOptions throws (e.g. missing translate key), we catch
  * at the server() boundary, log once to console.error, and return hooks with
@@ -63,6 +67,24 @@ const READING_LOOP_ADVISORY = [
   'Cite the wiki page URLs you relied on. If you learn something new worth keeping, offer to record it as a page.',
 ].join('\n');
 
+/** /historian-capture command (plan v2 todo 9): the always-available manual
+ *  path from "notable session" to "G1 event page" — registered regardless of
+ *  capture.enabled; the enabled-gated toast only nudges toward it. Agent-facing
+ *  instruction text, generic wording only (ships in the tarball). */
+const CAPTURE_COMMAND_DESCRIPTION = '把本次会话记为史官事件页 / record this session as a historian event page';
+
+const CAPTURE_COMMAND_TEMPLATE = [
+  'Summarize the current session as a historian G1 event page (an append-only record of what happened).',
+  '',
+  '1. Draft four sections: 过程/Process (what was done, in order), 原因/Cause (why it was needed), 后果/Consequence (impact, artifacts), 改进/Improvement (follow-ups, preventions).',
+  "2. Run historian_map action:'show' to see existing sections, then choose a short factual path under one.",
+  '3. Save with historian_page_create (genre "G1"); the zh twin is auto-created. If the session only repeated known knowledge, say so and skip writing.',
+  '4. Echo both page URLs (en + zh) back to the user.',
+].join('\n');
+
+const CAPTURE_TOAST_MESSAGE =
+  '会话空闲：有值得留存的决定/修复/踩坑就跑 /historian-capture。Session idle — run /historian-capture if it produced decisions, fixes, or pitfalls worth keeping.';
+
 async function server(input: PluginInput, options?: PluginOptions): Promise<Hooks> {
   let opts: HistorianOptions;
   try {
@@ -78,11 +100,18 @@ async function server(input: PluginInput, options?: PluginOptions): Promise<Hook
     return {};
   }
 
+  const captureReminded = new Set<string>();
+
   const hooks: Hooks = {
     config: async (cfg: Config) => {
       const cfgWithSkills = cfg as ConfigWithSkills;
       cfgWithSkills.skills ??= {};
       cfgWithSkills.skills.paths = unique([...(cfgWithSkills.skills.paths ?? []), skillsDir]);
+      cfg.command ??= {};
+      cfg.command['historian-capture'] = {
+        description: CAPTURE_COMMAND_DESCRIPTION,
+        template: CAPTURE_COMMAND_TEMPLATE,
+      };
     },
     tool: buildTools(opts),
     'experimental.chat.system.transform': async (_input, output) => {
@@ -94,6 +123,32 @@ async function server(input: PluginInput, options?: PluginOptions): Promise<Hook
         // A broken inject must never crash a chat request (plan v2 todo 8).
         console.error(
           '[opencode-historian] reading-loop advisory skipped:',
+          err instanceof Error ? err.message : err,
+        );
+      }
+    },
+    event: async ({ event }) => {
+      try {
+        if (opts.capture.enabled !== true) return;
+        if (event.type !== 'session.idle') return;
+        // Feature-detect recordable work: session.idle only fires on a
+        // busy→idle transition (a session that never ran a prompt never goes
+        // idle), and each session is reminded at most once per plugin load.
+        const sessionID = event.properties.sessionID;
+        if (captureReminded.has(sessionID)) return;
+        captureReminded.add(sessionID);
+        await input.client.tui.showToast({
+          body: {
+            title: '史官 / historian',
+            message: CAPTURE_TOAST_MESSAGE,
+            variant: 'info',
+            duration: 15000,
+          },
+        });
+      } catch (err) {
+        // A failed reminder must never break the event stream (plan v2 todo 9).
+        console.error(
+          '[opencode-historian] capture reminder skipped:',
           err instanceof Error ? err.message : err,
         );
       }
