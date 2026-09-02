@@ -7,6 +7,8 @@
  * The server() hook resolves plugin options and returns:
  *   - config: mutates cfg.skills.paths to ship the bundled skills/ directory
  *   - tool: 10 historian_* tools wired by buildTools(opts)
+ *   - experimental.chat.system.transform: pushes the historian-first reading
+ *     loop advisory onto output.system[] (gated by opts.readingLoop)
  *
  * Defensive: if resolveOptions throws (e.g. missing translate key), we catch
  * at the server() boundary, log once to console.error, and return hooks with
@@ -50,6 +52,17 @@ function unique<T>(items: readonly T[]): T[] {
   return [...new Set(items)];
 }
 
+/** Reading-loop advisory (plan v2 todo 8): the machine wiki is the
+ *  authoritative institutional memory; consult it before acting, cite URLs.
+ *  Shipped text — generic wording only (privacy-audit scans dist). */
+const READING_LOOP_ADVISORY = [
+  'You have a historian: a wiki.js knowledge base acting as this machine\'s authoritative institutional memory.',
+  'Before doing work that touches this machine\'s deployments, history, pitfalls, or decisions, consult it first:',
+  '- historian_search by topic for relevant pages; historian_map action:"timeline" for what changed recently;',
+  '- G5 current-state ledger pages answer "what is deployed/running now" — check each row\'s verified date before trusting it.',
+  'Cite the wiki page URLs you relied on. If you learn something new worth keeping, offer to record it as a page.',
+].join('\n');
+
 async function server(input: PluginInput, options?: PluginOptions): Promise<Hooks> {
   let opts: HistorianOptions;
   try {
@@ -65,14 +78,28 @@ async function server(input: PluginInput, options?: PluginOptions): Promise<Hook
     return {};
   }
 
-  return {
+  const hooks: Hooks = {
     config: async (cfg: Config) => {
       const cfgWithSkills = cfg as ConfigWithSkills;
       cfgWithSkills.skills ??= {};
       cfgWithSkills.skills.paths = unique([...(cfgWithSkills.skills.paths ?? []), skillsDir]);
     },
     tool: buildTools(opts),
+    'experimental.chat.system.transform': async (_input, output) => {
+      try {
+        if (opts.readingLoop !== true) return;
+        if (output.system.some((block) => block.includes('historian_search'))) return;
+        output.system.push(READING_LOOP_ADVISORY);
+      } catch (err) {
+        // A broken inject must never crash a chat request (plan v2 todo 8).
+        console.error(
+          '[opencode-historian] reading-loop advisory skipped:',
+          err instanceof Error ? err.message : err,
+        );
+      }
+    },
   };
+  return hooks;
 }
 
 const plugin: PluginExport = {
