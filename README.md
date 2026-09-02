@@ -64,7 +64,7 @@ G5 现状卡回答"现在跑着什么"，timeline 回答"最近两周变了什�
    ```jsonc
    ["opencode-wiki-historian", {
      "baseUrl": "http://<your-wiki>:3000",
-     "apiKeyPath": "~/.wikijs-api-key",
+     "apiKeyPath": "~/.wiki-key",
      "sections": ["team-notes/"]
    }]
    ```
@@ -142,7 +142,7 @@ opencode run --command historian --message "historian_map show"
   "plugin": [
     ["opencode-wiki-historian", {
       "baseUrl": "http://your-wiki:3000",
-      "apiKeyPath": "~/.wikijs-api-key",
+      "apiKeyPath": "~/.wiki-key",
       "translate": {
         "endpoint": "https://<your-anthropic-compatible-gateway>/v1",
         "model": "qwen3.7-plus",
