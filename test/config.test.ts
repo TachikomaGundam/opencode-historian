@@ -191,7 +191,19 @@ describe('resolveOptions defaults', () => {
     expect(opts.sections).toEqual([]);
     expect(opts.locales).toEqual(['en', 'zh']);
     expect(opts.readingLoop).toBe(true);
+    expect(opts.capture.enabled).toBe(false);
     void opts satisfies HistorianOptions;
+  });
+
+  it('capture is opt-in: defaults disabled, honors an explicit enable', () => {
+    const off = resolveOptions({ translate: { apiKey: 'sk-env' } }, NO_ENV, makeHomeDir());
+    expect(off.capture.enabled).toBe(false);
+    const on = resolveOptions(
+      { capture: { enabled: true }, translate: { apiKey: 'sk-env' } },
+      NO_ENV,
+      makeHomeDir(),
+    );
+    expect(on.capture.enabled).toBe(true);
   });
 
   it('readingLoop defaults true and honors an explicit false', () => {

@@ -18,6 +18,7 @@ vi.mock('../src/config.js', async () => {
       sections: ['test'],
       locales: ['en', 'zh'],
       readingLoop: true,
+      capture: { enabled: false },
     })),
   };
 });
