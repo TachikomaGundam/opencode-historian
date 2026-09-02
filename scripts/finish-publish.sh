@@ -2,7 +2,7 @@
 # finish-publish.sh — todo 19 completion runner (the 10-step checklist in .qa/19.txt, automated).
 #
 # Usage:  scripts/finish-publish.sh <6-digit-npm-OTP>
-# Effect: publishes opencode-historian@0.1.0 to npm, proves the npm-sourced plugin
+# Effect: publishes opencode-wiki-historian@0.1.0 to npm, proves the npm-sourced plugin
 #         loads (not the file:// twin), verifies npmjs 200, tags v0.1.0.
 # Safe:   idempotent (re-run OK); never prints the OTP; restores global config on exit.
 set -euo pipefail
@@ -11,7 +11,7 @@ OTP="${1:-}"
 REPO="/home/user/workspace/opencode-historian"
 JSONC="$HOME/.config/opencode/opencode.jsonc"
 SCRATCH="$REPO/.qa/scratch/npm-smoke"
-PKG="opencode-historian"
+PKG="opencode-wiki-historian"
 EVID="$REPO/.qa/19.txt"
 
 if [[ ! "$OTP" =~ ^[0-9]{6}$ ]]; then
