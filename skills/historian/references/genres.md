@@ -1,6 +1,6 @@
-# 页型模板 G1-G4
+# 页型模板 G1-G5
 
-> 四种页型覆盖 wiki 中所有知识形态。选定页型后用对应骨架写作。骨架实现见 `src/templates/skeletons.ts`，本文件是操作指南。
+> 五种页型覆盖 wiki 中所有知识形态。选定页型后用对应骨架写作。骨架实现见 `src/templates/skeletons.ts`，本文件是操作指南。
 
 ## Phase 1.5 页型分类
 
@@ -12,6 +12,7 @@
 | G2 对比选型 | 对比/选型/vs/versus/compare/benchmark/alternatives | 比较两个或以上方案，给出选型建议 |
 | G3 清单索引 | 清单/列表/inventory/checklist/catalog/命令速查 | 罗列同类对象（端口、模型、命令、配置项） |
 | G4 概念原理 | 原理/为什么/how it works/概念/机制 | 解释一个概念或机制的工作原理 |
+| G5 现状账本 | 端口/版本/已部署/当前状态/上次核实/last verified + 组件表 | 记录此刻部署/运行态，每行可复核、可追漂移 |
 
 声明格式：`页型: G<N> <类型名>`（如 `页型: G1 事件复盘`）
 
@@ -100,6 +101,30 @@
 
 ---
 
+## G5 现状账本 (Current-State Ledger)
+
+记录机器"此刻部署/运行着什么"的权威快照，供人和 agent 索引现状、追踪漂移。是状态卡，不是叙事页。
+
+**固定节序**：
+
+1. 状态块 — 机读单行取值：`Active` | `Superseded-by: <path>` | `Deprecated`
+2. 部署物清单 (Component Table) — 每行必填：组件 | 版本 | 端口/路径 | 端点 | 依赖 | **上次核实于**
+3. 依赖与集成 (Dependencies & Integration) — 外部依赖与被依赖方
+4. 失效策略 (Invalidation Policy) — 什么事件作废本卡 + 复核周期
+5. 验证方法 (Verification) — 每组件一条可执行命令，agent 可直接复跑核实
+6. 变更记录 (Change Log) — 仅追加小表（日期 | 变更 | 依据）；完整历史写 G1 事件页并交叉引用
+7. 相关页面 (Related Pages)
+
+**部署物清单示例**（占位值，勿用真实部署）：
+
+| 组件 | 版本 | 端口/路径 | 端点 | 依赖 | 上次核实于 |
+|------|------|-----------|------|------|------------|
+| example-svc | 1.2.3 | 8000 | http://example.com/api | postgres | 2026-09-01 |
+
+**禁止**：叙事正文；行缺「上次核实于」；验证方法写成散文。**Supersede**：现状大改时新建卡，旧卡状态行改 `Superseded-by: <新卡路径>` 并保留，不删除。自检门第 4-6 项对 G5 换用账本变体判据（见 `src/migrate-score.ts` 的 `scoreG5Item*`）。
+
+---
+
 ## 通用元素（所有页型共享）
 
 ### 状态块（H1 后紧跟）
@@ -130,6 +155,6 @@
 
 ## 来源
 
-骨架实现：`src/templates/skeletons.ts`（G1_ZH/G1_EN/G2_ZH/G2_EN/G3_ZH/G3_EN/G4_ZH/G4_EN）。
-分类规则：`src/templates/genres.ts`（`classifyGenre` 函数）。
+骨架实现：`src/templates/skeletons.ts`（G1_ZH/G1_EN/G2_ZH/G2_EN/G3_ZH/G3_EN/G4_ZH/G4_EN/G5_ZH/G5_EN）。
+分类规则：`src/templates/genres.ts`（`classifyGenre` 函数）；G5 门控判据：`src/migrate-score.ts`（`scoreG5Item4/5/6`）。
 调研依据：`docs/research/cross-cultural-wiki-writing.md` Genre templates 节。

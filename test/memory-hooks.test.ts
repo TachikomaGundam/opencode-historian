@@ -175,4 +175,14 @@ describe('capture event + /historian-capture command (todo 9)', () => {
     expect(cmd?.template).toContain('改进/Improvement');
     expect(cmd?.template).toContain('(en + zh)');
   });
+
+  it('config hook never clobbers a user-defined /historian-capture command', async () => {
+    const hooks = await plugin.server(fakeInput().input, BASE_OPTS);
+    if (hooks.config === undefined) throw new Error('config hook missing');
+    const userCmd = { template: 'user-defined', description: 'mine' };
+    const cfg: Config = { command: { 'historian-capture': { ...userCmd }, mine: { template: 'echo' } } };
+    await hooks.config(cfg);
+    expect(cfg.command?.['historian-capture']).toEqual(userCmd);
+    expect(cfg.command?.mine).toEqual({ template: 'echo' });
+  });
 });

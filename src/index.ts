@@ -108,7 +108,9 @@ async function server(input: PluginInput, options?: PluginOptions): Promise<Hook
       cfgWithSkills.skills ??= {};
       cfgWithSkills.skills.paths = unique([...(cfgWithSkills.skills.paths ?? []), skillsDir]);
       cfg.command ??= {};
-      cfg.command['historian-capture'] = {
+      // ??= — a user-defined /historian-capture in their own config wins;
+      // the plugin only supplies the default.
+      cfg.command['historian-capture'] ??= {
         description: CAPTURE_COMMAND_DESCRIPTION,
         template: CAPTURE_COMMAND_TEMPLATE,
       };
