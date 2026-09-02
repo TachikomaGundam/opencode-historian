@@ -231,7 +231,7 @@ key 缺失时 `ConfigError` 记录一次日志，插件工具全部禁用，open
 http://<host>/zh/<path>
 ```
 
-例如 `ops/gpu-setup` 的中文版在 `http://<host>/zh/ops/gpu-setup`。英文版不带 locale 前缀：`http://<host>/ops/gpu-setup`。
+例如 `ops/deploy-checklist` 的中文版在 `http://<host>/zh/ops/deploy-checklist`。英文版不带 locale 前缀：`http://<host>/ops/deploy-checklist`。
 
 **语言切换器**出现在页面右上角的前提是 namespacing 已开启且 zh 在 Active Namespaces 里。看不到切换器时，检查 Admin > General > Multilingual 设置。
 
