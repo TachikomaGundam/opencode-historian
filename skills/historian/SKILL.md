@@ -119,6 +119,7 @@ historian_search query="<核心主题关键词>" kind=content
 | G2 对比选型 | 对比/选型/vs/versus/compare/benchmark/alternatives | 比较方案给建议 |
 | G3 清单索引 | 清单/列表/inventory/checklist/catalog/命令速查 | 罗列同类对象 |
 | G4 概念原理 | 原理/为什么/how it works/概念/机制 | 解释概念或机制 |
+| G5 现状账本 | 端口/版本/已部署/当前状态/上次核实/last verified + 组件表 | 记录此刻部署/运行态 |
 
 声明格式：`页型: G<N> <类型名>`
 
@@ -156,7 +157,7 @@ historian_search query="<核心主题关键词>" kind=content
 
 | 工具 | 用途 | 关键参数 |
 |------|------|----------|
-| `historian_page_create` | 创建页面（含孪生） | `path`, `title`, `content`（缺省=返回本地骨架）, `genre`(G1-G4), `locale`(en/zh, 缺省 en), `isPublished`(缺省 true), `tags`(缺省 []), `twin`(缺省 true) |
+| `historian_page_create` | 创建页面（含孪生） | `path`, `title`, `content`（缺省=返回本地骨架）, `genre`(G1-G5), `locale`(en/zh, 缺省 en), `isPublished`(缺省 true), `tags`(缺省 []), `twin`(缺省 true) |
 | `historian_page_update` | 更新页面（全量合并） | `path`, `locale`, `title?`, `content?`, `description?`, `tags?` |
 | `historian_page_append` | 追加到页面（双 locale） | `path`, `section`, `locale`, `sectionZh?` |
 | `historian_translate_snippet` | 翻译片段 | `text`, `from`(en/zh), `to`(en/zh) |
@@ -201,15 +202,15 @@ historian_search query="<核心主题关键词>" kind=content
 | 1 | 导言占比 10-15% | 全部 | dry-run |
 | 2 | 句长上限 zh≤20 / en≤25 | 全部 | dry-run |
 | 3 | ≥3 字段入表 | 全部 | dry-run |
-| 4 | 对比表含来源列 | G2 | dry-run |
-| 5 | 时间线含来源列 | G1 | dry-run |
-| 6 | 行动项五要素 | G1 | dry-run |
+| 4 | 对比表含来源列（G5 变体：部署物清单每行带「上次核实于」列） | G2 / G5 | dry-run |
+| 5 | 时间线含来源列（G5 变体：验证方法含可执行复核命令） | G1 / G5 | dry-run |
+| 6 | 行动项五要素（G5 变体：无叙事正文 = 状态块 + 表格） | G1 / G5 | dry-run |
 | 7 | 无杂项筐 | 全部 | dry-run |
 | 8 | 无溢美词 | 全部 | dry-run |
 | 9 | 双语 URL 已回报 | 全部 | apply 后 |
 | 10 | 孪生已建或 zh-pending 已记录 | 全部 | apply 后 |
 
-页型不适用项（非 G1 的时间线/行动项、非 G2 的来源列）判 N/A=PASS。
+页型不适用项（非 G1 的时间线/行动项、非 G2 的来源列）判 N/A=PASS；G5 页的第 4-6 项换用账本变体判据。
 
 任一内容项 FAIL → 修订草稿重试，每页最多 3 轮。用尽 → BLOCKED 停下报告。
 
