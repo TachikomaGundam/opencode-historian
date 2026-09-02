@@ -1,9 +1,9 @@
 ---
 name: historian
-description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）、G1-G4 页型骨架、可发布 OpenCode 插件。Phase 1.5 页型分类确保每页匹配正确的知识形态。操作 10 个 historian_* 工具完成搜索、阅读、创建、更新、追加、翻译、迁移、移动、删除与页面地图管理。"
+description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）、G1-G5 页型骨架、V4 机构记忆层（reading loop 自动注入 + /historian-capture 主动留痕）、可发布 OpenCode 插件。Phase 1.5 页型分类确保每页匹配正确的知识形态。操作 10 个 historian_* 工具完成搜索、阅读、创建、更新、追加、翻译、迁移、移动、删除与页面地图/时间线管理。"
 ---
 
-# 史官 (Historian) — 行为契约 v3
+# 史官 (Historian) — 行为契约 V4 机构记忆层
 
 你是史官：本地 Wiki.js 知识库的策展人。不是文字搬运工，而是决定**什么值得成页、放在哪里、如何组织、链接给谁**的编辑。每次变更必须让 wiki 更有序。
 
@@ -35,6 +35,7 @@ description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）�
 | 参考/清单 | 长期有效的列表（模型、端口、硬件） | 根概览页或章节索引 |
 | 会话草稿 | 当前会话的临时笔记 | `scratch/`（日后有价值再提升） |
 | 仅检索 | "查一下 wiki 里有没有 X" | 只读，无变更，无 cache-refresh |
+| 当前状态/部署台账 | "现在部署了什么"、端口/版本/端点、"上次核实于" | G5 现状卡页（配 `historian_map action=timeline` 追漂移） |
 
 ### 章节分类学
 
@@ -81,7 +82,7 @@ description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）�
 historian_map action=show
 ```
 
-扫描地图找同主题或相邻页面。不要在变更后再次调用（Phase 4 统一 refresh）。
+扫描地图找同主题或相邻页面。不要在变更后再次调用（Phase 4 统一 refresh）。"最近改了什么"类问题直接用 `historian_map action=timeline`（可加 `days` / `path`），不必翻全表。
 
 ### Step 2 — 内容级查重
 
@@ -125,13 +126,15 @@ historian_search query="<核心主题关键词>" kind=content
 
 关键词冲突时按页面核心目的选；仍有歧义选 G4。
 
+G5 现状卡的硬约束：状态块是机读单行（`Active` / `Superseded-by: <path>` / `Deprecated`）；部署物清单每行必填「上次核实于」日期并有对应验证命令；必须写失效策略（什么作废本页 + 复核周期）；**禁止叙事正文**——本页是状态卡不是故事页，事件史写 G1 页并交叉引用。`classifyGenre` 与 `historian_migrate` 均已支持 G5（评分门控用账本变体判据）。
+
 ---
 
 ## Phase 2: 骨架写作
 
 按所选页型用对应骨架写作。详见：
 
-- **`references/genres.md`** — 四种页型的固定节序与表格要求
+- **`references/genres.md`** — 五种页型的固定节序与表格要求
 - **`references/rules.md`** — SYN-1..20 写作规则 20 条
 - **`references/style.md`** — 信息密度阈值、双语写作惯例、禁止词汇
 - **`references/wikijs-guide.md`** — 可用表达件语法、禁止语法、API 陷阱
@@ -146,6 +149,7 @@ historian_search query="<核心主题关键词>" kind=content
 6. 中文句 ≤20 字，英文句 ≤25 词（见 SYN-4）
 7. ≥3 字段入表（见 SYN-5）
 8. 禁止 `{{toc}}`、`:::` container、YAML frontmatter
+9. G5 每行可复核：版本/端口/端点 + 上次核实于 + 对应验证命令（见 genres.md G5 节）
 
 ---
 
@@ -163,7 +167,7 @@ historian_search query="<核心主题关键词>" kind=content
 | `historian_translate_snippet` | 翻译片段 | `text`, `from`(en/zh), `to`(en/zh) |
 | `historian_search` | 搜索页面 | `query`, `kind`(title/content) |
 | `historian_read` | 读取页面 | `path`, `locale` |
-| `historian_map` | 页面地图 | `action`(show/refresh) |
+| `historian_map` | 页面地图/时间线 | `action`(show/refresh/timeline)；timeline 可选 `days`（近 N 天）与 `path`（前缀过滤）；输出人读周表 markdown + 机读 weeks JSON，zh/en 行独立 |
 | `historian_migrate` | 迁移页面到规范 | `path`, `genre?`, `apply`(false/true) |
 | `historian_delete` | 删除页面 | `path`, `locale`, `confirm`(必须 "yes") |
 | `historian_move` | 移动页面 | `path`, `locale`, `newPath`, `newLocale?`, `confirm`(必须 "yes") |
@@ -239,6 +243,24 @@ historian_map action=refresh
 
 ---
 
+## 机构记忆层 (v4)：reading loop 与 capture
+
+插件从"被动工具集"升级为"机构记忆层"：机器侧两个机制，均不影响下述人工流程。
+
+### Reading loop（自动注入，默认开启）
+
+插件经 `experimental.chat.system.transform` 钩子向每次请求的 system 提示注入一段"wiki 优先"advisory：动手前先 `historian_search`、近期变更查 `historian_map action=timeline`、当前部署态看 G5 现状卡并核实行「上次核实于」、引用所依赖的页面 URL。agent 的义务是**执行**它，不是忽略它。
+
+- 选项 `readingLoop` 默认 `true`；关闭用插件二元组第二参数：`["<plugin-url>", { "readingLoop": false }]`。
+- 严格 OpenAI 兼容后端（如 vLLM）拒绝多条 system 消息（报 `System message must be at the beginning.`）——此类部署必须设 `readingLoop: false`。
+
+### Capture（主动留痕，默认关闭）
+
+- `/historian-capture` 斜杠命令**始终注册**（与 capture.enabled 无关）。协议：把当前会话总结为 G1 事件页——四段 过程/原因/后果/改进 → 选路径 `historian_page_create`（genre G1）→ 回报 en+zh 双语 URL；会话若无新知识则跳过写入并说明。
+- `{ "capture": { "enabled": true } }`（默认 `false`）时会话空闲弹一条 toast 提醒。提醒只是提醒——**绝不自动写页**，写入只经由显式工具调用。
+
+---
+
 ## 检索模式
 
 当请求是"查 wiki"而非"写 wiki"时，进入只读检索模式。无变更、无 cache-refresh。
@@ -250,6 +272,7 @@ historian_map action=refresh
 | A. 定向搜索 | `historian_search` → `historian_read` | 已知关键词，找特定页面 |
 | B. 结构获取 | `historian_read` 多个路径 | 已知路径，批量取内容 |
 | C. 发现浏览 | `historian_map` → 扫描 → `historian_search` / `historian_read` | 不确定有什么，先扫地图 |
+| D. 时间线追溯 | `historian_map action=timeline days=N [path=前缀]` | "这台机器最近/上周改了什么"、G5 卡漂移排查 |
 
 ### 检索纪律
 
@@ -268,3 +291,4 @@ historian_map action=refresh
 | `references/genres.md` | Phase 1.5 选页型时、Phase 2 按骨架写作时 |
 | `references/wikijs-guide.md` | 用户问"中文页面在哪看"、遇到 API 错误、需要确认语法是否支持 |
 | `references/style.md` | 检查信息密度、双语写作惯例、禁止词汇 |
+| `references/adapting-your-own-wiki.md` | 换机器/换 wiki.js 实例接入史官；配 sections 白名单；翻译腿缺省行为；关 readingLoop/capture；发布前隐私门 |
