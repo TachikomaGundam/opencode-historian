@@ -3,7 +3,6 @@ dist/
 .qa/*
 !.qa/.gitkeep
 
-# todo 14: pre-image backup files (restore program of record) live here
+# todo 5: leaky dev artifacts stay local only — never tracked, never shipped
 results/*
-!results/pilot-*.md
-!results/pilot-backup-*.json
+results/*.json
