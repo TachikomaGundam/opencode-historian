@@ -6,3 +6,4 @@ dist/
 # todo 5: leaky dev artifacts stay local only — never tracked, never shipped
 results/*
 results/*.json
+.omo/
