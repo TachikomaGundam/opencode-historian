@@ -38,8 +38,9 @@ export interface HistorianOptions {
     readonly model: string;
     readonly apiKey: string;
     /** jsonc provider whose `options.apiKey` is the third translation-key
-     *  trust leg (see resolveTranslationApiKey). Machine-agnostic: override
-     *  via `translate.providerKey` when your key lives elsewhere. */
+     *  trust leg (see resolveTranslationApiKey). Empty string = NOT
+     *  CONFIGURED: the jsonc leg is opt-in via `translate.providerKey`;
+     *  the shipped package carries no default provider name. */
     readonly providerKey: string;
   }>;
   /** Path-prefix whitelist. Empty (the shipped default) = no restriction —
@@ -58,9 +59,8 @@ export interface HistorianPluginOptions {
     readonly endpoint?: string;
     readonly model?: string;
     readonly apiKey?: string;
-    /** jsonc provider key for the apiKey fallback leg; default
-     *  'my-provider' (an example-compatible third-party provider
-     *  name, not user-identifying — override for a different gateway). */
+    /** jsonc provider name for the apiKey fallback leg. No default: when
+     *  unset the jsonc leg never runs. */
     readonly providerKey?: string;
   }>;
   readonly sections?: readonly string[];
@@ -76,7 +76,6 @@ export const DEFAULT_API_KEY_PATH = '~/.wikijs-api-key';
 /** Env leg of the endpoint chain: raw option → this env var → unset (''). */
 export const ENV_TRANSLATE_ENDPOINT = 'HISTORIAN_TRANSLATE_ENDPOINT';
 export const DEFAULT_TRANSLATE_MODEL = 'qwen3.7-plus';
-export const DEFAULT_TRANSLATE_PROVIDER_KEY = 'my-provider';
 /** Empty = no path-prefix restriction (see HistorianOptions.sections). */
 export const DEFAULT_SECTIONS: readonly string[] = [];
 export const DEFAULT_LOCALES = ['en', 'zh'] as const;
@@ -90,7 +89,8 @@ export const DEFAULT_LOCALES = ['en', 'zh'] as const;
  * Translation key priority (highest wins):
  *   1. raw.translate.apiKey
  *   2. env DASHSCOPE_API_KEY
- *   3. jsonc provider[translate.providerKey ?? 'my-provider'].options.apiKey
+ *   3. jsonc provider[translate.providerKey].options.apiKey — only when
+ *      `translate.providerKey` is set explicitly (no default provider name)
  *   4. throw ConfigError('missing translation key')
  *
  * Translation endpoint priority: raw.translate.endpoint →
@@ -107,7 +107,7 @@ export function resolveOptions(
   env: NodeJS.ProcessEnv = process.env,
   homeDir: string = homedir(),
 ): HistorianOptions {
-  const providerKey = raw.translate?.providerKey ?? DEFAULT_TRANSLATE_PROVIDER_KEY;
+  const providerKey = raw.translate?.providerKey ?? '';
   const translateApiKey = resolveTranslationApiKey(raw, env, homeDir, providerKey);
   return {
     baseUrl: raw.baseUrl ?? DEFAULT_BASE_URL,
@@ -135,14 +135,20 @@ function resolveTranslationApiKey(
   const envKey = env.DASHSCOPE_API_KEY;
   if (isNonEmpty(envKey)) return envKey;
 
-  const jsoncKey = readProviderApiKeyFromJsonc(homeDir, providerKey);
-  if (isNonEmpty(jsoncKey)) return jsoncKey;
+  if (providerKey !== '') {
+    const jsoncKey = readProviderApiKeyFromJsonc(homeDir, providerKey);
+    if (isNonEmpty(jsoncKey)) return jsoncKey;
+  }
 
+  const jsoncHint =
+    providerKey !== ''
+      ? `add provider["${providerKey}"].options.apiKey`
+      : `set translate.providerKey and add the key to provider["<name>"].options.apiKey`;
   throw new ConfigError(
     'missing-translation-key',
     `Missing translation api key: set plugin option translate.apiKey, ` +
-      `export DASHSCOPE_API_KEY, or add provider["${providerKey}"].options.apiKey ` +
-      `to ${opencodeJsoncPath(homeDir)}.`,
+      `export DASHSCOPE_API_KEY, or ${jsoncHint} ` +
+      `in ${opencodeJsoncPath(homeDir)}.`,
   );
 }
 

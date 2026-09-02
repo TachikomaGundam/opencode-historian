@@ -1,21 +1,25 @@
 #!/usr/bin/env bash
 # finish-publish.sh — todo 19 completion runner (the 10-step checklist in .qa/19.txt, automated).
 #
-# Usage:  scripts/finish-publish.sh <6-digit-npm-OTP>
+# Usage:  tools/finish-publish.sh <6-digit-npm-OTP>   (REPO defaults to `git rev-parse --show-toplevel`)
 # Effect: publishes opencode-wiki-historian@0.1.0 to npm, proves the npm-sourced plugin
 #         loads (not the file:// twin), verifies npmjs 200, tags v0.1.0.
 # Safe:   idempotent (re-run OK); never prints the OTP; restores global config on exit.
 set -euo pipefail
 
 OTP="${1:-}"
-REPO="/home/user/workspace/opencode-historian"
+REPO="${REPO:-$(git rev-parse --show-toplevel 2>/dev/null || true)}"
+if [[ -z "$REPO" ]]; then
+  echo "ERROR: REPO unset — run inside the repo or export REPO=/path/to/opencode-historian" >&2
+  exit 2
+fi
 JSONC="$HOME/.config/opencode/opencode.jsonc"
 SCRATCH="$REPO/.qa/scratch/npm-smoke"
 PKG="opencode-wiki-historian"
 EVID="$REPO/.qa/19.txt"
 
 if [[ ! "$OTP" =~ ^[0-9]{6}$ ]]; then
-  echo "usage: scripts/finish-publish.sh <6-digit OTP from your authenticator>" >&2
+  echo "usage: tools/finish-publish.sh <6-digit OTP from your authenticator>" >&2
   exit 2
 fi
 
@@ -54,12 +58,12 @@ restore() {
   rm -f "$BACKUP"
 }
 trap restore EXIT
-python3 - "$JSONC" "$PKG" <<'PY'
+python3 - "$JSONC" "$REPO" <<'PY'
 import re, sys
-p, pkg = sys.argv[1], sys.argv[2]
+p, repo = sys.argv[1], sys.argv[2].rstrip('/')
 s = open(p, encoding='utf-8').read()
 # comment out ONLY the entry string pointing at the local repo dir (abs OR file:// form)
-out = re.sub(r'"((?:file://)?/home/user/workspace/%s[^"]*)"' % pkg, r'/*ORCH-MASKED-FOR-PUBLISH-SMOKE "\1"*/', s, count=1)
+out = re.sub(r'"((?:file://)?%s[^"]*)"' % re.escape(repo), r'/*ORCH-MASKED-FOR-PUBLISH-SMOKE "\1"*/', s, count=1)
 assert out != s, "no file:// or abs-path entry found to mask"
 open(p, 'w', encoding='utf-8').write(out)
 print("masked file:// entry")

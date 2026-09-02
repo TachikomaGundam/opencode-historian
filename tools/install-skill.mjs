@@ -13,7 +13,7 @@ const force = args.includes('--force');
 const help = args.includes('--help') || args.includes('-h');
 
 if (help) {
-  console.log(`Usage: node scripts/install-skill.mjs [--dry-run] [--force]
+  console.log(`Usage: node tools/install-skill.mjs [--dry-run] [--force]
 
 Copies skills/historian/ to ~/.config/opencode/skills/historian/
 

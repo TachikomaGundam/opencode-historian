@@ -4,19 +4,9 @@
   "description": "opencode plugin that manages a wiki.js knowledge base with bilingual pages, genre templates, and migration tooling.",
   "type": "module",
   "license": "MIT",
-  "author": "TachikomaGundam",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/TachikomaGundam/opencode-historian.git"
-  },
-  "bugs": {
-    "url": "https://github.com/TachikomaGundam/opencode-historian/issues"
-  },
-  "homepage": "https://github.com/TachikomaGundam/opencode-historian#readme",
   "files": [
     "dist",
-    "skills",
-    "scripts"
+    "skills"
   ],
   "main": "./dist/index.js",
   "exports": {

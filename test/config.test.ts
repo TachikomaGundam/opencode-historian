@@ -45,7 +45,7 @@ const REALISTIC_JSONC = `{
     },
     "my-provider": {
       "npm": "@ai-sdk/anthropic",
-      "name": "Alibaba Cloud Model Studio",
+      "name": "Example Anthropic-compatible Gateway",
       "options": {
         "baseURL": "https://gw.example.test/apps/anthropic/v1", // https:// in this string must survive
         "note": "/* not a block comment */ // not a line comment",
@@ -81,25 +81,35 @@ describe('resolveOptions translation-key priority matrix', () => {
     expect(opts.sections).toEqual(['custom']);
   });
 
-  it('env DASHSCOPE_API_KEY beats jsonc provider-x key when raw absent', () => {
+  it('env DASHSCOPE_API_KEY beats jsonc provider key when raw absent', () => {
     const homeDir = makeHomeDir();
     writeJsonc(homeDir, REALISTIC_JSONC);
-    const opts = resolveOptions({}, { DASHSCOPE_API_KEY: 'sk-env' }, homeDir);
+    const opts = resolveOptions(
+      { translate: { providerKey: 'my-provider' } },
+      { DASHSCOPE_API_KEY: 'sk-env' },
+      homeDir,
+    );
     expect(opts.translate.apiKey).toBe('sk-env');
   });
 
-  it('jsonc my-provider key is picked when raw and env are absent', () => {
+  it('jsonc provider key is picked when raw and env are absent and providerKey is configured', () => {
     const homeDir = makeHomeDir();
     writeJsonc(homeDir, REALISTIC_JSONC);
-    const opts = resolveOptions({}, NO_ENV, homeDir);
+    const opts = resolveOptions({ translate: { providerKey: 'my-provider' } }, NO_ENV, homeDir);
     expect(opts.translate.apiKey).toBe('sk-jsonc-live');
+  });
+
+  it('skips the jsonc leg entirely when providerKey is not configured (no baked default)', () => {
+    const homeDir = makeHomeDir();
+    writeJsonc(homeDir, REALISTIC_JSONC); // would resolve a key if the leg ran
+    expect(() => resolveOptions({}, NO_ENV, homeDir)).toThrow(ConfigError);
   });
 
   it('throws ConfigError when all three legs are absent (fixture homeDir proves real config is not read)', () => {
     const emptyHomeDir = makeHomeDir(); // no .config/opencode/opencode.jsonc here
     let caught: unknown;
     try {
-      resolveOptions({}, NO_ENV, emptyHomeDir);
+      resolveOptions({ translate: { providerKey: 'my-provider' } }, NO_ENV, emptyHomeDir);
     } catch (err) {
       caught = err;
     }
@@ -120,10 +130,12 @@ describe('resolveOptions translation-key priority matrix', () => {
   }
 }`,
     );
-    expect(() => resolveOptions({}, NO_ENV, homeDir)).toThrow(ConfigError);
+    expect(() =>
+      resolveOptions({ translate: { providerKey: 'my-provider' } }, NO_ENV, homeDir),
+    ).toThrow(ConfigError);
   });
 
-  it('throws ConfigError when provider-x exists but its apiKey is an empty string', () => {
+  it('throws ConfigError when the configured provider exists but its apiKey is an empty string', () => {
     const homeDir = makeHomeDir();
     writeJsonc(
       homeDir,
@@ -133,19 +145,21 @@ describe('resolveOptions translation-key priority matrix', () => {
   }
 }`,
     );
-    expect(() => resolveOptions({}, NO_ENV, homeDir)).toThrow(ConfigError);
+    expect(() =>
+      resolveOptions({ translate: { providerKey: 'my-provider' } }, NO_ENV, homeDir),
+    ).toThrow(ConfigError);
   });
 });
 
 describe('resolveOptions translate.providerKey (jsonc trust leg)', () => {
-  it('reads the apiKey from the configured provider, not the hardcoded default', () => {
+  it('reads the apiKey only from the configured provider, ignoring others', () => {
     const homeDir = makeHomeDir();
     writeJsonc(
       homeDir,
       `{
   "provider": {
     "my-gateway": { "options": { "apiKey": "sk-my-gw" } },
-    "my-provider": { "options": { "apiKey": "sk-default-not-used" } }
+    "other-provider": { "options": { "apiKey": "sk-other-not-used" } }
   }
 }`,
     );
@@ -173,7 +187,7 @@ describe('resolveOptions defaults', () => {
     expect(opts.apiKeyPath).toBe('~/.wikijs-api-key');
     expect(opts.translate.endpoint).toBe('');
     expect(opts.translate.model).toBe('qwen3.7-plus');
-    expect(opts.translate.providerKey).toBe('my-provider');
+    expect(opts.translate.providerKey).toBe(''); // opt-in only: no default provider
     expect(opts.sections).toEqual([]);
     expect(opts.locales).toEqual(['en', 'zh']);
     void opts satisfies HistorianOptions;
@@ -225,25 +239,33 @@ describe('resolveOptions malformed jsonc (adversarial: malformed_input)', () => 
   it('throws ConfigError for unterminated block comment instead of crashing', () => {
     const homeDir = makeHomeDir();
     writeJsonc(homeDir, '{"provider": {} /* never closed');
-    expect(() => resolveOptions({}, NO_ENV, homeDir)).toThrow(ConfigError);
+    expect(() =>
+      resolveOptions({ translate: { providerKey: 'my-provider' } }, NO_ENV, homeDir),
+    ).toThrow(ConfigError);
   });
 
   it('throws ConfigError for unterminated string instead of crashing', () => {
     const homeDir = makeHomeDir();
     writeJsonc(homeDir, '{"provider": {"x": "oops');
-    expect(() => resolveOptions({}, NO_ENV, homeDir)).toThrow(ConfigError);
+    expect(() =>
+      resolveOptions({ translate: { providerKey: 'my-provider' } }, NO_ENV, homeDir),
+    ).toThrow(ConfigError);
   });
 
   it('throws ConfigError when top-level jsonc is not an object', () => {
     const homeDir = makeHomeDir();
     writeJsonc(homeDir, '[{"provider": {"my-provider": {"options": {"apiKey": "sk-x"}}}}]');
-    expect(() => resolveOptions({}, NO_ENV, homeDir)).toThrow(ConfigError);
+    expect(() =>
+      resolveOptions({ translate: { providerKey: 'my-provider' } }, NO_ENV, homeDir),
+    ).toThrow(ConfigError);
   });
 
   it('throws ConfigError when jsonc is pure garbage', () => {
     const homeDir = makeHomeDir();
     writeJsonc(homeDir, 'this is { not json');
-    expect(() => resolveOptions({}, NO_ENV, homeDir)).toThrow(ConfigError);
+    expect(() =>
+      resolveOptions({ translate: { providerKey: 'my-provider' } }, NO_ENV, homeDir),
+    ).toThrow(ConfigError);
   });
 });
 
