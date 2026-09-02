@@ -23,6 +23,7 @@ export const OPTS: HistorianOptions = {
   },
   sections: ['_sandbox'],
   locales: ['en', 'zh'],
+  readingLoop: true,
 };
 
 const tmpDirs: string[] = [];

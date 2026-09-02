@@ -48,6 +48,10 @@ export interface HistorianOptions {
    *  real authorization gate. Consumers must treat [] as allow-any. */
   readonly sections: readonly string[];
   readonly locales: readonly string[];
+  /** v2 reading-loop gate: true (the shipped default) makes the plugin push a
+   *  consult-the-wiki advisory block into every chat request's system array via
+   *  the experimental.chat.system.transform hook. false = hook is a pure no-op. */
+  readonly readingLoop: boolean;
 }
 
 /** Raw, user-supplied plugin options (the opencode PluginOptions shape).
@@ -65,6 +69,7 @@ export interface HistorianPluginOptions {
   }>;
   readonly sections?: readonly string[];
   readonly locales?: readonly string[];
+  readonly readingLoop?: boolean;
 }
 
 // --- Defaults (single source of truth for the plan's contract) --------------
@@ -79,6 +84,8 @@ export const DEFAULT_TRANSLATE_MODEL = 'qwen3.7-plus';
 /** Empty = no path-prefix restriction (see HistorianOptions.sections). */
 export const DEFAULT_SECTIONS: readonly string[] = [];
 export const DEFAULT_LOCALES = ['en', 'zh'] as const;
+/** Reading loop is on unless explicitly disabled (plan v2 todo 8). */
+export const DEFAULT_READING_LOOP = true;
 
 // --- Resolution -------------------------------------------------------------
 
@@ -120,6 +127,7 @@ export function resolveOptions(
     },
     sections: raw.sections ?? DEFAULT_SECTIONS,
     locales: raw.locales ?? DEFAULT_LOCALES,
+    readingLoop: raw.readingLoop ?? DEFAULT_READING_LOOP,
   };
 }
 
