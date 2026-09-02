@@ -30,7 +30,7 @@ description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）�
 | 类型 | 信号 | 归处 |
 |------|------|------|
 | 持久发现/配置 | "记录这个"、基准结论、调参、架构决策 | 对应主题章节 |
-| 事件复盘 | 症状→根因→修复→预防 | `troubleshooting/` |
+| 事件复盘 | 症状→根因→修复→预防 | `incidents/` |
 | 服务操作手册 | 启停、健康检查、配置、回滚 | `ops/` |
 | 参考/清单 | 长期有效的列表（模型、端口、硬件） | 根概览页或章节索引 |
 | 会话草稿 | 当前会话的临时笔记 | `scratch/`（日后有价值再提升） |
@@ -38,18 +38,20 @@ description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）�
 
 ### 章节分类学
 
+顶级章节**按机器配置**，插件不内置任何特定部署的章节表：可写前缀白名单由插件选项 `sections` 传入（默认为空 = 不限制前缀；实际权限由 wiki.js token 的 page rules 决定）。当前实例的章节布局以 `historian_map show` 输出或用户说明为准，不要臆断。
+
+假想实例的占位示例（仅示意，非真实章节表）：
+
 | 章节 | 用途 |
 |------|------|
-| 根页面 | 仅服务级概览：`server-overview`、`architecture`、`network`、`services`、`home`、`wiki-index` |
+| 根页面 | 概览类页面（如 `wiki-index`） |
 | `ops/` | 服务运维：启停、健康、配置、回滚 |
-| `inference-notes/` | 跨后端推理实验与可复用发现 |
-| `llm-server/` | 已部署的 Qwen 服务器与模型特定历史 |
-| `perf-notes/` | Vulkan 后端调查 |
-| `opencode/` | OpenCode / OMO agent 分析 |
-| `agent-eval/` | HR 模型评测产出与方法论 |
-| `troubleshooting/` | 事件：症状、根因、修复、预防 |
+| `infra/` | 基础设施：部署、网络、环境配置 |
+| `team-notes/` | 团队约定、决策记录 |
 | `scratch/` | 临时会话笔记；持久发现日后提升 |
 | `_sandbox/` | 评测/测试区。仅当 brief 显式说"eval sandbox"时使用。沙箱页默认 `isPublished: false`（fixture 惯例）；当 brief 要求匿名可访问（如"两版 URL 都能开"）时跟随 brief 用默认 `true`。 |
+
+`_sandbox/` 规则以字面路径前缀 `_sandbox/` 为准，与 `sections` 配置无关。
 
 ### 值不值得写 — 入门门控
 
@@ -223,8 +225,8 @@ historian_map action=refresh
 
 ```markdown
 ## 史官工作报告
-- **动作**: created `troubleshooting/wiki-oom-restart` / updated `wiki-index` / moved …
-- **分诊**: incident postmortem → troubleshooting/ → create (无现存页面覆盖该主题)
+- **动作**: created `incidents/wiki-oom-restart` / updated `wiki-index` / moved …
+- **分诊**: incident postmortem → incidents/ → create (无现存页面覆盖该主题)
 - **页型**: G1 事件复盘
 - **链接**: backlink from `wiki-index`, cross-link to `ops/wiki`
 - **en URL**: http://localhost:3000/<path>

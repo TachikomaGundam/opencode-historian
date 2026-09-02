@@ -15,7 +15,12 @@ export const URL = 'http://localhost:3000/graphql';
 export const OPTS: HistorianOptions = {
   baseUrl: 'http://localhost:3000',
   apiKeyPath: '~/.wikijs-api-key',
-  translate: { endpoint: 'http://translate.test', model: 'example-model', apiKey: 'sk-translate' },
+  translate: {
+    endpoint: 'http://translate.test',
+    model: 'example-model',
+    apiKey: 'sk-translate',
+    providerKey: 'my-provider',
+  },
   sections: ['_sandbox'],
   locales: ['en', 'zh'],
 };
