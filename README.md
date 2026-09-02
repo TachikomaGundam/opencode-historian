@@ -70,18 +70,19 @@ opencode run --command historian --message "historian_map show"
       "baseUrl": "http://your-wiki:3000",
       "apiKeyPath": "~/.wikijs-api-key",
       "translate": {
-        "endpoint": "https://...",
+        "endpoint": "https://your-gateway.example.com/apps/anthropic",
         "model": "qwen3.7-plus",
-        "apiKey": "<YOUR_KEY>"
+        "apiKey": "<YOUR_KEY>",
+        "providerKey": "your-jsonc-provider"
       },
-      "sections": ["ops", "perf-notes"],
+      "sections": ["team-notes", "infra"],
       "locales": ["en", "zh"]
     }]
   ]
 }
 ```
 
-不传选项时等同 `["opencode-wiki-historian"]`，使用全部默认值。
+不传选项时等同 `["opencode-wiki-historian"]`，使用全部默认值。插件包内不携带任何特定机器的配置（章节分类学、翻译网关地址均已清空为通用默认）。
 
 ### 选项全表
 
@@ -89,18 +90,16 @@ opencode run --command historian --message "historian_map show"
 |---|---|---|---|
 | `baseUrl` | string | `http://localhost:3000` | wiki.js GraphQL 端点 |
 | `apiKeyPath` | string | `~/.wikijs-api-key` | wiki API key 文件路径（tilde 在读取时展开） |
-| `translate.endpoint` | string | `https://gateway.example.net/apps/anthropic` | 翻译 API 端点 |
+| `translate.endpoint` | string | 未配置（见下方链） | 翻译 API 端点 |
 | `translate.model` | string | `qwen3.7-plus` | 翻译模型 |
 | `translate.apiKey` | string | 见下方链 | 翻译 API 密钥 |
-| `sections` | string[] | 见下方 | 插件可操作的 wiki 路径前缀白名单 |
+| `translate.providerKey` | string | `my-provider`（示例兼容值） | jsonc 兜底腿读取的 provider 名 |
+| `sections` | string[] | `[]`（不限制） | 插件可操作的 wiki 路径前缀白名单 |
 | `locales` | string[] | `["en", "zh"]` | 启用的语言列表 |
 
-`sections` 默认值：
+`translate.endpoint` 解析链（优先级从高到低）：`translate.endpoint` 选项 → 环境变量 `HISTORIAN_TRANSLATE_ENDPOINT` → 未配置。包内**不**内置任何网关地址；未配置时翻译调用直接以 `translate.endpoint not configured` 失败（见降级行为）。
 
-```json
-["ops", "inference-notes", "llm-server", "perf-notes",
- "opencode", "agent-eval", "troubleshooting", "scratch", "_sandbox"]
-```
+`sections` 默认为空列表 = 不限制路径前缀（任意合法路径可写，实际权限由 wiki.js token 的 page rules 决定）。按机器通过选项传入白名单，例如 `["team-notes", "infra", "ops"]`。
 
 ### API Key 获取优先级
 
@@ -108,7 +107,7 @@ opencode run --command historian --message "historian_map show"
 
 1. 配置对象中的 `translate.apiKey` 字段
 2. 环境变量 `DASHSCOPE_API_KEY`
-3. opencode jsonc 配置中 `provider["my-provider"].options.apiKey`
+3. opencode jsonc 配置中 `provider["<translate.providerKey>"].options.apiKey`（默认 providerKey 为 `my-provider`，可按部署改配）
 4. 均无则抛出 `ConfigError('missing-translation-key')`
 
 **wiki.js API key**，按优先级：
@@ -119,7 +118,7 @@ opencode run --command historian --message "historian_map show"
 
 ### 降级行为
 
-Key 缺失时 `ConfigError` 记录一次日志，插件工具全部禁用，opencode 正常启动不受影响。翻译 key 缺失时双语孪生功能降级为 pending 状态，创建页面只写入请求 locale 的内容。
+key 缺失时 `ConfigError` 记录一次日志，插件工具全部禁用，opencode 正常启动不受影响。`translate.endpoint` 未配置时双语孪生功能降级为 pending 状态（`twinReason: 'translate.endpoint not configured — ...'`），创建页面只写入请求 locale 的内容，不会发起任何翻译网络请求。
 
 ## wiki.js 前置检查 / Prerequisites
 

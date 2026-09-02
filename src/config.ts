@@ -30,10 +30,21 @@ export interface HistorianOptions {
    *  read time (the key file is not read during option resolution). */
   readonly apiKeyPath: string;
   readonly translate: Readonly<{
+    /** Empty string = NOT CONFIGURED. Resolution chain: raw option →
+     *  env HISTORIAN_TRANSLATE_ENDPOINT → unset. The shipped package
+     *  deliberately carries no endpoint default; every translate call
+     *  degrades to TranslateError('config') before touching the network. */
     readonly endpoint: string;
     readonly model: string;
     readonly apiKey: string;
+    /** jsonc provider whose `options.apiKey` is the third translation-key
+     *  trust leg (see resolveTranslationApiKey). Machine-agnostic: override
+     *  via `translate.providerKey` when your key lives elsewhere. */
+    readonly providerKey: string;
   }>;
+  /** Path-prefix whitelist. Empty (the shipped default) = no restriction —
+   *  any syntactically valid path is allowed; wiki.js page-rules remain the
+   *  real authorization gate. Consumers must treat [] as allow-any. */
   readonly sections: readonly string[];
   readonly locales: readonly string[];
 }
@@ -47,29 +58,27 @@ export interface HistorianPluginOptions {
     readonly endpoint?: string;
     readonly model?: string;
     readonly apiKey?: string;
+    /** jsonc provider key for the apiKey fallback leg; default
+     *  'my-provider' (an example-compatible third-party provider
+     *  name, not user-identifying — override for a different gateway). */
+    readonly providerKey?: string;
   }>;
   readonly sections?: readonly string[];
   readonly locales?: readonly string[];
 }
 
 // --- Defaults (single source of truth for the plan's contract) --------------
+// Machine-agnostic by contract: the shipped package carries no deployment's
+// section taxonomy, translation gateway URL, or provider layout.
 
 export const DEFAULT_BASE_URL = 'http://localhost:3000';
 export const DEFAULT_API_KEY_PATH = '~/.wikijs-api-key';
-export const DEFAULT_TRANSLATE_ENDPOINT =
-  'https://gateway.example.net/apps/anthropic';
+/** Env leg of the endpoint chain: raw option → this env var → unset (''). */
+export const ENV_TRANSLATE_ENDPOINT = 'HISTORIAN_TRANSLATE_ENDPOINT';
 export const DEFAULT_TRANSLATE_MODEL = 'qwen3.7-plus';
-export const DEFAULT_SECTIONS = [
-  'ops',
-  'inference-notes',
-  'llm-server',
-  'perf-notes',
-  'opencode',
-  'agent-eval',
-  'troubleshooting',
-  'scratch',
-  '_sandbox',
-] as const;
+export const DEFAULT_TRANSLATE_PROVIDER_KEY = 'my-provider';
+/** Empty = no path-prefix restriction (see HistorianOptions.sections). */
+export const DEFAULT_SECTIONS: readonly string[] = [];
 export const DEFAULT_LOCALES = ['en', 'zh'] as const;
 
 // --- Resolution -------------------------------------------------------------
@@ -81,26 +90,33 @@ export const DEFAULT_LOCALES = ['en', 'zh'] as const;
  * Translation key priority (highest wins):
  *   1. raw.translate.apiKey
  *   2. env DASHSCOPE_API_KEY
- *   3. jsonc provider["my-provider"].options.apiKey
+ *   3. jsonc provider[translate.providerKey ?? 'my-provider'].options.apiKey
  *   4. throw ConfigError('missing translation key')
  *
+ * Translation endpoint priority: raw.translate.endpoint →
+ * env HISTORIAN_TRANSLATE_ENDPOINT → unset (''). There is no baked-in
+ * gateway URL; an unset endpoint degrades translate calls to
+ * TranslateError('config') (twins go pending, see translate.ts).
+ *
  * There is deliberately NO anthropic fallback leg (removed by plan — the
- * machine has no such provider; the only live key for the default endpoint
- * lives under my-provider).
+ * provider layout varies per machine; the jsonc leg is opt-in via
+ * translate.providerKey).
  */
 export function resolveOptions(
   raw: Partial<HistorianPluginOptions>,
   env: NodeJS.ProcessEnv = process.env,
   homeDir: string = homedir(),
 ): HistorianOptions {
-  const translateApiKey = resolveTranslationApiKey(raw, env, homeDir);
+  const providerKey = raw.translate?.providerKey ?? DEFAULT_TRANSLATE_PROVIDER_KEY;
+  const translateApiKey = resolveTranslationApiKey(raw, env, homeDir, providerKey);
   return {
     baseUrl: raw.baseUrl ?? DEFAULT_BASE_URL,
     apiKeyPath: raw.apiKeyPath ?? DEFAULT_API_KEY_PATH,
     translate: {
-      endpoint: raw.translate?.endpoint ?? DEFAULT_TRANSLATE_ENDPOINT,
+      endpoint: raw.translate?.endpoint ?? env[ENV_TRANSLATE_ENDPOINT] ?? '',
       model: raw.translate?.model ?? DEFAULT_TRANSLATE_MODEL,
       apiKey: translateApiKey,
+      providerKey,
     },
     sections: raw.sections ?? DEFAULT_SECTIONS,
     locales: raw.locales ?? DEFAULT_LOCALES,
@@ -111,6 +127,7 @@ function resolveTranslationApiKey(
   raw: Partial<HistorianPluginOptions>,
   env: NodeJS.ProcessEnv,
   homeDir: string,
+  providerKey: string,
 ): string {
   const rawKey = raw.translate?.apiKey;
   if (isNonEmpty(rawKey)) return rawKey;
@@ -118,13 +135,13 @@ function resolveTranslationApiKey(
   const envKey = env.DASHSCOPE_API_KEY;
   if (isNonEmpty(envKey)) return envKey;
 
-  const jsoncKey = readBailianApiKeyFromJsonc(homeDir);
+  const jsoncKey = readProviderApiKeyFromJsonc(homeDir, providerKey);
   if (isNonEmpty(jsoncKey)) return jsoncKey;
 
   throw new ConfigError(
     'missing-translation-key',
-    'Missing translation api key: set plugin option translate.apiKey, ' +
-      'export DASHSCOPE_API_KEY, or add provider["my-provider"].options.apiKey ' +
+    `Missing translation api key: set plugin option translate.apiKey, ` +
+      `export DASHSCOPE_API_KEY, or add provider["${providerKey}"].options.apiKey ` +
       `to ${opencodeJsoncPath(homeDir)}.`,
   );
 }
@@ -164,10 +181,10 @@ function opencodeJsoncPath(homeDir: string): string {
   return `${homeDir}/.config/opencode/opencode.jsonc`;
 }
 
-/** Read provider["my-provider"].options.apiKey from the machine config.
+/** Read provider[providerKey].options.apiKey from the machine config.
  *  Missing file or missing key -> undefined (a later leg decides); malformed
  *  file -> ConfigError. Commented-out apiKey lines never survive stripping. */
-function readBailianApiKeyFromJsonc(homeDir: string): string | undefined {
+function readProviderApiKeyFromJsonc(homeDir: string, providerKey: string): string | undefined {
   const path = opencodeJsoncPath(homeDir);
   let content: string;
   try {
@@ -186,9 +203,9 @@ function readBailianApiKeyFromJsonc(homeDir: string): string | undefined {
 
   const provider = parsed.provider;
   if (!isRecord(provider)) return undefined; // no providers at all -> not a key source
-  const provider-x = provider['my-provider'];
-  if (!isRecord(provider-x)) return undefined;
-  const options = provider-x.options;
+  const chosen = provider[providerKey];
+  if (!isRecord(chosen)) return undefined;
+  const options = chosen.options;
   if (!isRecord(options)) return undefined;
   const apiKey = options.apiKey;
 
