@@ -1189,3 +1189,295 @@ describe('historian_migrate', () => {
     expect(text).not.toMatch(/\n\s*at /);
   });
 });
+
+// --- evidence tier + internal namespace guards (v3 todo 4) -------------------
+
+const MACHINE_NOTE = 'machine-tier page; anonymous visits 404 by design';
+
+describe('evidence tier + internal namespace guards', () => {
+  it('front regression: default-tier create payload and envelope are byte-for-byte 0.2.0', async () => {
+    // Given: a wiki that answers the en create + its authoritative lookup
+    const { tools, captured, fetchCount } = makeWired({
+      'create(': (vars) => ({
+        data: { pages: { create: { ...RESP_OK, page: { id: 999, path: vars.path, locale: vars.locale } } } },
+      }),
+      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage() } } }),
+    });
+
+    // When: creating on the front tier with NO tier argument (today's call shape)
+    const out = await run(tools.historian_page_create, {
+      path: PATH,
+      title: 'Alpha',
+      content: '# Alpha\nbody',
+      tags: ['t1'],
+      twin: false,
+    });
+
+    // Then: the create client payload is EXACTLY the 0.2.0 shape — no extra
+    // fields, no note key, isPrivate still false — and the envelope matches
+    // today's key set verbatim (this is the characterization baseline:
+    // captured against current code, must stay green after the tier change).
+    expect(out).toEqual({
+      ok: true,
+      mode: 'create',
+      path: PATH,
+      locale: 'en',
+      pageId: 76,
+      twinStatus: 'skipped',
+      urls: { en: EN_URL, zh: ZH_URL },
+    });
+    expect(varsOf(captured, 'create(')).toEqual([
+      {
+        path: PATH,
+        locale: 'en',
+        title: 'Alpha',
+        content: '# Alpha\nbody',
+        description: '',
+        editor: 'markdown',
+        isPublished: true,
+        isPrivate: false,
+        tags: ['t1'],
+      },
+    ]);
+    expect(fetchCount()).toBe(2);
+  });
+
+  it('rejects tier evidence + front path docs/foo before any fetch', async () => {
+    // Given: fetch spy that fails loudly
+    const { tools, fetchCount } = makeWired({});
+
+    // When: creating with an explicit evidence tier on a normal path
+    const out = await run(tools.historian_page_create, {
+      path: 'docs/foo',
+      title: 'T',
+      content: 'c',
+      tier: 'evidence',
+    });
+
+    // Then: structured mismatch envelope, zero network
+    expect(out.ok).toBe(false);
+    expect(out.errorKind).toBe('TierPathMismatchError');
+    expect(String(out.message)).toContain('docs/foo');
+    expect(typeof out.actionableHint).toBe('string');
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('rejects tier evidence + front path results/bar on append before any fetch', async () => {
+    // Given: fetch spy that fails loudly
+    const { tools, fetchCount } = makeWired({});
+
+    // When: appending with an explicit evidence tier on a normal path
+    const out = await run(tools.historian_page_append, {
+      path: 'results/bar',
+      section: '## x',
+      tier: 'evidence',
+    });
+
+    // Then: mismatch envelope, zero network
+    expect(out.ok).toBe(false);
+    expect(out.errorKind).toBe('TierPathMismatchError');
+    expect(String(out.message)).toContain('results/bar');
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('rejects tier front + internal path _meta/page-map before any fetch', async () => {
+    // Given: fetch spy that fails loudly
+    const { tools, fetchCount } = makeWired({});
+
+    // When: creating on the front tier against the machine namespace
+    const out = await run(tools.historian_page_create, {
+      path: '_meta/page-map',
+      title: 'T',
+      content: 'c',
+      tier: 'front',
+    });
+
+    // Then: mismatch envelope, zero network
+    expect(out.ok).toBe(false);
+    expect(out.errorKind).toBe('TierPathMismatchError');
+    expect(String(out.message)).toContain('_meta');
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('rejects tier front + internal path _evidence/x on append before any fetch', async () => {
+    // Given: fetch spy that fails loudly
+    const { tools, fetchCount } = makeWired({});
+
+    // When: appending on the front tier against the evidence namespace
+    const out = await run(tools.historian_page_append, {
+      path: '_evidence/x',
+      section: '## x',
+      tier: 'front',
+    });
+
+    // Then: mismatch envelope, zero network
+    expect(out.ok).toBe(false);
+    expect(out.errorKind).toBe('TierPathMismatchError');
+    expect(String(out.message)).toContain('_evidence');
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('evidence create carries the machine flags and never calls twin create', async () => {
+    // Given: a wiki answering the en create + lookup
+    const { tools, captured, fetchCount } = makeWired({
+      'create(': (vars) => ({
+        data: { pages: { create: { ...RESP_OK, page: { id: 901, path: vars.path, locale: vars.locale } } } },
+      }),
+      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage({ id: 901, path: '_evidence/run-1' }) } } }),
+    });
+
+    // When: creating with tier evidence while explicitly ASKING for the human
+    // defaults (isPublished/twin true) — the tier must override them
+    const out = await run(tools.historian_page_create, {
+      path: '_evidence/run-1',
+      title: 'Gate',
+      content: 'body',
+      tags: ['gate'],
+      isPublished: true,
+      twin: true,
+      tier: 'evidence',
+    });
+
+    // Then: exactly one create — unpublished, private, tagged 'evidence', no twin
+    const creates = varsOf(captured, 'create(');
+    expect(creates.length).toBe(1);
+    expect(creates[0].isPublished).toBe(false);
+    expect(creates[0].isPrivate).toBe(true);
+    expect(creates[0].tags).toEqual(['gate', 'evidence']);
+    expect(out.twinStatus).toBe('skipped');
+    expect(fetchCount()).toBe(2);
+  });
+
+  it('evidence create with locale zh hints the monolingual invariant and still creates as en', async () => {
+    // Given: a wiki answering the en create + lookup
+    const { tools, captured, fetchCount } = makeWired({
+      'create(': (vars) => ({
+        data: { pages: { create: { ...RESP_OK, page: { id: 902, path: vars.path, locale: vars.locale } } } },
+      }),
+      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage({ id: 902, path: '_evidence/run-2' }) } } }),
+    });
+
+    // When: passing locale:'zh' with tier evidence — spec says hint, never throw
+    const out = await run(tools.historian_page_create, {
+      path: '_evidence/run-2',
+      title: 'Gate',
+      content: 'body',
+      locale: 'zh',
+      tier: 'evidence',
+    });
+
+    // Then: the page was created as en and the envelope explains why
+    expect(out.ok).toBe(true);
+    expect(out.locale).toBe('en');
+    expect(varsOf(captured, 'create(')[0].locale).toBe('en');
+    expect(String(out.localeHint)).toContain('monolingual');
+    expect(fetchCount()).toBe(2);
+  });
+
+  it('front append with a missing twin and wired translator bootstraps the twin (positive control)', async () => {
+    // Given: zh missing, translator SPY wired — without this control the
+    // evidence spy=0 assertion below would be a trivial false-green
+    let spyCalls = 0;
+    let zhCreated = false;
+    const translate = async (text: string): Promise<string> => {
+      spyCalls++;
+      return TWIN_TEXT(text);
+    };
+    const { tools } = makeWired(
+      {
+        'singleByPath(': (vars) => {
+          if (vars.locale !== 'zh') return { data: { pages: { singleByPath: rawPage() } } };
+          return { data: { pages: { singleByPath: zhCreated ? zhPage() : null } } };
+        },
+        'single(': () => ({ data: { pages: { single: rawPage() } } }),
+        'update(': (vars) => ({
+          data: { pages: { update: { ...RESP_OK, page: { id: vars.id, path: vars.path, locale: vars.locale } } } },
+        }),
+        'create(': (vars) => {
+          if (vars.locale === 'zh') zhCreated = true;
+          return { data: { pages: { create: { ...RESP_OK, page: { id: 998, path: vars.path, locale: vars.locale } } } } };
+        },
+      },
+      translate,
+    );
+
+    // When: appending to a front en page without a zh twin
+    const out = await run(tools.historian_page_append, { path: PATH, section: '## New' });
+
+    // Then: the translator was exercised and the twin was created
+    expect(out.zhStatus).toBe('created');
+    expect(spyCalls).toBeGreaterThanOrEqual(1);
+  });
+
+  it('evidence append skips twin bootstrap even with the translator wired (spy=0)', async () => {
+    // Given: the SAME translate-wired fixture shape as the positive control,
+    // but the path lives in the internal namespace (tier inferred)
+    let spyCalls = 0;
+    let zhSeen = false;
+    const translate = async (text: string): Promise<string> => {
+      spyCalls++;
+      return TWIN_TEXT(text);
+    };
+    const { tools, captured } = makeWired(
+      {
+        'singleByPath(': (vars) => {
+          if (vars.locale !== 'zh') {
+            return { data: { pages: { singleByPath: rawPage({ path: '_evidence/run-9' }) } } };
+          }
+          zhSeen = true;
+          return { data: { pages: { singleByPath: null } } };
+        },
+        'single(': () => ({ data: { pages: { single: rawPage({ path: '_evidence/run-9' }) } } }),
+        'update(': (vars) => ({
+          data: { pages: { update: { ...RESP_OK, page: { id: vars.id, path: vars.path, locale: vars.locale } } } },
+        }),
+        'create(': () => ({ data: { pages: { create: RESP_OK } } }),
+      },
+      translate,
+    );
+
+    // When: appending to an _evidence page with NO explicit tier (inference rule)
+    const out = await run(tools.historian_page_append, { path: '_evidence/run-9', section: '## gate' });
+
+    // Then: primary append stands; no zh read, no bootstrap, zero translator calls
+    expect(out.ok).toBe(true);
+    expect(out.zhStatus).toBe('skipped');
+    expect(spyCalls).toBe(0);
+    expect(zhSeen).toBe(false);
+    expect(varsOf(captured, 'create(').length).toBe(0);
+  });
+
+  it('evidence success envelopes (create + append) carry the machine-tier note', async () => {
+    // Given: an evidence-capable wiki for both tools
+    const { tools: createTools } = makeWired({
+      'create(': (vars) => ({
+        data: { pages: { create: { ...RESP_OK, page: { id: 903, path: vars.path, locale: vars.locale } } } },
+      }),
+      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage({ id: 903, path: '_evidence/n1' }) } } }),
+    });
+    const { tools: appendTools } = makeWired({
+      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage({ path: '_evidence/n2' }) } } }),
+      'single(': () => ({ data: { pages: { single: rawPage({ path: '_evidence/n2' }) } } }),
+      'update(': (vars) => ({
+        data: { pages: { update: { ...RESP_OK, page: { id: vars.id, path: vars.path, locale: vars.locale } } } },
+      }),
+    });
+
+    // When: creating AND appending on the evidence tier
+    const created = await run(createTools.historian_page_create, {
+      path: '_evidence/n1',
+      title: 'Gate',
+      content: 'body',
+      tier: 'evidence',
+    });
+    const appended = await run(appendTools.historian_page_append, {
+      path: '_evidence/n2',
+      section: '## x',
+      tier: 'evidence',
+    });
+
+    // Then: both envelopes carry the plan-mandated note verbatim
+    expect(created.note).toBe(MACHINE_NOTE);
+    expect(appended.note).toBe(MACHINE_NOTE);
+  });
+});

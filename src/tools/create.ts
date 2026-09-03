@@ -9,7 +9,19 @@ import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { validatePath } from '../wiki/locale.js';
 import { createPage } from '../wiki/pages.js';
 import { classifyGenre, genreSkeleton } from '../templates/genres.js';
-import { errEnvelope, okJson, urlPair, URL_MANDATE, pageDeps, type ToolDeps } from './shared.js';
+import {
+  enforceTierPath,
+  errEnvelope,
+  MACHINE_TIER_NOTE,
+  okJson,
+  pageDeps,
+  tierMismatchJson,
+  TIERS,
+  urlPair,
+  URL_MANDATE,
+  type Tier,
+  type ToolDeps,
+} from './shared.js';
 
 const s = tool.schema;
 
@@ -25,6 +37,7 @@ const ARGS_SHAPE = {
   tags: s.array(s.string()).default([]),
   twin: s.boolean().default(true).describe('Auto-create the opposite-locale twin via translation'),
   description: s.string().optional(),
+  tier: s.enum(TIERS).default('front').describe('front = bilingual human page; evidence = machine page under _meta/ or _evidence/ (hidden, unpublished, monolingual en)'),
 } as const;
 
 const ArgsSchema = s.object(ARGS_SHAPE);
@@ -38,41 +51,56 @@ export function makeCreateTool(deps: ToolDeps): ToolDefinition {
     args: ARGS_SHAPE,
     execute: async (raw) => {
       const args = ArgsSchema.parse(raw);
+      const tier: Tier = args.tier;
       try {
         validatePath(args.path);
       } catch (err) {
         return errEnvelope(err);
       }
+      const mismatch = enforceTierPath(tier, args.path);
+      if (mismatch !== null) return tierMismatchJson(mismatch);
+      // Evidence pages are monolingual en: a zh locale is FORCED to en with an
+      // envelope hint — plan ruling: hint, never throw.
+      const isEvidence = tier === 'evidence';
+      const locale = isEvidence ? 'en' : args.locale;
+      const localeHint =
+        isEvidence && args.locale === 'zh'
+          ? 'evidence pages are monolingual en — the locale argument was forced to "en"'
+          : undefined;
       if (args.content === undefined || args.content.trim() === '') {
         const genre = args.genre ?? classifyGenre({ title: args.title, body: args.description ?? '' }).genre;
         return okJson({
           mode: 'template',
           genre,
-          locale: args.locale,
-          skeleton: genreSkeleton(genre, args.locale),
+          locale,
+          skeleton: genreSkeleton(genre, locale),
           note: 'Nothing was written to the wiki (template mode, no content). Fill the skeleton and call historian_page_create again with content.',
+          ...(localeHint === undefined ? {} : { localeHint }),
         });
       }
       try {
         const result = await createPage(pageDeps(deps), {
           path: args.path,
-          locale: args.locale,
+          locale,
           title: args.title,
           content: args.content,
-          tags: args.tags,
-          isPublished: args.isPublished,
-          twin: args.twin,
+          tags: isEvidence ? [...new Set([...args.tags, 'evidence'])] : args.tags,
+          isPublished: isEvidence ? false : args.isPublished,
+          isPrivate: isEvidence,
+          twin: isEvidence ? false : args.twin,
           description: args.description,
         });
         return okJson({
           mode: 'create',
           path: args.path,
-          locale: args.locale,
+          locale,
           pageId: result.pageId,
           twinStatus: result.twinStatus,
           twinReason: result.twinReason,
           twinId: result.twinId,
           urls: urlPair(result),
+          ...(isEvidence ? { note: MACHINE_TIER_NOTE } : {}),
+          ...(localeHint === undefined ? {} : { localeHint }),
         });
       } catch (err) {
         return errEnvelope(err);
