@@ -27,7 +27,7 @@ const OPTS: HistorianOptions = {
   },
   sections: ['_sandbox'],
   locales: ['en', 'zh'],
-  readingLoop: true,
+  readingLoop: false,
   capture: { enabled: false },
 };
 
