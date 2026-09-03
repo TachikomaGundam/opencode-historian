@@ -8,8 +8,11 @@
  *   - config: mutates cfg.skills.paths to ship the bundled skills/ directory
  *     and registers the /historian-capture command (todo 9)
  *   - tool: 10 historian_* tools wired by buildTools(opts)
- *   - experimental.chat.system.transform: pushes the historian-first reading
- *     loop advisory onto output.system[] (gated by opts.readingLoop)
+ *   - experimental.chat.system.transform: merges the historian-first reading
+ *     loop advisory into the LAST system block (single-block-safe append — a
+ *     second entry is never added). v3 double gate: 默认 false，true 需配置+哨兵双确认.
+ *     Both the readingLoop option and the on-machine confirmation sentinel
+ *     (src/loop-state.ts, re-read per request, never cached) must pass.
  *   - event: on session.idle emits ONE capture reminder toast per session
  *     (gated by opts.capture.enabled; reminder-only — the page write happens
  *     through /historian-capture -> historian_page_create, never here)
@@ -23,7 +26,9 @@
  */
 
 import { fileURLToPath } from 'url';
+import { homedir } from 'node:os';
 import { resolveOptions, type HistorianOptions } from './config.js';
+import { isReadingLoopConfirmed, loopStatePath } from './loop-state.js';
 import { buildTools } from './tools.js';
 import type { PluginInput, PluginOptions, Hooks, Config } from '@opencode-ai/plugin';
 
@@ -100,6 +105,17 @@ async function server(input: PluginInput, options?: PluginOptions): Promise<Hook
     return {};
   }
 
+  // Once per plugin load (never in the per-request hot path): a config-only
+  // opt-in leaves the loop dark because this machine has not confirmed it —
+  // point at the missing second signal instead of silently no-oping forever.
+  if (opts.readingLoop === true && !isReadingLoopConfirmed(homedir())) {
+    console.error(
+      '[opencode-historian] readingLoop enabled in config but not confirmed on this machine; to activate, create ' +
+        loopStatePath(homedir()) +
+        ' with {"version":1,"confirmed":true}',
+    );
+  }
+
   const captureReminded = new Set<string>();
 
   const hooks: Hooks = {
@@ -119,8 +135,16 @@ async function server(input: PluginInput, options?: PluginOptions): Promise<Hook
     'experimental.chat.system.transform': async (_input, output) => {
       try {
         if (opts.readingLoop !== true) return;
+        if (!isReadingLoopConfirmed(homedir())) return;
         if (output.system.some((block) => block.includes('historian_search'))) return;
-        output.system.push(READING_LOOP_ADVISORY);
+        if (output.system.length === 0) {
+          output.system.push(READING_LOOP_ADVISORY);
+        } else {
+          // Single-block-safe merge: a second system entry makes strict chat
+          // templates (e.g. vLLM) reject the request with HTTP 400.
+          const last = output.system.length - 1;
+          output.system[last] += '\n\n' + READING_LOOP_ADVISORY;
+        }
       } catch (err) {
         // A broken inject must never crash a chat request (plan v2 todo 8).
         console.error(
