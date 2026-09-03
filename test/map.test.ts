@@ -7,7 +7,9 @@
  * (full-RMW keeps the existing isPrivate/isPublished/tags), the local mirror
  * write, and getMap's staleness + missing/corrupt-mirror fallback. buildChronology
  * (src/chronology.ts) is covered with pure in-memory rows: ISO week
- * grouping/order, Monday-start + week-year boundaries, days window, prefix filter.
+ * grouping/order, Monday-start + week-year boundaries, days window, prefix
+ * filter, machine-namespace (_meta/_evidence) exclusion. The markdown preamble
+ * (snapshot stamp + audit-ledger role) is asserted with a fixed injected clock.
  * Requests
  * are mocked and dispatched by query fragment ('list(', 'singleByPath(',
  * 'single(', 'update(', 'create(') — an unknown shape throws so the suite
@@ -370,24 +372,49 @@ describe('buildPageMap', () => {
 
 // --- renderMapMarkdown -------------------------------------------------------
 
+const GENERATED_AT = '2026-09-02T00:00:00.000Z';
+
 describe('renderMapMarkdown', () => {
-  it('emits the 7-column header and one row per map row with absolute URLs', async () => {
+  it('emits the two-line snapshot/ledger preamble then the 7-column header', async () => {
     // Given: a fully paired map
     const { fetchImpl } = makeResponder(listResponder(EN_ROWS, ZH_ROWS));
     const { client } = makeClient(fetchImpl);
     const { rows } = await buildPageMap({ client, options: OPTS });
 
-    // When: rendering the markdown table
-    const md = renderMapMarkdown(rows);
+    // When: rendering the markdown table with a caller-injected stamp
+    const md = renderMapMarkdown(rows, GENERATED_AT);
 
-    // Then: header verbatim, separator, and a row carrying URL + twin URL
+    // Then: preamble (blockquote + blank line) above the header verbatim
     const lines = md.trim().split('\n');
-    expect(lines[0]).toBe(HEADER);
-    expect(lines[1]).toBe('| --- | --- | --- | --- | --- | --- | --- |');
-    expect(lines).toHaveLength(6); // header + separator + 4 rows
-    expect(lines[2]).toBe(
+    expect(lines[0]).toBe(
+      `> Snapshot generated ${GENERATED_AT} · 4 pages (2/2). This page is the audit ledger: ` +
+        `each 'historian_map refresh' commits a new wiki revision (page history = chronological record ` +
+        `of the whole wiki). Live queries read the local mirror (historian-map.json); this page serves ` +
+        `harness audits, the admin UI, and cross-machine review.`,
+    );
+    expect(lines[1]).toBe('');
+    expect(md).toContain('audit ledger');
+    // Then: header verbatim, separator, and a row carrying URL + twin URL
+    expect(lines[2]).toBe(HEADER);
+    expect(lines[3]).toBe('| --- | --- | --- | --- | --- | --- | --- |');
+    expect(lines).toHaveLength(8); // preamble + blank + header + separator + 4 rows
+    expect(lines[4]).toBe(
       '| 10 | en | _sandbox/map/alpha | Alpha | http://localhost:3000/en/_sandbox/map/alpha | http://localhost:3000/zh/_sandbox/map/alpha | 2026-09-01T06:00:00.000Z |',
     );
+  });
+
+  it('does not render a clock of its own — the stamp arrives from the caller', async () => {
+    // Given: rows only (no generatedAt source inside the renderer)
+    const { fetchImpl } = makeResponder(listResponder(EN_ROWS, ZH_ROWS));
+    const { client } = makeClient(fetchImpl);
+    const { rows } = await buildPageMap({ client, options: OPTS });
+
+    // When: rendering
+    const md = renderMapMarkdown(rows, GENERATED_AT);
+
+    // Then: exactly the injected stamp appears, and only once
+    const stamped = md.split('\n')[0];
+    expect(stamped.match(/2026-09-02T00:00:00\.000Z/g)).toHaveLength(1);
   });
 
   it('escapes pipes in titles', async () => {
@@ -398,7 +425,7 @@ describe('renderMapMarkdown', () => {
     const { rows } = await buildPageMap({ client, options: OPTS });
 
     // When: rendering
-    const md = renderMapMarkdown(rows);
+    const md = renderMapMarkdown(rows, GENERATED_AT);
 
     // Then: the pipe is escaped — the table keeps exactly six columns
     expect(md).toContain('| Read \\| Write |');
@@ -418,7 +445,7 @@ describe('renderMapMarkdown', () => {
     const { rows } = await buildPageMap({ client, options: OPTS });
 
     // When: rendering
-    const md = renderMapMarkdown(rows);
+    const md = renderMapMarkdown(rows, GENERATED_AT);
 
     // Then: em-dash in the Twin column; the raw ISO stamp in the last column
     expect(md).toContain('| — | 2026-09-01T07:07:07.777Z |');
@@ -438,11 +465,13 @@ describe('refreshMapCache', () => {
     // When: refreshing the cache
     const result = await refreshMapCache({ client, options: OPTS }, { homeDir: home, now });
 
-    // Then: one update whose payload is the rendered table ONLY — every other
-    // field echoed from the read (pitfalls #1+#2: never wiped)
+    // Then: one update whose payload is the rendered page ONLY — preamble first,
+    // every other field echoed from the read (pitfalls #1+#2: never wiped)
     expect(fetchCount()).toBe(6); // 2 lists + cache read + state read + update + re-read
     const vars = varsOf(captured, 'update(')[0];
-    expect(vars.content.startsWith(HEADER)).toBe(true);
+    expect(vars.content.startsWith('> Snapshot generated')).toBe(true);
+    expect(vars.content).toContain(`This page is the audit ledger`);
+    expect(vars.content).toContain(HEADER);
     expect(vars.content).toContain('| 51 | en | _meta/page-map |');
     expect(vars.isPrivate).toBe(true);
     expect(vars.isPublished).toBe(false);
@@ -652,6 +681,43 @@ describe('buildChronology', () => {
     expect(markdown).toContain('| 2026-08-31 | notes | notes/\\|pipe\\| | Plain note | — |');
     const dataRows = markdown.split('\n').filter((l) => /^\| 20/.test(l));
     expect(dataRows.length).toBe(weeks.flatMap((w) => w.items).length);
+  });
+
+  it('drops _meta machine-namespace rows (the ledger page never hits the timeline)', () => {
+    // Given: the map cache page next to a human page
+    const rows = [
+      crow('_meta/page-map', 'en', '2026-09-01T06:00:00.000Z', 'Page Map Cache'),
+      crow('_meta/page-map', 'zh', '2026-09-01T06:00:00.000Z', '页面地图缓存'),
+      crow('ops/x', 'en', '2026-09-01T00:00:00.000Z'),
+    ];
+    // When: building the chronology
+    const { weeks, markdown } = buildChronology(rows);
+    // Then: only the human page survives, in weeks and markdown alike
+    expect(weeks.flatMap((w) => w.items).map((i) => i.path)).toEqual(['ops/x']);
+    expect(markdown).not.toContain('_meta');
+    expect(markdown).not.toContain('Page Map Cache');
+  });
+
+  it('drops _evidence rows too (machine tier, not wiki content)', () => {
+    const rows = [
+      crow('_evidence/audits/2026-08', 'en', '2026-09-01T05:00:00.000Z', 'Audit trail'),
+      crow('ops/y', 'en', '2026-09-01T00:00:00.000Z'),
+    ];
+    const { weeks, markdown } = buildChronology(rows);
+    expect(weeks.flatMap((w) => w.items).map((i) => i.path)).toEqual(['ops/y']);
+    expect(markdown).not.toContain('_evidence');
+  });
+
+  it('keeps _sandbox rows visible (v2/F3 regression — sandbox is human tier)', () => {
+    const rows = [
+      crow('_sandbox/map/alpha', 'en', '2026-09-01T00:00:00.000Z', 'Alpha'),
+      crow('_sandbox/map/alpha', 'zh', '2026-09-01T00:00:00.000Z', '阿尔法'),
+    ];
+    const { weeks } = buildChronology(rows);
+    expect(weeks.flatMap((w) => w.items).map((i) => [i.path, i.locale])).toEqual([
+      ['_sandbox/map/alpha', 'en'],
+      ['_sandbox/map/alpha', 'zh'],
+    ]);
   });
 });
 
