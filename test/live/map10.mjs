@@ -54,7 +54,7 @@ try {
     );
     // Evidence for .qa/10.txt: header verbatim + first 10 rows
     line('--- first 10 rows ---');
-    const md = renderMapMarkdown(passA.rows).trim().split('\n');
+    const md = renderMapMarkdown(passA.rows, new Date().toISOString()).trim().split('\n');
     for (const l of md.slice(0, 12)) line(l);
   }
 } catch (err) {

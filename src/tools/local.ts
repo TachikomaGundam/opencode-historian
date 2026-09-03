@@ -81,7 +81,8 @@ export function makeMapTool(deps: ToolDeps): ToolDefinition {
   return tool({
     description:
       `Inspect (show), rebuild (refresh), or aggregate recent updates (timeline) over the en/zh page map ` +
-      `with its local mirror + _meta/page-map cache page. ` +
+      `with its local mirror + _meta/page-map cache page. Two roles: the local mirror is the live query ` +
+      `source for show/timeline; the wiki page is the audit ledger (every refresh commits a new wiki revision). ` +
       `show reads the local mirror (zero writes); refresh rebuilds from the wiki and writes the mirror + cache page ` +
       `(idempotent — the engine upserts via full RMW); timeline groups mirror rows by ISO week (newest first, ` +
       `optional days window + section/path prefix filter) into a human markdown table + machine-readable weeks JSON. ` +

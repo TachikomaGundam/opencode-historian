@@ -1,6 +1,12 @@
 /**
  * Locale-aware page map (todo 10): full cross-locale inventory with en/zh twin
  * pairing, rendered as the markdown `_meta/page-map` cache page + local mirror.
+ *
+ * Intended readers: harness cache-read scripts, the admin UI, and
+ * remote/cross-machine review. Role split — live queries (getMap) read the
+ * LOCAL MIRROR (historian-map.json) only and never this wiki page; the wiki
+ * page exists as the audit ledger (each refresh commits a new revision) and
+ * for human inspection.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -137,12 +143,19 @@ export async function buildPageMap(deps: MapDeps): Promise<PageMap> {
 
 // --- renderMapMarkdown ------------------------------------------------------
 
-export function renderMapMarkdown(rows: readonly MapRow[]): string {
+export function renderMapMarkdown(rows: readonly MapRow[], generatedAt: string): string {
+  const perLocale = { en: 0, zh: 0 };
+  for (const r of rows) if (r.locale === 'en' || r.locale === 'zh') perLocale[r.locale] += 1;
+  const preamble =
+    `> Snapshot generated ${generatedAt} · ${rows.length} pages (${perLocale.en}/${perLocale.zh}). ` +
+    `This page is the audit ledger: each 'historian_map refresh' commits a new wiki revision (page ` +
+    `history = chronological record of the whole wiki). Live queries read the local mirror ` +
+    `(historian-map.json); this page serves harness audits, the admin UI, and cross-machine review.`;
   const lines = rows.map(
     (r) =>
       `| ${r.id} | ${r.locale} | ${r.path} | ${r.title.replaceAll('|', '\\|')} | ${r.url} | ${r.twinUrl ?? '—'} | ${r.updatedAt} |`,
   );
-  return [HEADER_ROW, '| --- | --- | --- | --- | --- | --- | --- |', ...lines, ''].join('\n');
+  return [preamble, '', HEADER_ROW, '| --- | --- | --- | --- | --- | --- | --- |', ...lines, ''].join('\n');
 }
 
 // --- Local mirror -----------------------------------------------------------
@@ -215,7 +228,7 @@ export async function refreshMapCache(deps: MapDeps, opts?: RefreshOptions): Pro
   const home = opts?.homeDir ?? homedir();
   const { rows, stats } = await buildPageMap(deps);
   writeMirror(home, { generatedAt: now.toISOString(), rows, stats });
-  const markdown = renderMapMarkdown(rows);
+  const markdown = renderMapMarkdown(rows, now.toISOString());
   const existing = await readPage(deps.client, CACHE_PATH, 'en');
   if (existing === null) {
     await createPage(deps, {
