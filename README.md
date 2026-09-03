@@ -7,11 +7,11 @@ opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具�
 功能一览:
 
 * 10 个 `historian_*` 工具，覆盖创建、更新、追加、翻译、搜索、阅读、地图/时间轴、迁移、删除、移动
-* Skill v4 随插件自动注入（config hook），无需手动安装 skill 文件
+* Skill v5 随插件自动注入（config hook），无需手动安装 skill 文件
 * G1 至 G5 页型契约，每种页型对应专属骨架模板
 * 双语孪生页面（en/zh）自动翻译，翻译引擎可配置
 * 页面地图缓存、本地镜像与时间轴聚合视图
-* 开工前置查阅回路（reading loop，默认开）+ `/historian-capture` 会话留痕（默认关）
+* 开工前置查阅回路（reading loop，默认关，双信号启用）+ `/historian-capture` 会话留痕（默认关）
 * 试点与评测均通过：pilot 7 页迁移 PASS，eval 7/7 场景首跑全过
 
 ## 史官宣言 / The Historian's Manifest
@@ -49,7 +49,7 @@ SRE postmortem 文化单独值得点名：它把"事件"当一等文档对待，
 | 五柱页型 | G1 事件复盘 / G2 对比选型 / G3 清单索引 / G4 概念原理 / G5 现状账本，写前声明页型，套固定骨架、过来源列检查 | `src/templates/genres.ts`，skill Phase 1.5 |
 | 双视图 | 地图视图（en/zh 对应关系，Locale/Twin 列）+ 时间轴视图（ISO 周分组，支持 `days` 窗口与 `path` 前缀过滤，人读周表 + 机读 weeks JSON） | `historian_map` 的 `action:'show'` / `action:'timeline'` |
 | 迁移与评分门禁 | 存量页按骨架重排：dry-run 评分在前，`apply=true` 自动 pre-image 备份；每页写入后过 10 项自检门 | `historian_migrate`，`selfReviewChecklist()` |
-| 前置查阅回路 | 向每次请求的 system 提示注入"先查 wiki"指令：动这台机器的部署/历史/坑/决定之前先 `historian_search`、查 timeline、核对 G5 卡的核实日期，引用查过的页面 URL | `readingLoop` 选项（默认 `true`），`src/index.ts` 的 `experimental.chat.system.transform` 钩子 |
+| 前置查阅回路 | 向每次请求的 system 提示注入"先查 wiki"指令（单块合并：追加到最后一个 system 块，绝不产生第二条 system 消息；双信号门控：选项与本机哨兵文件同时到位才注入）：动这台机器的部署/历史/坑/决定之前先 `historian_search`、查 timeline、核对 G5 卡的核实日期，引用查过的页面 URL | `readingLoop` 选项（默认 false，开启需配置+哨兵双确认）+ 哨兵文件 `~/.config/opencode/historian-reading-loop.json`，`src/index.ts` 的 `experimental.chat.system.transform` 钩子 |
 | 主动留痕 | `/historian-capture` 命令把当前会话总结成 G1 事件页；开启 `capture.enabled` 后额外在会话空闲时弹一次提醒，仅提醒，绝不自动写页 | `src/index.ts` 的 `config` / `event` 钩子 |
 
 G5 现状卡回答"现在跑着什么"，timeline 回答"最近两周变了什么"。比如问"`service-a` 现在监听哪个端口"，应当命中现状账本里的一行（形如 `example.com:8000`，带上次核实日期与验证命令），而不是某次会话的聊天记录。这两样合起来，wiki 才从文档堆变成可查询的运维账本。
@@ -75,7 +75,18 @@ G5 现状卡回答"现在跑着什么"，timeline 回答"最近两周变了什�
 
    → 分诊为事件复盘，声明 G1 → `historian_page_create`（`genre: "G1"`）→ 回报 `http://<your-wiki>:3000/team-notes/<slug>` 与它的 `/zh/` 孪生页。
 4. **检索与整理**：`historian_search` 按主题查；`historian_map` 的 `show` 看双语地图、`timeline`（可选 `days` / `path`）看最近变动；存量页不合规用 `historian_migrate` 先 dry-run 再 apply。
-5. **开关**：严格 OpenAI 兼容后端（如 vLLM，会拒绝多条 system 消息）把 `"readingLoop": false` 关掉；想要空闲留痕提醒就 `"capture": { "enabled": true }`，`/historian-capture` 命令本身与开关无关、始终注册。
+5. **开关**：reading loop 默认 false，开启需配置+哨兵双确认，两步缺一不可：
+
+   1. 插件二元组第二参数写 `"readingLoop": true`：`["opencode-wiki-historian", { "readingLoop": true }]`
+   2. 人工写入本机哨兵文件（agent 不能自我启用）：
+
+      ```bash
+      cat > ~/.config/opencode/historian-reading-loop.json <<'EOF'
+      {"version":1,"confirmed":true}
+      EOF
+      ```
+
+   任一信号缺失即不注入；配置已开而哨兵缺失时，插件加载期会打一条提示（给出哨兵路径与内容），不会静默失灵。删除哨兵文件即刻回退，无需改配置。想要空闲留痕提醒就 `"capture": { "enabled": true }`，`/historian-capture` 命令本身与开关无关、始终注册。
 
 ### 解耦声明 / Decoupling
 
@@ -131,7 +142,7 @@ opencode run --command historian --message "historian_map show"
 
 如果工具列表中出现 `historian_page_create` 等 10 个工具，安装成功。
 
-> **升级提示**：如果你之前使用过 historian v2 的扁平 skill 文件（如 `~/.config/opencode/skills/historian.md`），需要先重命名为 `historian.md.v2-disabled` 或移到别处。插件通过 config hook 自动注入 v4 skill，两个同名 skill 不能共存。
+> **升级提示**：如果你之前使用过 historian v2 的扁平 skill 文件（如 `~/.config/opencode/skills/historian.md`），需要先重命名为 `historian.md.v2-disabled` 或移到别处。插件通过 config hook 自动注入 v5 skill，两个同名 skill 不能共存。
 
 ## 配置 / Configuration
 
@@ -170,7 +181,7 @@ opencode run --command historian --message "historian_map show"
 | `translate.providerKey` | string | 未配置 | jsonc 兜底腿读取的 provider 名；须显式设置才会启用该腿 |
 | `sections` | string[] | `[]`（不限制） | 插件可操作的 wiki 路径前缀白名单 |
 | `locales` | string[] | `["en", "zh"]` | 启用的语言列表 |
-| `readingLoop` | boolean | `true` | 向每次请求注入"先查 wiki"的开工前置查阅 advisory；拒绝多条 system 消息的严格 OpenAI 兼容后端（如 vLLM）须设 `false` |
+| `readingLoop` | boolean | `false` | 开工前置查阅 advisory，向每次请求注入"先查 wiki"提示；默认 false，true 需配置+哨兵双确认（见「使用方式」开关步骤）；单块合并追加到最后一个 system 块，绝不产生第二条 system 消息，vLLM 等拒绝多条 system 的严格后端同样安全 |
 | `capture.enabled` | boolean | `false` | 开启后会话空闲时弹一次 `/historian-capture` 留痕提醒；仅提醒，不自动写页 |
 
 `translate.endpoint` 解析链（优先级从高到低）：`translate.endpoint` 选项 → 环境变量 `HISTORIAN_TRANSLATE_ENDPOINT` → 未配置。包内**不**内置任何网关地址；未配置时翻译调用直接以 `translate.endpoint not configured` 失败（见降级行为）。
@@ -195,6 +206,12 @@ opencode run --command historian --message "historian_map show"
 ### 降级行为
 
 key 缺失时 `ConfigError` 记录一次日志，插件工具全部禁用，opencode 正常启动不受影响。`translate.endpoint` 未配置时双语孪生功能降级为 pending 状态（`twinReason: 'translate.endpoint not configured — ...'`），创建页面只写入请求 locale 的内容，不会发起任何翻译网络请求。
+
+### 已知限制
+
+| 现象 | 定性 | 说明 |
+|---|---|---|
+| 裸配置未传 `translate` 选项（三段 key 链 `translate.apiKey` → `DASHSCOPE_API_KEY` → `translate.providerKey` 全缺）时插件工具全部禁用 | by design | 翻译腿是写操作的前提，缺 key 时宁可整体禁用也不静默半成品；配置按上方选项全表补齐即恢复。缺配置时的部分降级（工具照常注册、仅翻译调用失败）在议 |
 
 ## wiki.js 前置检查 / Prerequisites
 
@@ -279,6 +296,26 @@ zh: http://<host>/zh/ops/example
 
 更细的 20 条写作规则散布在 `skills/historian/references/` 目录下各参考文件中，agent 加载 skill 时自动读取。
 
+## 前台 / 后台 / 证据三层 / Three Content Tiers
+
+wiki 内容按读者分三层，工具按层执行不同语义（`historian_page_create` 的 `tier` 参数）：
+
+| 层 | 位置 | 职责 |
+|---|---|---|
+| 前台 (front) | 主题章节的 G1-G5 页 | 人写人读的知识页；双语孪生、进索引；只放提炼后的内容与链接 |
+| 后台 (backstage) | `_meta/` 页 + 本地镜像文件 | 机器记账：page-map 缓存页、迁移 checkpoint、reading loop 哨兵文件；不参与人读正文 |
+| 证据 (evidence) | `_evidence/` | 超 10 行原始件（日志、转写、大 diff）的归宿：单语 en、不发布（匿名访问 404 是 by design），人类页面只链接不复制 |
+
+用法示例：
+
+```jsonc
+// 大段原始材料先落证据页，再在人读页附录里给链接
+historian_page_create({ path: "_evidence/<topic>--<yyyymmdd>", tier: "evidence", content: "<原始件全文>" })
+```
+
+- **软提醒语义（soft advisory）**：写前台页时若内容含超过 30 行的围栏代码块，工具结果附一条 `advisory`，提示把原始件搬到 `_evidence/` 页、正文改放决定性摘录（每段 ≤10 行）+ 证据页链接 + 外部链接（commit/PR/告警）。提醒归提醒，写入永不阻断；证据层页自身不跑这项检查。
+- **镜像与快照页分工**：本地镜像 `~/.config/opencode/historian-map.json` 是活查询的唯一来源（`historian_map show` 直接读它）；`_meta/page-map` wiki 页是审计账本，`historian_map refresh` 每次提交一个新修订，wiki 的页面历史即全库变更时间线。
+
 ## wiki.js 用法与定制化 / Usage Guide
 
 ### Markdown 速查
@@ -348,7 +385,7 @@ wiki.js GraphQL API 有 9 个常见陷阱。插件在内部处理了每一个（
 
 1. 重命名旧 skill 文件：`mv ~/.config/opencode/skills/historian.md ~/.config/opencode/skills/historian.md.v2-disabled`
 2. 在 `opencode.json[c]` 的 `plugin` 数组中添加 `opencode-wiki-historian`
-3. 重启 opencode，`/historian` 命令可用即表示 v4 skill 已注入
+3. 重启 opencode，`/historian` 命令可用即表示 v5 skill 已注入
 
 ## 运维 / Operations
 

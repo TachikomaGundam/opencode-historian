@@ -39,15 +39,25 @@ Six-step self-onboarding for pointing the historian plugin at your own Wiki.js i
 - 任何进入包/文档的内容不得包含：真实主机名、真实用户路径（`/home/...`）、token、真实私有部署的页面标题与章节表。
 - 硬门：`node tools/privacy-audit.mjs` 扫描 `npm pack` 全部文件（含 `dist/` 与 `skills/`）。改过任何随包文本后必须跑到 exit 0 再发布。
 
-## 6. 机构记忆层开关 / reading-loop & capture switches
+## 6. 机构记忆层开关与证据层 / reading-loop & capture switches, evidence tier
 
-- `readingLoop` 默认 `true`：插件向每次请求的 system 注入"先查 wiki"提示。严格 OpenAI 兼容后端（如 vLLM）会拒绝多条 system 消息——此类部署设 `"readingLoop": false`。
+- `readingLoop` 开关默认 false，true 需配置+哨兵双确认：插件向每次请求的 system 注入"先查 wiki"提示，但只有配置信号与本机哨兵文件同时到位才生效。注入是单块合并（追加到最后一个 system 块），绝不产生第二条 system 消息——严格 OpenAI 兼容后端（如 vLLM）同样安全。
+- 哨兵文件必须由人在本机写入（agent 自我启用被禁止）：
+
+  ```bash
+  cat > ~/.config/opencode/historian-reading-loop.json <<'EOF'
+  {"version":1,"confirmed":true}
+  EOF
+  ```
+
+- 缺一不生效：只配了选项而没有哨兵，插件加载期打一条提示（给出哨兵路径与内容），不注入；删除哨兵文件即刻回退。
 - `capture.enabled` 默认 `false`：置 `true` 后会话空闲时弹一条 toast 提醒；**只提醒、绝不自动写页**。`/historian-capture` 命令始终注册，与此开关无关。
+- 证据层接入：会话产出的原始件（日志、转写、大 diff）超过 10 行时，用 `historian_page_create` 传 `tier: "evidence"` 存入 `_evidence/<主题>--<yyyymmdd>`（单语 en、不发布、匿名访问 404 属 by design），人读页附录只放决定性摘录加链接。往人读页写超过 30 行的围栏块会收到一条 `advisory` 软提醒，不阻断写入。
 
 ```jsonc
-["opencode-historian", { "readingLoop": false, "capture": { "enabled": true } }]
+["opencode-historian", { "readingLoop": true, "capture": { "enabled": true } }]
 ```
 
 ---
 
-配完六步，你的史官即就位：consult（reading loop 自动引路）、notice（capture 提醒留痕）、record（G1-G5 骨架 + map/timeline 归档）。
+配完六步，你的史官即就位：consult（reading loop 双信号启用后自动引路）、notice（capture 提醒留痕）、record（G1-G5 骨架 + `_evidence/` 证据页 + map/timeline 归档）。
