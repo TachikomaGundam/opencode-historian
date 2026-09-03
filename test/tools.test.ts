@@ -1481,3 +1481,163 @@ describe('evidence tier + internal namespace guards', () => {
     expect(appended.note).toBe(MACHINE_NOTE);
   });
 });
+
+// --- front-tier raw-dump soft gate (v3 todo 6) --------------------------------
+
+/** A fenced block with EXACTLY `lines` lines strictly inside the ``` fence. */
+const fenceBlock = (lines: number): string =>
+  '```text\n' + Array.from({ length: lines }, (_, i) => `line ${i + 1}`).join('\n') + '\n```';
+
+/** Independent literal pin of the SYN-16 advisory wording (do not derive from
+ *  the implementation — this is the contract the agent reads). */
+const dumpAdvisory = (n: number): string =>
+  `content contains a ${n}-line fenced block; per contract, move raw material to a ` +
+  'tier:"evidence" page under _evidence/ and link it from the human page (SYN-16)';
+
+describe('front-tier raw-dump soft gate', () => {
+  it('clean front create: envelope key set unchanged, no advisory key', async () => {
+    // Given: the standard front create wiki (byte-for-byte 0.2.0 fixture)
+    const { tools } = makeWired({
+      'create(': (vars) => ({
+        data: { pages: { create: { ...RESP_OK, page: { id: 999, path: vars.path, locale: vars.locale } } } },
+      }),
+      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage() } } }),
+    });
+
+    // When: creating with short, fence-free content
+    const out = await run(tools.historian_page_create, {
+      path: PATH,
+      title: 'Alpha',
+      content: '# Alpha\nbody',
+      tags: ['t1'],
+      twin: false,
+    });
+
+    // Then: EXACTLY the pre-gate key set — the advisory key is omitted, not undefined
+    expect(out).toEqual({
+      ok: true,
+      mode: 'create',
+      path: PATH,
+      locale: 'en',
+      pageId: 76,
+      twinStatus: 'skipped',
+      urls: { en: EN_URL, zh: ZH_URL },
+    });
+  });
+
+  it('front create with a 31-line fence: advisory present naming the count, write still performed', async () => {
+    // Given: the same front create wiki
+    const { tools, captured } = makeWired({
+      'create(': (vars) => ({
+        data: { pages: { create: { ...RESP_OK, page: { id: 999, path: vars.path, locale: vars.locale } } } },
+      }),
+      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage() } } }),
+    });
+
+    // When: creating with a fenced block just OVER the 30-line soft limit
+    const content = `preamble\n${fenceBlock(31)}\ntrailer`;
+    const out = await run(tools.historian_page_create, { path: PATH, title: 'Alpha', content, twin: false });
+
+    // Then: ok stays true, the create WAS written, and the advisory is verbatim
+    expect(out.ok).toBe(true);
+    expect(out.mode).toBe('create');
+    expect(out.advisory).toBe(dumpAdvisory(31));
+    expect(varsOf(captured, 'create(').length).toBe(1);
+  });
+
+  it('front create with an exactly-30-line fence: at the limit, no advisory', async () => {
+    // Given: the same front create wiki
+    const { tools } = makeWired({
+      'create(': (vars) => ({
+        data: { pages: { create: { ...RESP_OK, page: { id: 999, path: vars.path, locale: vars.locale } } } },
+      }),
+      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage() } } }),
+    });
+
+    // When: creating at the boundary (30 inside lines ≤ limit)
+    const out = await run(tools.historian_page_create, {
+      path: PATH,
+      title: 'Alpha',
+      content: fenceBlock(30),
+      twin: false,
+    });
+
+    // Then: the key is absent entirely
+    expect(out.ok).toBe(true);
+    expect('advisory' in out).toBe(false);
+  });
+
+  it('evidence tier is NEVER checked: create AND inferred-path append with a 40-line fence stay silent', async () => {
+    // Given: an evidence-capable wiki for create and append
+    const { tools: createTools } = makeWired({
+      'create(': (vars) => ({
+        data: { pages: { create: { ...RESP_OK, page: { id: 911, path: vars.path, locale: vars.locale } } } },
+      }),
+      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage({ id: 911, path: '_evidence/dump-1' }) } } }),
+    });
+    const { tools: appendTools } = makeWired({
+      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage({ path: '_evidence/dump-2' }) } } }),
+      'single(': () => ({ data: { pages: { single: rawPage({ path: '_evidence/dump-2' }) } } }),
+      'update(': (vars) => ({
+        data: { pages: { update: { ...RESP_OK, page: { id: vars.id, path: vars.path, locale: vars.locale } } } },
+      }),
+    });
+
+    // When: creating with tier:"evidence" and appending WITHOUT any tier argument
+    // (the _evidence/ path prefix must infer evidence) — both with 40-line fences
+    const created = await run(createTools.historian_page_create, {
+      path: '_evidence/dump-1',
+      title: 'Raw',
+      content: fenceBlock(40),
+      tier: 'evidence',
+    });
+    const appended = await run(appendTools.historian_page_append, {
+      path: '_evidence/dump-2',
+      section: fenceBlock(40),
+    });
+
+    // Then: raw dumps are the evidence tier's PURPOSE — never advisories
+    expect(created.ok).toBe(true);
+    expect('advisory' in created).toBe(false);
+    expect(appended.ok).toBe(true);
+    expect(appended.zhStatus).toBe('skipped');
+    expect('advisory' in appended).toBe(false);
+  });
+
+  it('page_update with a 31-line fence on a front page: advisory present', async () => {
+    // Given: a front page the update tool can read + write
+    const { tools } = makeWired({
+      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage() } } }),
+      'single(': () => ({ data: { pages: { single: rawPage() } } }),
+      'update(': (vars) => ({
+        data: { pages: { update: { ...RESP_OK, page: { id: vars.id, path: vars.path, locale: vars.locale } } } },
+      }),
+    });
+
+    // When: pushing full replacement content carrying a 31-line fence
+    const out = await run(tools.historian_page_update, { path: PATH, content: fenceBlock(31) });
+
+    // Then: the soft gate speaks (no tier argument exists on update — path inference)
+    expect(out.ok).toBe(true);
+    expect(out.mode).toBe('update');
+    expect(out.advisory).toBe(dumpAdvisory(31));
+  });
+
+  it('page_update with a 31-line fence on an _evidence/ page: stays silent', async () => {
+    // Given: an existing machine-namespace page
+    const { tools } = makeWired({
+      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage({ path: '_evidence/dump-3' }) } } }),
+      'single(': () => ({ data: { pages: { single: rawPage({ path: '_evidence/dump-3' }) } } }),
+      'update(': (vars) => ({
+        data: { pages: { update: { ...RESP_OK, page: { id: vars.id, path: vars.path, locale: vars.locale } } } },
+      }),
+    });
+
+    // When: updating it with the same 31-line fence content
+    const out = await run(tools.historian_page_update, { path: '_evidence/dump-3', content: fenceBlock(31) });
+
+    // Then: evidence stays unchecked on the update path too
+    expect(out.ok).toBe(true);
+    expect('advisory' in out).toBe(false);
+  });
+});
