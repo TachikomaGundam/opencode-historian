@@ -107,7 +107,7 @@ export const G1_ZH: string = `# 页面标题（占位：写完后替换为实际
 
 ## 附录
 
-<!-- 原始证据：告警截图、日志片段、commit/PR 链接。脚注示例： -->
+<!-- 决定性摘录（每段 ≤10 行）+ 证据页链接（\`_evidence/...\`，historian_page_create tier:"evidence" 建页）+ 外部链接（commit/PR/告警）。脚注示例： -->
 见脚注[^1]。
 
 [^1]: 来源链接（替换为真实出处）
@@ -199,7 +199,7 @@ export const G1_EN: string = `# Page Title (placeholder: replace with the real t
 
 ## Appendix
 
-<!-- Raw evidence: alert screenshots, log excerpts, commit/PR links. Footnote example: -->
+<!-- Decisive excerpts (≤10 lines each) + evidence-page links (\`_evidence/...\`, created via historian_page_create with tier:"evidence") + external links (commits/PRs/alerts). Footnote example: -->
 See footnote[^1].
 
 [^1]: Source link (replace with the real source)
@@ -509,7 +509,7 @@ export const G5_ZH: string = `# 页面标题（占位：写完后替换为实际
 | --- | --- | --- |
 | YYYY-MM-DD | 初版快照 | — |
 
-<!-- 追加式小表：只记影响清单行的变更。完整历史写 G1 事件页并互链。 -->
+<!-- 追加式小表：只记影响清单行的变更。完整历史写 G1 事件页并互链；「依据」可指向证据页 URL（\`_evidence/...\`）。 -->
 
 ## 相关页面
 
@@ -561,7 +561,7 @@ export const G5_EN: string = `# Page Title (placeholder: replace with the real t
 | --- | --- | --- |
 | YYYY-MM-DD | initial snapshot | — |
 
-<!-- Append-only mini table for list-affecting changes. Full history lives in G1 event pages. -->
+<!-- Append-only mini table for list-affecting changes. Full history lives in G1 event pages; Evidence may point at an evidence-page URL (\`_evidence/...\`). -->
 
 ## Related Pages
 

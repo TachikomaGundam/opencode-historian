@@ -83,8 +83,9 @@ const CAPTURE_COMMAND_TEMPLATE = [
   '',
   '1. Draft four sections: 过程/Process (what was done, in order), 原因/Cause (why it was needed), 后果/Consequence (impact, artifacts), 改进/Improvement (follow-ups, preventions).',
   "2. Run historian_map action:'show' to see existing sections, then choose a short factual path under one.",
-  '3. Save with historian_page_create (genre "G1"); the zh twin is auto-created. If the session only repeated known knowledge, say so and skip writing.',
-  '4. Echo both page URLs (en + zh) back to the user.',
+  '3. If the session produced raw artifacts (logs, transcripts, big diffs), first store each via historian_page_create with tier:"evidence" under `_evidence/`, then cite those URLs in the G1 appendix.',
+  '4. Save with historian_page_create (genre "G1"); the zh twin is auto-created. If the session only repeated known knowledge, say so and skip writing.',
+  '5. Echo both page URLs (en + zh) back to the user.',
 ].join('\n');
 
 const CAPTURE_TOAST_MESSAGE =
