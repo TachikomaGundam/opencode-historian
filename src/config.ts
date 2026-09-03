@@ -48,9 +48,12 @@ export interface HistorianOptions {
    *  real authorization gate. Consumers must treat [] as allow-any. */
   readonly sections: readonly string[];
   readonly locales: readonly string[];
-  /** v2 reading-loop gate: true (the shipped default) makes the plugin push a
-   *  consult-the-wiki advisory block into every chat request's system array via
-   *  the experimental.chat.system.transform hook. false = hook is a pure no-op. */
+  /** v3 reading-loop gate (double signal): false by default. The plugin pushes
+   *  a consult-the-wiki advisory block into every chat request's system array
+   *  via the experimental.chat.system.transform hook ONLY when this option is
+   *  true AND the local confirmation sentinel agrees (src/loop-state.ts:
+   *  ~/.config/opencode/historian-reading-loop.json, written by hand).
+   *  默认 false，true 需配置+哨兵双确认；either signal missing = pure no-op. */
   readonly readingLoop: boolean;
   /** v2 capture gate: reminder-only. When enabled the event hook fires one
    *  TUI toast per idle session nudging the agent/user to run the
@@ -92,8 +95,9 @@ export const DEFAULT_TRANSLATE_MODEL = 'qwen3.7-plus';
 /** Empty = no path-prefix restriction (see HistorianOptions.sections). */
 export const DEFAULT_SECTIONS: readonly string[] = [];
 export const DEFAULT_LOCALES = ['en', 'zh'] as const;
-/** Reading loop is on unless explicitly disabled (plan v2 todo 8). */
-export const DEFAULT_READING_LOOP = true;
+/** Reading loop is opt-in: activated only when configured true AND the local
+ *  sentinel confirms it (plan v3 todo 1; see src/loop-state.ts). */
+export const DEFAULT_READING_LOOP = false;
 /** Capture reminders are opt-in (plan v2 todo 9). */
 export const DEFAULT_CAPTURE_ENABLED = false;
 
