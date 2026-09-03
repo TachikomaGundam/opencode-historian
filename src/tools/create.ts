@@ -9,6 +9,7 @@ import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { validatePath } from '../wiki/locale.js';
 import { createPage } from '../wiki/pages.js';
 import { classifyGenre, genreSkeleton } from '../templates/genres.js';
+import { evidenceSkeleton } from '../templates/evidence.js';
 import {
   enforceTierPath,
   errEnvelope,
@@ -68,6 +69,26 @@ export function makeCreateTool(deps: ToolDeps): ToolDefinition {
           ? 'evidence pages are monolingual en — the locale argument was forced to "en"'
           : undefined;
       if (args.content === undefined || args.content.trim() === '') {
+        if (isEvidence) {
+          // Evidence pages are not genre-templated: echo the machine skeleton.
+          // The source page is unknown at template time, so the fields ship as
+          // placeholder hints; the description arg (if given) is the context hint.
+          return okJson({
+            mode: 'template',
+            locale,
+            skeleton: evidenceSkeleton({
+              sourcePath: '<human-page-path>',
+              sourceUrl: '<human-page-url>',
+              capturedAt: new Date().toISOString(),
+              context: args.description ?? '<one-line context>',
+            }),
+            note:
+              'Nothing was written to the wiki (template mode, no content). Paste the raw material verbatim ' +
+              'into the 原文 fence, replace the <human-page-path> / <human-page-url> / <one-line context> ' +
+              'placeholders with the citing human page, then call historian_page_create again with tier:"evidence" and content.',
+            ...(localeHint === undefined ? {} : { localeHint }),
+          });
+        }
         const genre = args.genre ?? classifyGenre({ title: args.title, body: args.description ?? '' }).genre;
         return okJson({
           mode: 'template',
