@@ -112,3 +112,66 @@ function hintFor(errorKind: string): string {
       return 'Inspect the message and retry.';
   }
 }
+
+// --- Tier plumbing (v3 todo 4) ------------------------------------------------
+
+/** Machine namespaces: pages whose first path segment lives here are hidden
+ *  machine-tier pages (the `_meta/page-map` cache precedent in src/map.ts —
+ *  isPublished:false + isPrivate:true + tags + twin:false). */
+export const INTERNAL_NAMESPACES = ['_meta', '_evidence'] as const;
+
+/** Plan-mandated note on every evidence-tier success envelope (verbatim). */
+export const MACHINE_TIER_NOTE = 'machine-tier page; anonymous visits 404 by design';
+
+/** Tier enum values — single source of truth. The zod schema itself must be
+ *  declared locally per tool via `s.enum(TIERS)`: exporting a zod value from
+ *  here breaks declaration emit (TS2742 — tool.schema is zod 4.1.8 nested in
+ *  @opencode-ai/plugin, unnameable without a zod import, and root zod is v3). */
+export const TIERS = ['front', 'evidence'] as const;
+
+/** Page tier: 'front' = bilingual human surface; 'evidence' = machine namespace. */
+export type Tier = (typeof TIERS)[number];
+
+/** True when the path's first segment is an internal (machine) namespace. */
+export function isInternalPath(path: string): boolean {
+  const first = path.split('/')[0];
+  return (INTERNAL_NAMESPACES as readonly string[]).includes(first);
+}
+
+/** Pure tier↔path guard: null when the pair is legal, an error string when
+ *  not (evidence ⇒ internal namespace; front ⇒ NOT internal). */
+export function enforceTierPath(tier: Tier, path: string): string | null {
+  const internal = isInternalPath(path);
+  switch (tier) {
+    case 'evidence':
+      return internal
+        ? null
+        : `tier "evidence" requires a machine namespace path (${INTERNAL_NAMESPACES.map((n) => `${n}/`).join(' or ')}) — got '${path}'`;
+    case 'front':
+      return internal
+        ? `tier "front" cannot write to the machine namespace '${path}' — use tier "evidence" for ${INTERNAL_NAMESPACES.map((n) => `${n}/`).join(' or ')} paths`
+        : null;
+  }
+}
+
+/** Tier↔path mismatch → uniform failure envelope (no fetch has run yet). */
+export function tierMismatchJson(message: string): ToolResult {
+  return dump({
+    ok: false,
+    error: 'tier-path-mismatch',
+    errorKind: 'TierPathMismatchError',
+    message,
+    actionableHint: 'Pass the tier that matches the path namespace: _meta/ and _evidence/ are machine (evidence) paths; everything else is front.',
+  });
+}
+
+/** Evidence-tier zh-side input → refusal envelope (monolingual invariant). */
+export function monolingualRefusalJson(toolName: string, argumentName: string): ToolResult {
+  return dump({
+    ok: false,
+    error: 'evidence-monolingual',
+    errorKind: 'TierMonolingualError',
+    message: `${toolName} received "${argumentName}" on an evidence-tier page, which is monolingual en`,
+    actionableHint: 'Drop the zh-side argument (locale "zh" / sectionZh) — evidence machine pages never carry a bilingual twin.',
+  });
+}

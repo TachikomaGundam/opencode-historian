@@ -8,7 +8,21 @@
 import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { appendSection, createPage, updatePage, PageNotFoundError } from '../wiki/pages.js';
 import { readPage, type PageRecord } from '../wiki/pages.read.js';
-import { errEnvelope, okJson, urlPair, URL_MANDATE, pageDeps, type ToolDeps } from './shared.js';
+import {
+  enforceTierPath,
+  errEnvelope,
+  isInternalPath,
+  MACHINE_TIER_NOTE,
+  monolingualRefusalJson,
+  okJson,
+  tierMismatchJson,
+  TIERS,
+  urlPair,
+  URL_MANDATE,
+  pageDeps,
+  type Tier,
+  type ToolDeps,
+} from './shared.js';
 
 const s = tool.schema;
 
@@ -99,6 +113,7 @@ const APPEND_ARGS = {
   section: s.string(),
   locale: s.enum(['en', 'zh']).default('en'),
   sectionZh: s.string().optional().describe('Explicit zh section; when absent the zh side falls back to translation/wiring'),
+  tier: s.enum(TIERS).optional().describe('Explicit tier; absent → inferred from the path (first segment _meta/ or _evidence/ ⇒ evidence, else front)'),
 } as const;
 
 const AppendArgsSchema = s.object(APPEND_ARGS);
@@ -108,15 +123,31 @@ export function makeAppendTool(deps: ToolDeps): ToolDefinition {
     description:
       `Append a section to an existing page (engine append + RMW). For the en page with a MISSING zh twin, ` +
       `the twin is auto-created — from sectionZh when given, else translated when the translator is wired. ` +
+      `Evidence-tier pages (_meta/ or _evidence/) are monolingual en — no twin handling. ` +
       `${URL_MANDATE}.`,
     args: APPEND_ARGS,
     execute: async (raw) => {
       const args = AppendArgsSchema.parse(raw);
+      // Exactly ONE resolution rule: explicit tier arg wins; otherwise infer
+      // from the path prefix (internal namespace ⇒ evidence).
+      const tier: Tier = args.tier ?? (isInternalPath(args.path) ? 'evidence' : 'front');
+      const mismatch = enforceTierPath(tier, args.path);
+      if (mismatch !== null) return tierMismatchJson(mismatch);
+      const isEvidence = tier === 'evidence';
+      if (isEvidence && args.locale === 'zh') {
+        return monolingualRefusalJson('historian_page_append', 'locale "zh"');
+      }
+      if (isEvidence && args.sectionZh !== undefined) {
+        return monolingualRefusalJson('historian_page_append', 'sectionZh');
+      }
       try {
         const appended = await appendSection(pageDeps(deps), args.path, args.locale, args.section);
         let zhStatus: string;
         let zhNote: string | undefined;
-        if (args.locale === 'zh') {
+        if (isEvidence) {
+          zhStatus = 'skipped';
+          zhNote = 'evidence tier is monolingual en — no zh twin is bootstrapped or touched.';
+        } else if (args.locale === 'zh') {
           zhStatus = 'appended';
           zhNote = 'Primary locale is zh — the en twin is untouched (check with historian_read(path, "en")).';
         } else if (args.sectionZh !== undefined) {
@@ -151,6 +182,7 @@ export function makeAppendTool(deps: ToolDeps): ToolDefinition {
           urls: urlPair(appended),
           zhStatus,
           zhNote,
+          ...(isEvidence ? { note: MACHINE_TIER_NOTE } : {}),
         });
       } catch (err) {
         return errEnvelope(err);
