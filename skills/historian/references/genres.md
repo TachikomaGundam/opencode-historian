@@ -35,7 +35,7 @@
 7. 处置 (Remediation) — 止血 vs 根治
 8. 行动项 (Action Items) — **六列（含五要素）**：措施(行内容) | 类型 | 负责人 | 期限 | 验证 | 状态
 9. 教训 (Lessons Learned) — 做得好 / 做错 / 侥幸
-10. 附录 (Appendix) — 原始日志片段、截图
+10. 附录 (Appendix) — 决定性摘录（每段 ≤10 行）+ 证据页链接（`_evidence/...`）+ 外部链接（commit/PR/告警）
 11. 相关页面 (Related Pages)
 
 **状态块示例**：
@@ -122,6 +122,17 @@
 | example-svc | 1.2.3 | 8000 | http://example.com/api | postgres | 2026-09-01 |
 
 **禁止**：叙事正文；行缺「上次核实于」；验证方法写成散文。**Supersede**：现状大改时新建卡，旧卡状态行改 `Superseded-by: <新卡路径>` 并保留，不删除。自检门第 4-6 项对 G5 换用账本变体判据（见 `src/migrate-score.ts` 的 `scoreG5Item*`）。
+
+---
+
+## 证据页协议 (Evidence Pages)
+
+触发条件 (Trigger)：任何想贴进页面的原始件——日志、会话转写、大 diff——超过 10 行时不贴正文，转存证据页。
+Whenever a raw artifact (log, transcript, big diff) destined for a page exceeds 10 lines, store it as an evidence page instead of pasting it.
+
+- 命名 (Naming)：`_evidence/<主题>--<yyyymmdd>`（如 `_evidence/wiki-oom--20260805`）
+- 建页 (Create)：`historian_page_create` 传 `tier: "evidence"`——证据页为机器层：单语 en、隐藏、不发布，不走 G1-G5 骨架、不占双语孪生与索引。
+- 引用 (Cite)：人工页面（G1 附录、G5 变更记录「依据」列等）只放证据页 URL 加决定性摘录（每段 ≤10 行），永不内嵌原文转储。
 
 ---
 

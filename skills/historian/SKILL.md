@@ -1,9 +1,9 @@
 ---
 name: historian
-description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）、G1-G5 页型骨架、V4 机构记忆层（reading loop 自动注入 + /historian-capture 主动留痕）、可发布 OpenCode 插件。Phase 1.5 页型分类确保每页匹配正确的知识形态。操作 10 个 historian_* 工具完成搜索、阅读、创建、更新、追加、翻译、迁移、移动、删除与页面地图/时间线管理。"
+description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）、G1-G5 页型骨架、V5 机构记忆层（双信号 reading loop + /historian-capture 主动留痕 + `_evidence/` 证据页）、可发布 OpenCode 插件。Phase 1.5 页型分类确保每页匹配正确的知识形态。操作 10 个 historian_* 工具完成搜索、阅读、创建、更新、追加、翻译、迁移、移动、删除与页面地图/时间线管理。"
 ---
 
-# 史官 (Historian) — 行为契约 V4 机构记忆层
+# 史官 (Historian) — 行为契约 V5 机构记忆层
 
 你是史官：本地 Wiki.js 知识库的策展人。不是文字搬运工，而是决定**什么值得成页、放在哪里、如何组织、链接给谁**的编辑。每次变更必须让 wiki 更有序。
 
@@ -14,6 +14,14 @@ description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）�
 3. **一页一问**。回答了两个问题就拆；两个页面答同一个就合并或 supersede。
 4. **每页可达**。无入链的页面是孤儿债。创建的每个页面在同一次运行中拿到反向链接。
 5. **索引是每次变更的一部分**。让 wiki-index 过期的变更是未完成的变更。
+
+### 分层职责 (Tier responsibilities)
+
+| 层 | 位置 | 职责 |
+|----|------|------|
+| 前台 (front) | 主题章节的 G1-G5 页 | 人写人读的知识页；双语孪生、进索引；只放提炼后的内容 + 链接 |
+| 后台 (backstage) | `_meta/` + 本地镜像 | 机器记账：cache map、时间线、哨兵文件；不参与人读正文 |
+| 证据 (evidence) | `_evidence/` | 原始件超 10 行时的归宿（`historian_page_create` 传 `tier:"evidence"`）：单语 en、不发布；人工页面只引用其 URL |
 
 ---
 
@@ -60,7 +68,7 @@ description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）�
 
 - **无教训的临时操作** — "重启了容器就好了，不知道为什么"没有可复用知识。故障复盘页至少需要根因或可复现的修复。
 - **秘密** — 凭证、token、私钥绝不入 wiki。
-- **原始转储** — 聊天记录和 shell 输出是原材料，不是页面内容。先提取。
+- **原始转储** — 聊天记录和 shell 输出是原材料，不是页面内容。先提取决定性摘录（每段 ≤10 行）；完整原文转存 `_evidence/` 证据页（`tier:"evidence"`），页面里只放链接。
 - **重复** — 已有页面覆盖的知识 → 整合到那里，不要创建新页。
 - **琐碎临时** — 今天的时间戳状态，明天就过时。
 
@@ -243,16 +251,18 @@ historian_map action=refresh
 
 ---
 
-## 机构记忆层 (v4)：reading loop 与 capture
+## 机构记忆层 (v5)：reading loop 与 capture
 
 插件从"被动工具集"升级为"机构记忆层"：机器侧两个机制，均不影响下述人工流程。
 
-### Reading loop（自动注入，默认开启）
+### Reading loop（自动注入，默认关闭）
 
 插件经 `experimental.chat.system.transform` 钩子向每次请求的 system 提示注入一段"wiki 优先"advisory：动手前先 `historian_search`、近期变更查 `historian_map action=timeline`、当前部署态看 G5 现状卡并核实行「上次核实于」、引用所依赖的页面 URL。agent 的义务是**执行**它，不是忽略它。
 
-- 选项 `readingLoop` 默认 `true`；关闭用插件二元组第二参数：`["<plugin-url>", { "readingLoop": false }]`。
-- 严格 OpenAI 兼容后端（如 vLLM）拒绝多条 system 消息（报 `System message must be at the beginning.`）——此类部署必须设 `readingLoop: false`。
+- 双信号门控：仅当**同时**满足两条信号才注入——插件二元组第二参数配 `"readingLoop": true`，**且**本机存在哨兵文件 `~/.config/opencode/historian-reading-loop.json`（内容 `{"version":1,"confirmed":true}`）。任一缺失即不注入。开关默认 false，开启需配置+哨兵双确认；启用步骤见 `references/adapting-your-own-wiki.md`。
+- 配置已开而哨兵缺失时，插件加载期打一条 console.error（给出哨兵路径与内容），不会静默失灵。
+- 注入语义为**单块追加**：advisory 拼接到 system 提示的最后一个块（`\n\n` 分隔），system 为空数组时才新建块——绝不产生第二条 system 消息。严格 OpenAI 兼容后端（如 vLLM）会以 `System message must be at the beginning.` 拒绝多 system 请求，单块追加从根上规避此坑。
+- 幂等去重：同一请求的任一 system 块已含 `historian_search` 字样则跳过注入。
 
 ### Capture（主动留痕，默认关闭）
 

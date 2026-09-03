@@ -307,19 +307,26 @@ describe('genreSkeleton anatomy per genre × lang', () => {
 // --- G1 specifics ------------------------------------------------------------
 
 describe('genreSkeleton G1', () => {
-  it('zh: timeline table, 5 Whys, 6-column action table, footnote slot', () => {
+  it('zh: timeline table, 5 Whys, 6-column action table, cite-not-dump appendix', () => {
     const zh = genreSkeleton('G1', 'zh');
     expect(zh).toContain('| 时间 | 事件 | 来源 |');
     expect(zh).toContain('5 Whys');
     // Digest action-item table: 措施 | 类型 | 负责人 | 期限 | 验证 | 状态
     expect(zh).toContain('| 措施 | 类型 | 负责人 | 期限 | 验证 | 状态 |');
+    // V5 appendix doctrine: decisive excerpts + evidence-page links, not raw dumps.
+    expect(zh).toContain('决定性摘录（每段 ≤10 行）');
+    expect(zh).toContain('`_evidence/...`');
+    expect(zh).toContain('tier:"evidence"');
     expect(zh).toContain('[^1]');
   });
-  it('en: parallel timeline table, 5 Whys, action table header, footnote slot', () => {
+  it('en: parallel timeline table, 5 Whys, action table header, cite-not-dump appendix', () => {
     const en = genreSkeleton('G1', 'en');
     expect(en).toContain('| Time | Event | Source |');
     expect(en).toContain('5 Whys');
     expect(en).toContain('| Action | Type | Owner | Due | Verification | Status |');
+    expect(en).toContain('Decisive excerpts (≤10 lines each)');
+    expect(en).toContain('`_evidence/...`');
+    expect(en).toContain('tier:"evidence"');
     expect(en).toContain('[^1]');
   });
 });
@@ -408,6 +415,7 @@ describe('genreSkeleton G5', () => {
     expect(zh).toContain('## 验证方法');
     expect(zh).toContain('`curl -s http://example.com:8000/health`');
     expect(zh).toContain('| 日期 | 变更 | 依据 |');
+    expect(zh).toContain('「依据」可指向证据页 URL');
     // Machine-parseable lifecycle line: Active / Superseded-by:<path> / Deprecated.
     expect(zh).toContain('Superseded-by: <path>');
     expect(zh).toContain('Deprecated');
@@ -420,6 +428,7 @@ describe('genreSkeleton G5', () => {
     expect(en).toContain('## Invalidation Policy');
     expect(en).toContain('## Verification');
     expect(en).toContain('## Change Log');
+    expect(en).toContain('Evidence may point at an evidence-page URL');
     expect(en).toContain('Superseded-by: <path>');
   });
   it('both langs carry only generic example values (privacy red-line)', () => {
