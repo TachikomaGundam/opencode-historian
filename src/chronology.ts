@@ -7,6 +7,7 @@
 import type { MapRow } from './map.js';
 import type { Locale } from './wiki/pages.read.js';
 import { classifyGenre } from './templates/genres.js';
+import { INTERNAL_NAMESPACES } from './tools/shared.js';
 
 // --- Chronology types + build ---
 
@@ -81,7 +82,12 @@ export function buildChronology(rows: readonly MapRow[], opts?: ChronologyOption
     opts?.days === undefined
       ? Number.NEGATIVE_INFINITY
       : (opts.now ?? new Date()).getTime() - opts.days * DAY_MS;
+  // Machine-namespace rows (INTERNAL_NAMESPACES) are dropped before grouping:
+  // the ledger page and evidence raw material are not wiki content, and their
+  // churn would drown the human timeline. All other namespaces (incl.
+  // `_sandbox`) stay visible.
   const kept = rows
+    .filter((r) => !(INTERNAL_NAMESPACES as readonly string[]).includes(r.path.split('/')[0]))
     .map((r) => ({ r, t: Date.parse(r.updatedAt) }))
     .filter((x) => !Number.isNaN(x.t) && x.t >= cutoff)
     .sort(
