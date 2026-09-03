@@ -175,3 +175,51 @@ export function monolingualRefusalJson(toolName: string, argumentName: string): 
     actionableHint: 'Drop the zh-side argument (locale "zh" / sectionZh) — evidence machine pages never carry a bilingual twin.',
   });
 }
+
+// --- Front-tier raw-dump soft gate (v3 todo 6) --------------------------------
+
+/** Contract band (SKILL.md SYN-16): a human page stays a 5-10 line excerpt;
+ *  longer raw material belongs on an evidence page. Strictly ABOVE this many
+ *  fence-interior lines triggers the advisory — 30 is the soft gate, never a
+ *  hard refusal. Deliberately layered vs the contract bands; do not unify. */
+const FRONT_DUMP_FENCE_LIMIT = 30;
+
+/** Longest fenced code block in the content, counting lines STRICTLY inside
+ *  the ``` fences (fence markers excluded). An unterminated fence counts to
+ *  EOF. Fences opening at line start (after optional indentation) close on
+ *  the next ```-leading line. */
+function longestFenceLines(content: string): number {
+  let longest = 0;
+  let inside = false;
+  let count = 0;
+  for (const line of content.split('\n')) {
+    if (line.trimStart().startsWith('```')) {
+      if (inside) {
+        if (count > longest) longest = count;
+        inside = false;
+        count = 0;
+      } else {
+        inside = true;
+        count = 0;
+      }
+    } else if (inside) {
+      count++;
+    }
+  }
+  if (inside && count > longest) longest = count; // unterminated fence → EOF
+  return longest;
+}
+
+/** Soft-gate advisory for front-tier raw dumps: null when nothing to say
+ *  (evidence tier NEVER checked — machine pages are the raw-material home;
+ *  fence at or under the limit). The advisory is informational only: every
+ *  caller still performs the write. */
+export function frontDumpAdvisory(tier: Tier, content: string): string | null {
+  if (tier !== 'front') return null;
+  const lines = longestFenceLines(content);
+  if (lines <= FRONT_DUMP_FENCE_LIMIT) return null;
+  return (
+    `content contains a ${lines}-line fenced block; per contract, move raw material to a ` +
+    `tier:"evidence" page under _evidence/ and link it from the human page (SYN-16)`
+  );
+}

@@ -13,6 +13,7 @@ import { evidenceSkeleton } from '../templates/evidence.js';
 import {
   enforceTierPath,
   errEnvelope,
+  frontDumpAdvisory,
   MACHINE_TIER_NOTE,
   okJson,
   pageDeps,
@@ -111,6 +112,7 @@ export function makeCreateTool(deps: ToolDeps): ToolDefinition {
           twin: isEvidence ? false : args.twin,
           description: args.description,
         });
+        const advisory = frontDumpAdvisory(tier, args.content);
         return okJson({
           mode: 'create',
           path: args.path,
@@ -122,6 +124,7 @@ export function makeCreateTool(deps: ToolDeps): ToolDefinition {
           urls: urlPair(result),
           ...(isEvidence ? { note: MACHINE_TIER_NOTE } : {}),
           ...(localeHint === undefined ? {} : { localeHint }),
+          ...(advisory === null ? {} : { advisory }),
         });
       } catch (err) {
         return errEnvelope(err);

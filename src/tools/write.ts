@@ -11,6 +11,7 @@ import { readPage, type PageRecord } from '../wiki/pages.read.js';
 import {
   enforceTierPath,
   errEnvelope,
+  frontDumpAdvisory,
   isInternalPath,
   MACHINE_TIER_NOTE,
   monolingualRefusalJson,
@@ -56,6 +57,7 @@ export function makeUpdateTool(deps: ToolDeps): ToolDefinition {
           description: args.description,
           tags: args.tags,
         });
+        const advisory = frontDumpAdvisory(inferredTier(page.path), args.content ?? '');
         return okJson({
           mode: 'update',
           path: args.path,
@@ -71,12 +73,19 @@ export function makeUpdateTool(deps: ToolDeps): ToolDefinition {
             updatedAt: result.page.updatedAt,
           },
           urls: urlPair(result),
+          ...(advisory === null ? {} : { advisory }),
         });
       } catch (err) {
         return errEnvelope(err);
       }
     },
   });
+}
+
+/** Path-only tier resolution (same rule the append fallback uses): an
+ *  internal namespace first segment ⇒ evidence, anything else ⇒ front. */
+function inferredTier(path: string): Tier {
+  return isInternalPath(path) ? 'evidence' : 'front';
 }
 
 // --- historian_page_append ---------------------------------------------------
@@ -130,7 +139,7 @@ export function makeAppendTool(deps: ToolDeps): ToolDefinition {
       const args = AppendArgsSchema.parse(raw);
       // Exactly ONE resolution rule: explicit tier arg wins; otherwise infer
       // from the path prefix (internal namespace ⇒ evidence).
-      const tier: Tier = args.tier ?? (isInternalPath(args.path) ? 'evidence' : 'front');
+      const tier: Tier = args.tier ?? inferredTier(args.path);
       const mismatch = enforceTierPath(tier, args.path);
       if (mismatch !== null) return tierMismatchJson(mismatch);
       const isEvidence = tier === 'evidence';
@@ -174,6 +183,7 @@ export function makeAppendTool(deps: ToolDeps): ToolDefinition {
             zhNote = 'No zh twin exists and no translator is wired — provide sectionZh to bootstrap it.';
           }
         }
+        const advisory = frontDumpAdvisory(tier, args.section);
         return okJson({
           mode: 'append',
           path: args.path,
@@ -183,6 +193,7 @@ export function makeAppendTool(deps: ToolDeps): ToolDefinition {
           zhStatus,
           zhNote,
           ...(isEvidence ? { note: MACHINE_TIER_NOTE } : {}),
+          ...(advisory === null ? {} : { advisory }),
         });
       } catch (err) {
         return errEnvelope(err);
