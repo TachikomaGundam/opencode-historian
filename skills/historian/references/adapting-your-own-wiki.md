@@ -41,7 +41,7 @@ Six-step self-onboarding for pointing the historian plugin at your own Wiki.js i
 
 ## 6. 机构记忆层开关与证据层 / reading-loop & capture switches, evidence tier
 
-- `readingLoop` 开关默认 false，true 需配置+哨兵双确认：插件向每次请求的 system 注入"先查 wiki"提示，但只有配置信号与本机哨兵文件同时到位才生效。注入是单块合并（追加到最后一个 system 块），绝不产生第二条 system 消息——严格 OpenAI 兼容后端（如 vLLM）同样安全。
+- `readingLoop` 开关默认关闭（false），true 需配置+哨兵双确认：插件向每次请求的 system 注入"先查 wiki"提示，但只有配置信号与本机哨兵文件同时到位才生效。注入是单块合并（追加到最后一个 system 块），绝不产生第二条 system 消息——严格 OpenAI 兼容后端（如 vLLM）同样安全。
 - 哨兵文件必须由人在本机写入（agent 自我启用被禁止）：
 
   ```bash
