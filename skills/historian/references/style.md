@@ -79,6 +79,16 @@ wiki 页面是 **en/zh 孪生体**：同一路径、两种语言、节对节镜�
 | please don't hesitate | — | 删除 |
 | delve | 深入 | 用「分析」或「调查」 |
 
+## 跨链义务
+
+- **每页相关页面段**：`## Related Pages` / `## 相关页面` 是固定尾部（SYN-9），必须挂真实互链；G6 手册链向 G3 清单、G4 原理、G1 事故史，让读者顺链可达背景与来龙去脉。
+- **合并后入链改写**：bold-merge 把被弃路径原地改为 Redirect 存根（SYN-22）后，全 wiki 所有指向旧路径的入链必须改写指向 canonical。这是**仅 URL 的机械改动**——链接文字、所在句子、上下文内容一律不动；改写范围以链接边表导出清单为准，逐页 diff 入 evidence。
+- 存根使旧 URL 仍返回 200 并指向 canonical，兜底外部书签；但站内已知入链不留旧路径，避免读者每次都被中转一次。
+
+## 索引 = 人工策展，机器只查覆盖率
+
+wiki-index 的类型×主题网格与首页导航是**人工策展产物**：收录哪些页、如何分组、每组一句话 Scope 都由人（或以人的判断行事的 agent）手写。maintain / map / scan 等机器工具只**测量**——索引覆盖率、死链、孤儿页、重复簇、新鲜度到期——并输出报告；**永不自动编辑索引**。机器发现缺口 → 人来决定是否补链、升格或合并。
+
 ## 来源
 
-提炼自 `docs/research/cross-cultural-wiki-writing.md` 信息密度节（SYN-3/4/5/11/12/14/15）与双语写作惯例（EN/ZH 对照样本）。
+提炼自 `docs/research/cross-cultural-wiki-writing.md` 信息密度节（SYN-3/4/5/11/12/14/15）与双语写作惯例（EN/ZH 对照样本）。跨链义务与索引策展条款依据 v4 已合入实现：bold-merge 流程见 `references/genres.md` Redirect 存根规范，机器只测不写的指标面见 `src/maintain.ts`。

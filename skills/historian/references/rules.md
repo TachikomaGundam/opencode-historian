@@ -1,6 +1,6 @@
-# 写作规则 20 条 (SYN-1..20)
+# 写作规则 23 条 (SYN-1..23)
 
-> 跨文化 wiki 写作的通用合成规则。每条规则可在 `docs/research/cross-cultural-wiki-writing.md` 找到原始调研证据。
+> 跨文化 wiki 写作的通用合成规则。SYN-1..20 每条可在 `docs/research/cross-cultural-wiki-writing.md` 找到原始调研证据；SYN-21..23 为 v4 策展闭环新增，依据 `src/` 已合入实现。
 
 | # | 规则 | 要点 |
 |---|------|------|
@@ -24,7 +24,10 @@
 | SYN-18 | **链接规范** | 内部链接用 `[Label](/path)` 格式。禁止 `[[path|label]]` 旧语法。每条链接必须指向 cache map 中现存的路径。 |
 | SYN-19 | **双语孪生** | 每个 en 页有 zh 孪生页，路径相同、语言不同。孪生标题各用本语言（如 `Architecture` / `建筑`）。正文节对节镜像。 |
 | SYN-20 | **Supersede 协议** | 新页取代旧页时：(1) 新页达标准 (2) 旧页状态块改 `Superseded` + 链接新页 (3) 更新 wiki-index (4) 不允许两页同时声称是某主题的权威。 |
+| SYN-21 | **撞车 advisory 必须响应** | `historian_page_create` 返回 `path exists — … prefer historian_page_update to amend it` 或 `疑似重复: … 先读再写` advisory（`src/tools/shared.ts` 的 `collisionAdvisory`）时，必须 `historian_read` 既有页后改用 `historian_page_update` 续写，禁止无视 advisory 直接重复建页。advisory 本身不拦截写入，拦截靠执行者响应——这是 GATE 环的设计（机器提示、人/agent 裁决）。 |
+| SYN-22 | **Redirect 存根正文** | 存根正文只允许 `> Redirect: <canonical URL>` 一行，行首起始（`/^>\s*Redirect:/i` 判定），不携带其他正文。双语孪生各改一份（en→`/en/...`、zh→`/zh/...` canonical）。流程与 maintain 计数口径见 `references/genres.md` Redirect 存根规范。 |
+| SYN-23 | **发布态流转** | capture 新建页必经 `状态: draft` → 十项自检通过 → `Active`。建页时自检 FAIL ≥3 条出 advisory `自检 N/10 未通过: … (不阻断, 发布前请补齐)`；FAIL 项用 `historian_page_update` 补齐后才可标 Active。禁止跳过自检直接把 draft 页改口成 Active。 |
 
 ## 来源
 
-提炼自 `docs/research/cross-cultural-wiki-writing.md` 的 SYN-1..20 综合规则集，结合 5 文化维度（EN/ZH/DE/FR/RU）的交叉验证。
+SYN-1..20 提炼自 `docs/research/cross-cultural-wiki-writing.md` 综合规则集，结合 5 文化维度（EN/ZH/DE/FR/RU）的交叉验证。SYN-21..23 依据 v4 已合入实现新增：`src/tools/shared.ts`（`collisionAdvisory` / `checklistAdvisory`）、`src/maintain.ts`（Redirect 计数）、`src/index.ts`（`CAPTURE_COMMAND_TEMPLATE` 的 draft→Active 流转）。
