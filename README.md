@@ -6,12 +6,15 @@ opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具�
 
 功能一览:
 
-* 10 个 `historian_*` 工具，覆盖创建、更新、追加、翻译、搜索、阅读、地图/时间轴、迁移、删除、移动
+* 10 个 `historian_*` 工具，覆盖创建、更新、追加、翻译、搜索、阅读、地图/时间轴/维护报告、迁移、删除、移动
 * Skill v5 随插件自动注入（config hook），无需手动安装 skill 文件
-* G1 至 G5 页型契约，每种页型对应专属骨架模板
+* G1 至 G6 页型契约，每种页型对应专属骨架模板（v4 新增 G6 操作手册/how-to）
 * 双语孪生页面（en/zh）自动翻译，翻译引擎可配置
-* 页面地图缓存、本地镜像与时间轴聚合视图
-* 开工前置查阅回路（reading loop，默认关，双信号启用）+ `/historian-capture` 会话留痕（默认关）
+* 页面地图缓存、本地镜像、时间轴聚合视图与 `maintain` 维护策展报告（light/deep 两档）
+* `options.sections` 路径前缀白名单强制生效：配置非空时越界写入硬拒（`ConfigError`，请求发出前拒绝）；`home`、`wiki-index`、`_sandbox`、`_data`、`_meta`、`_evidence` 系统路径恒豁免；默认 `[]` = 不限制
+* `historian_search` 标签过滤：`tags` 1-5 个，`tagsMode` 默认 `all`（服务端 AND）、`any` 为客户端逐标签 fan-out 求并集
+* 顶层 `home` 落地页解锁：仅豁免精确顶层 `home`，其余保留字（login/register/graphql/healthz/_assets/favicon）与嵌套 `home` 照旧拒绝
+* 开工前置查阅回路（reading loop，默认关，双信号启用；v4 advisory：先查索引、update 优先、引页引日期、标注过期）+ `/historian-capture` 会话留痕（默认关）
 * 试点与评测均通过：pilot 7 页迁移 PASS，eval 7/7 场景首跑全过
 
 ## 史官宣言 / The Historian's Manifest
@@ -42,17 +45,27 @@ SRE postmortem 文化单独值得点名：它把"事件"当一等文档对待，
 
 ### 作用 / What it does
 
-五柱页型契约，加上读写两条自动化回路：
+六柱页型契约，加上读写两条自动化回路：
 
 | 能力 | 机制 | 落点 |
 |---|---|---|
-| 五柱页型 | G1 事件复盘 / G2 对比选型 / G3 清单索引 / G4 概念原理 / G5 现状账本，写前声明页型，套固定骨架、过来源列检查 | `src/templates/genres.ts`，skill Phase 1.5 |
-| 双视图 | 地图视图（en/zh 对应关系，Locale/Twin 列）+ 时间轴视图（ISO 周分组，支持 `days` 窗口与 `path` 前缀过滤，人读周表 + 机读 weeks JSON） | `historian_map` 的 `action:'show'` / `action:'timeline'` |
+| 六柱页型 | G1 事件复盘 / G2 对比选型 / G3 清单索引 / G4 概念原理 / G5 现状账本 / G6 操作手册，写前声明页型，套固定骨架、过来源列检查 | `src/templates/genres.ts`，skill Phase 1.5 |
+| 三视图 | 地图视图（en/zh 对应关系，Locale/Twin 列）+ 时间轴视图（ISO 周分组，支持 `days` 窗口与 `path` 前缀过滤，人读周表 + 机读 weeks JSON）+ 维护策展报告（`action:'maintain'`：双语缺口、近似重复标题、过期、孤儿候选、标签词表、章节分布；light 档只扫地图行加每 locale 一次 `pages.list`，`deep:true` 逐页读正文补新鲜度标记与 Redirect 存根识别） | `historian_map` 的 `action:'show'` / `'timeline'` / `'maintain'` |
 | 迁移与评分门禁 | 存量页按骨架重排：dry-run 评分在前，`apply=true` 自动 pre-image 备份；每页写入后过 10 项自检门 | `historian_migrate`，`selfReviewChecklist()` |
-| 前置查阅回路 | 向每次请求的 system 提示注入"先查 wiki"指令（单块合并：追加到最后一个 system 块，绝不产生第二条 system 消息；双信号门控：选项与本机哨兵文件同时到位才注入）：动这台机器的部署/历史/坑/决定之前先 `historian_search`、查 timeline、核对 G5 卡的核实日期，引用查过的页面 URL | `readingLoop` 选项（默认 false，开启需配置+哨兵双确认）+ 哨兵文件 `~/.config/opencode/historian-reading-loop.json`，`src/index.ts` 的 `experimental.chat.system.transform` 钩子 |
+| 前置查阅回路 | 向每次请求的 system 提示注入"先查 wiki"指令（单块合并：追加到最后一个 system 块，绝不产生第二条 system 消息；双信号门控：选项与本机哨兵文件同时到位才注入）：v4 advisory 四条——先读 `wiki-index` / `historian_map show` 定位再 `historian_search`（index-first）；update 优先于 create；引用页面时带 URL 与日期；发现矛盾/过期在页内标注（supersede 或复核章）而非静默覆盖，G5 账本逐行核对「上次核实于」 | `readingLoop` 选项（默认 false，开启需配置+哨兵双确认）+ 哨兵文件 `~/.config/opencode/historian-reading-loop.json`，`src/index.ts` 的 `experimental.chat.system.transform` 钩子 |
 | 主动留痕 | `/historian-capture` 命令把当前会话总结成 G1 事件页；开启 `capture.enabled` 后额外在会话空闲时弹一次提醒，仅提醒，绝不自动写页 | `src/index.ts` 的 `config` / `event` 钩子 |
 
 G5 现状卡回答"现在跑着什么"，timeline 回答"最近两周变了什么"。比如问"`service-a` 现在监听哪个端口"，应当命中现状账本里的一行（形如 `example.com:8000`，带上次核实日期与验证命令），而不是某次会话的聊天记录。这两样合起来，wiki 才从文档堆变成可查询的运维账本。
+
+知识库要同时满足四种诉求——档案、手册、百科、知识库（速查）。六柱页型加索引层按层分工：
+
+| 层诉求 | 回答的问题 | 对应页型 | 承载机制 |
+|---|---|---|---|
+| 档案 | 发生过什么、现在跑着什么 | G1 事件复盘 + G5 现状账本 | G1 时间线带来源列；G5 每行带「上次核实于」+ 验证命令 |
+| 手册 | 怎么把一件事做完 | G6 操作手册 | 目标句式标题、步骤三段（动作+预期结果+失败处置）、上次核实+复核周期 |
+| 百科 | 它是什么、为什么 | G4 概念原理 | 概念定义 → 图示 → 示例 |
+| 知识库（速查） | 该选哪个、去哪查 | G2 对比选型 + G3 清单索引 | 对比表带来源列；可勾选检查项 |
+| 索引层 | 从哪读起 | ——（不是页型） | `wiki-index` 人策展目录 + `historian_map` 的 show/timeline/maintain |
 
 ### 使用方式 / Usage
 
@@ -74,7 +87,7 @@ G5 现状卡回答"现在跑着什么"，timeline 回答"最近两周变了什�
    > `service-a` 今天 OOM 重启，根因是缓存没设上限，已加告警，记下来。
 
    → 分诊为事件复盘，声明 G1 → `historian_page_create`（`genre: "G1"`）→ 回报 `http://<your-wiki>:3000/team-notes/<slug>` 与它的 `/zh/` 孪生页。
-4. **检索与整理**：`historian_search` 按主题查；`historian_map` 的 `show` 看双语地图、`timeline`（可选 `days` / `path`）看最近变动；存量页不合规用 `historian_migrate` 先 dry-run 再 apply。
+4. **检索与整理**：`historian_search` 按主题查，可按标签过滤（`tags` 1-5 个，`tagsMode` 默认 `all` 即服务端 AND，`any` 为客户端逐标签 fan-out 并集）；`historian_map` 的 `show` 看双语地图、`timeline`（可选 `days` / `path`）看最近变动、`maintain`（可选 `deep:true`）出维护策展报告；存量页不合规用 `historian_migrate` 先 dry-run 再 apply。
 5. **开关**：reading loop 默认 false，开启需配置+哨兵双确认，两步缺一不可：
 
    1. 插件二元组第二参数写 `"readingLoop": true`：`["opencode-wiki-historian", { "readingLoop": true }]`
@@ -179,14 +192,14 @@ opencode run --command historian --message "historian_map show"
 | `translate.model` | string | `qwen3.7-plus` | 翻译模型 |
 | `translate.apiKey` | string | 见下方链 | 翻译 API 密钥 |
 | `translate.providerKey` | string | 未配置 | jsonc 兜底腿读取的 provider 名；须显式设置才会启用该腿 |
-| `sections` | string[] | `[]`（不限制） | 插件可操作的 wiki 路径前缀白名单 |
+| `sections` | string[] | `[]`（不限制） | 写入路径前缀白名单。v4 起强制生效：非空时 create/update/append/delete/move(目标路径) 在发出请求前做 `sectionGuard` 检查，越界返回 `ConfigError`；`home`、`wiki-index`、`_sandbox`、`_data`、`_meta`、`_evidence` 恒豁免；按首路径段匹配、区分大小写 |
 | `locales` | string[] | `["en", "zh"]` | 启用的语言列表 |
 | `readingLoop` | boolean | `false` | 开工前置查阅 advisory，向每次请求注入"先查 wiki"提示；默认 false，true 需配置+哨兵双确认（见「使用方式」开关步骤）；单块合并追加到最后一个 system 块，绝不产生第二条 system 消息，vLLM 等拒绝多条 system 的严格后端同样安全 |
 | `capture.enabled` | boolean | `false` | 开启后会话空闲时弹一次 `/historian-capture` 留痕提醒；仅提醒，不自动写页 |
 
 `translate.endpoint` 解析链（优先级从高到低）：`translate.endpoint` 选项 → 环境变量 `HISTORIAN_TRANSLATE_ENDPOINT` → 未配置。包内**不**内置任何网关地址；未配置时翻译调用直接以 `translate.endpoint not configured` 失败（见降级行为）。
 
-`sections` 默认为空列表 = 不限制路径前缀（任意合法路径可写，实际权限由 wiki.js token 的 page rules 决定）。按机器通过选项传入白名单，例如 `["team-notes", "infra", "ops"]`。
+`sections` 默认为空列表 = 不限制路径前缀（任意合法路径可写，实际权限由 wiki.js token 的 page rules 决定）。按机器通过选项传入白名单，例如 `["team-notes", "infra", "ops"]`。传入非空列表即强制生效（v4）：五个写入工具先过 `sectionGuard`（`src/tools/shared.ts`），不在白名单内的路径直接以 `ConfigError` 拒绝、不发任何写请求；报错信息会点名越界的首段并提示把它加进 `sections`。两个细节：匹配按首路径段、区分大小写，`doc` 授权 `doc` 与 `doc/x` 但不授权 `docs/x`；配置项首尾斜杠可省。`home`、`wiki-index`、`_sandbox`、`_data`、`_meta`、`_evidence` 是插件自记账与索引胶水所需，恒豁免。
 
 ### API Key 获取优先级
 
@@ -263,11 +276,13 @@ zh: http://<host>/zh/ops/example
 
 **时间轴视图**：`historian_map action:'timeline'` 把镜像行按 ISO 周分组（可选 `days` 窗口与 `path` 前缀过滤），输出人读周表 + 机读 `weeks` JSON，回答"最近哪些页面变过"。
 
+**维护视图**：`historian_map action:'maintain'` 输出策展报告——双语缺口、近似重复标题、过期页面、孤儿/扩散候选、标签词表、章节分布。默认 light 档只扫地图行加每个 locale 一次 `pages.list`；`deep:true` 逐页读正文，补新鲜度标记与 Redirect 存根识别。
+
 ## 写作质量体系 / Quality System
 
-### G1 至 G5 页型
+### G1 至 G6 页型
 
-插件根据内容形态把每页归入五种页型之一，每种有专属骨架模板：
+插件根据内容形态把每页归入六种页型之一，每种有专属骨架模板：
 
 | 页型 | 用途 | 骨架结构 |
 |---|---|---|
@@ -276,10 +291,11 @@ zh: http://<host>/zh/ops/example
 | G3 清单 | 操作步骤、检查项 | 可勾选的检查项列表 |
 | G4 概念 | 架构说明、原理讲解 | 概念定义 → 图示 → 示例 |
 | G5 现状账本 | 此刻的部署/运行态，回答"现在跑着什么" | 状态块 → 部署物清单（每行带「上次核实于」+ 验证命令）→ 失效策略，禁止叙事正文 |
+| G6 操作手册 | how-to，回答"怎么把一件事做完"，目标句式标题 | 前置条件 → 操作步骤（每步含预期结果+失败处置）→ 回退 → 元数据表（上次核实 + 复核周期）→ 相关页面 |
 
 ### 10 项自检门
 
-每页写入后过一遍自检清单（源码 `src/templates/genres.ts` `selfReviewChecklist()`，参考文件 `skills/historian/references/rules.md` + `genres.md`）。dry-run 阶段评 1–8，apply 后评 9–10。genre-specific 条目对不匹配的页型记 N/A=PASS；G5 页的第 4–6 项换成账本变体（`G5_CHECKLIST_VARIANTS`）：
+每页写入后过一遍自检清单（源码 `src/templates/genres.ts` `selfReviewChecklist()`，参考文件 `skills/historian/references/rules.md` + `genres.md`）。dry-run 阶段评 1–8，apply 后评 9–10。genre-specific 条目对不匹配的页型记 N/A=PASS；G5 页的第 4–6 项换成账本变体（`G5_CHECKLIST_VARIANTS`），G6 页换成手册变体（`G6_CHECKLIST_VARIANTS`）：第 4 项要求标题是目标句式 "How to X" / "如何/怎么做X"，第 5 项要求每条操作步骤三段（动作 + 预期结果 + 失败处置），第 6 项要求元数据表含「上次核实」与「复核周期」行：
 
 1. **导言占比 10–15%**：导言 ≈ 正文的 10–15%，每个重要小节在导言至少占一句
 2. **句长上限**：中文句 ≤20 字、英文句 ≤25 词
@@ -302,7 +318,7 @@ wiki 内容按读者分三层，工具按层执行不同语义（`historian_page
 
 | 层 | 位置 | 职责 |
 |---|---|---|
-| 前台 (front) | 主题章节的 G1-G5 页 | 人写人读的知识页；双语孪生、进索引；只放提炼后的内容与链接 |
+| 前台 (front) | 主题章节的 G1-G6 页 | 人写人读的知识页；双语孪生、进索引；只放提炼后的内容与链接 |
 | 后台 (backstage) | `_meta/` 页 + 本地镜像文件 | 机器记账：page-map 缓存页、迁移 checkpoint、reading loop 哨兵文件；不参与人读正文 |
 | 证据 (evidence) | `_evidence/` | 超 10 行原始件（日志、转写、大 diff）的归宿：单语 en、不发布（匿名访问 404 是 by design），人类页面只链接不复制 |
 
@@ -407,7 +423,7 @@ harness repo（与本插件仓库同工作区）提供 7 个行为验收场景�
 
 ```bash
 npm run build       # tsc 编译到 dist/
-npm test            # vitest run（331 tests, 15 files）
+npm test            # vitest run（478 tests, 20 files）
 npm pack --dry-run  # 检查打包文件列表
 ```
 
