@@ -52,7 +52,8 @@ const SEGMENT_CHARS = /^[A-Za-z0-9._-]+$/;
  *  5. first segment matches the locale shape (pitfall #9)
  *  6. any segment is length 1 (wiki.js rejects single-char path components)
  *  7. any segment contains characters outside `[A-Za-z0-9._-]`
- *  8. any segment is a reserved word (wiki.js endpoint collision)
+ *  8. any segment is a reserved word (wiki.js endpoint collision), except the
+ *     exact top-level 'home' (a live published path — see D9 note at the check)
  *
  * Order matters: cheap substring checks first, then per-segment rules.
  * Every rejection names the offending segment + the rule in the message.
@@ -112,7 +113,12 @@ export function validatePath(p: string): void {
         `segment '${seg}' contains invalid characters (allowed: [A-Za-z0-9._-])`,
       );
     }
-    if (RESERVED_WORDS.has(seg.toLowerCase())) {
+    // D9 bypass (probe p1): wiki.js 2.5.314 hosts a live published page at
+    // path=home (id48, en+zh) — the reserved-word block was plugin-side
+    // folklore, not a server limit. Allow the EXACT top-level segment 'home'
+    // only; nested 'home' (foo/home) and case variants (HOME) stay rejected.
+    const isExactTopLevelHome = segments.length === 1 && seg === 'home';
+    if (!isExactTopLevelHome && RESERVED_WORDS.has(seg.toLowerCase())) {
       throw new PathValidationError(
         `segment '${seg}' is a reserved wiki.js word (home|login|register|graphql|healthz|_assets|favicon)`,
       );

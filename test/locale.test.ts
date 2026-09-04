@@ -34,8 +34,12 @@ describe('validatePath rejects', () => {
   it('space in segment', () => rejects('foo/bar baz', 'space'));
   it('backslash separator', () => rejects('foo\\bar', 'backslash'));
   it('double slash', () => rejects('foo//bar', '//'));
-  it('reserved word: home (case-insensitive)', () => rejects('home', 'home'));
-  it('reserved word: HOME upper', () => rejects('HOME', 'home'));
+  // v0.4.0 (v4 plan D9): the EXACT top-level segment 'home' is allowed — the
+  // instance hosts a live published page at path=home (wiki.js 2.5.314, id48,
+  // en+zh). Every other 'home' shape keeps today's reserved-word rejection.
+  it('reserved word: HOME upper (bypass is exact lowercase only)', () => rejects('HOME', 'home'));
+  it('home as nested segment (pinned: still rejected)', () => rejects('foo/home', 'home'));
+  it('home as second segment (pinned: still rejected)', () => rejects('ops/home', 'home'));
   it('reserved word as second segment', () => rejects('ops/login', 'login'));
   it('reserved word: _assets', () => rejects('_assets/img', '_assets'));
   it('reserved word: favicon', () => rejects('favicon', 'favicon'));
@@ -65,6 +69,8 @@ describe('validatePath accepts', () => {
     expect(() => validatePath(input)).not.toThrow();
   };
 
+  // D9 bypass: top-level 'home' (exact, lowercase) is a legal live path.
+  it('home (exact top-level — live page id48)', () => accepts('home'));
   it('ops/foo (real section)', () => accepts('ops/foo'));
   it('_sandbox/incident-2026-09-01', () => accepts('_sandbox/incident-2026-09-01'));
   it('llm-server/vllm-notes', () => accepts('llm-server/vllm-notes'));
@@ -131,7 +137,10 @@ describe('localeUrl', () => {
     expect(localeUrl(`${BASE}///`, 'en', 'foo/bar')).toBe(`${BASE}/en/foo/bar`);
   });
   it('rejects invalid path via validatePath', () => {
-    expect(() => localeUrl(BASE, 'en', 'home')).toThrow(PathValidationError);
+    expect(() => localeUrl(BASE, 'en', 'login')).toThrow(PathValidationError);
+  });
+  it('composes URL for exact top-level home (D9)', () => {
+    expect(localeUrl(BASE, 'en', 'home')).toBe(`${BASE}/en/home`);
   });
 });
 
@@ -154,6 +163,11 @@ describe('assertLocalePair', () => {
     expect(pair.twinUrl).toBe(`${BASE}/zh/ops/foo`);
   });
   it('rejects invalid path', () => {
-    expect(() => assertLocalePair('home', 'en', BASE)).toThrow(PathValidationError);
+    expect(() => assertLocalePair('login', 'en', BASE)).toThrow(PathValidationError);
+  });
+  it('accepts exact top-level home (D9)', () => {
+    const pair = assertLocalePair('home', 'en', BASE);
+    expect(pair.url).toBe(`${BASE}/en/home`);
+    expect(pair.twinUrl).toBe(`${BASE}/zh/home`);
   });
 });
