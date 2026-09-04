@@ -8,9 +8,11 @@
 import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { validatePath } from '../wiki/locale.js';
 import { createPage } from '../wiki/pages.js';
+import { listPages, readPage, type PageListItem } from '../wiki/pages.read.js';
 import { classifyGenre, genreSkeleton } from '../templates/genres.js';
 import { evidenceSkeleton } from '../templates/evidence.js';
 import {
+  collisionAdvisory,
   enforceTierPath,
   errEnvelope,
   frontDumpAdvisory,
@@ -21,6 +23,7 @@ import {
   TIERS,
   urlPair,
   URL_MANDATE,
+  type CollisionInput,
   type Tier,
   type ToolDeps,
 } from './shared.js';
@@ -43,6 +46,30 @@ const ARGS_SHAPE = {
 } as const;
 
 const ArgsSchema = s.object(ARGS_SHAPE);
+
+/** Best-effort collision advice for the content branch: read-only pre-checks
+ *  whose every failure is SWALLOWED — the write proceeds with no advice
+ *  rather than being blocked or errored by the adviser itself (the
+ *  "hint, never throw" precedent above). */
+async function collisionAdvice(
+  deps: ToolDeps,
+  probe: Omit<CollisionInput, 'exists' | 'inventory'>,
+): Promise<string | null> {
+  const client = deps.getClient();
+  let exists = false;
+  try {
+    exists = (await readPage(client, probe.path, probe.locale)) !== null;
+  } catch {
+    /* failed existence read → assume absence: never advise on unknowns */
+  }
+  let inventory: readonly PageListItem[] = [];
+  try {
+    inventory = await listPages(client);
+  } catch {
+    /* failed inventory read → no duplicate advice */
+  }
+  return collisionAdvisory({ ...probe, exists, inventory });
+}
 
 export function makeCreateTool(deps: ToolDeps): ToolDefinition {
   return tool({
@@ -101,6 +128,13 @@ export function makeCreateTool(deps: ToolDeps): ToolDefinition {
         });
       }
       try {
+        const collision = await collisionAdvice(deps, {
+          tier,
+          path: args.path,
+          locale,
+          title: args.title,
+          baseUrl: deps.options.baseUrl,
+        });
         const result = await createPage(pageDeps(deps), {
           path: args.path,
           locale,
@@ -112,7 +146,9 @@ export function makeCreateTool(deps: ToolDeps): ToolDefinition {
           twin: isEvidence ? false : args.twin,
           description: args.description,
         });
-        const advisory = frontDumpAdvisory(tier, args.content);
+        const advisories = [frontDumpAdvisory(tier, args.content), collision].filter(
+          (a): a is string => a !== null,
+        );
         return okJson({
           mode: 'create',
           path: args.path,
@@ -124,7 +160,7 @@ export function makeCreateTool(deps: ToolDeps): ToolDefinition {
           urls: urlPair(result),
           ...(isEvidence ? { note: MACHINE_TIER_NOTE } : {}),
           ...(localeHint === undefined ? {} : { localeHint }),
-          ...(advisory === null ? {} : { advisory }),
+          ...(advisories.length === 0 ? {} : { advisory: advisories.join('\n') }),
         });
       } catch (err) {
         return errEnvelope(err);
