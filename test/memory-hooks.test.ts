@@ -280,9 +280,42 @@ describe('capture event + /historian-capture command (todo 9)', () => {
     expect(cmd?.description).toBe('把本次会话记为史官事件页 / record this session as a historian event page');
     expect(cmd?.template).toContain('historian_page_create');
     expect(cmd?.template).toContain('G1');
-    expect(cmd?.template).toContain('过程/Process');
-    expect(cmd?.template).toContain('改进/Improvement');
     expect(cmd?.template).toContain('(en + zh)');
+  });
+
+  it('capture template carries the v4 contract: trigger list, 四段式 body, draft→Active flow', async () => {
+    const hooks = await plugin.server(fakeInput().input, BASE_OPTS);
+    if (hooks.config === undefined) throw new Error('config hook missing');
+    const cfg: Config = {};
+    await hooks.config(cfg);
+    const template = cfg.command?.['historian-capture']?.template ?? '';
+
+    // D3 trigger list: all five capture triggers must be encoded (K1 proved
+    // the v2 template had zero trigger encoding).
+    for (const needle of ['事故闭环', '部署完成', 'bug修复合入', '探针结论', '被否决方案', '否决理由']) {
+      expect(template).toContain(needle);
+    }
+
+    // D2 body contract: 四段式 evidence-chain ordering replaces the v2 form.
+    for (const needle of ['证据链', '方法', '修复手段', '函数级实现']) {
+      expect(template).toContain(needle);
+    }
+    expect(template).not.toContain('过程/Process');
+    expect(template).not.toContain('改进/Improvement');
+
+    // SRE discipline survives as the metadata table fields.
+    for (const needle of ['影响', '负责人', '后续动作', '来源类型']) {
+      expect(template).toContain(needle);
+    }
+
+    // G1 appendix contract: full 四段 material goes to a tier:evidence page.
+    expect(template).toContain('tier:"evidence"');
+    expect(template).toContain('_evidence/');
+
+    // Pre-write self-check (todo-4 gate) + capture→review→publish flow (K3⑥).
+    expect(template).toContain('自检');
+    expect(template).toContain('状态:draft');
+    expect(template).toContain('Active');
   });
 
   it('config hook never clobbers a user-defined /historian-capture command', async () => {

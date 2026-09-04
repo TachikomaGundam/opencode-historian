@@ -76,20 +76,34 @@ const READING_LOOP_ADVISORY = [
   'If you learn something new worth keeping, offer to record it as a page.',
 ].join('\n');
 
-/** /historian-capture command (plan v2 todo 9): the always-available manual
- *  path from "notable session" to "G1 event page" — registered regardless of
- *  capture.enabled; the enabled-gated toast only nudges toward it. Agent-facing
- *  instruction text, generic wording only (ships in the tarball). */
+/** /historian-capture command (plan v2 todo 9, upgraded by v4 todo-10 / D2+D3):
+ *  the always-available manual path from "notable session" to "G1 event page" —
+ *  trigger list, 四段式 evidence-chain body contract, evidence split, and the
+ *  draft→review→Active publish flow are the drive surface (idle toast is
+ *  non-observable; this template text is the contract). Registered regardless
+ *  of capture.enabled; the enabled-gated toast only nudges toward it.
+ *  Agent-facing instruction text, generic wording only (ships in the tarball).
+ *  Context-rot budget ≤~30 lines. */
 const CAPTURE_COMMAND_DESCRIPTION = '把本次会话记为史官事件页 / record this session as a historian event page';
 
 const CAPTURE_COMMAND_TEMPLATE = [
-  'Summarize the current session as a historian G1 event page (an append-only record of what happened).',
+  'Summarize the current session as a historian G1 event page — only if it produced capture-worthy knowledge.',
   '',
-  '1. Draft four sections: 过程/Process (what was done, in order), 原因/Cause (why it was needed), 后果/Consequence (impact, artifacts), 改进/Improvement (follow-ups, preventions).',
+  '0. Capture triggers — proceed only if at least one matches, else say so and skip writing:',
+  '   事故闭环 incident closed with a root cause | 部署完成 deployment completed | bug修复合入 bugfix merged',
+  '   | 探针结论 probe/eval conclusion | 被否决方案 rejected option (record the 否决理由 veto reason).',
+  '1. Draft the body in the 四段式 evidence-chain order: 证据链/Evidence (what was observed, artifacts first)',
+  '   → 方法/Method (how it was proven) → 修复手段/Fix (what changed, or the decision) → 函数级实现/Implementation (file:symbol detail).',
   "2. Run historian_map action:'show' to see existing sections, then choose a short factual path under one.",
-  '3. If the session produced raw artifacts (logs, transcripts, big diffs), first store each via historian_page_create with tier:"evidence" under `_evidence/`, then cite those URLs in the G1 appendix.',
-  '4. Save with historian_page_create (genre "G1"); the zh twin is auto-created. If the session only repeated known knowledge, say so and skip writing.',
-  '5. Echo both page URLs (en + zh) back to the user.',
+  '3. Evidence split (G1 appendix contract): store the full 四段 material via historian_page_create with tier:"evidence"',
+  '   under `_evidence/`; the main page body stays the cited/summarized form linking to those evidence pages.',
+  '4. Carry SRE discipline in the 元数据表 metadata table rows: 影响/impact | 负责人/owner',
+  '   | 后续动作/action items (owner + 优先级/priority + verifiable done-state) | 来源类型/source type.',
+  '5. Pre-write self-check: create the page (genre "G1", 状态:draft, content included) so the 十项自检 scoring',
+  '   advisory runs on the draft; fix its FAIL items via historian_page_update before publishing.',
+  '6. Publish flow capture→review→Active: the page starts 状态:draft; once the self-check passes,',
+  '   historian_page_update it to Active. The zh twin is auto-created.',
+  '7. Echo both page URLs (en + zh) back to the user.',
 ].join('\n');
 
 const CAPTURE_TOAST_MESSAGE =
