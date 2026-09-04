@@ -15,6 +15,8 @@ import type { HistorianOptions } from '../config.js';
 import type { PageDeps } from '../wiki/pages.write.js';
 import type { TranslateFn, Locale, PageListItem } from '../wiki/pages.read.js';
 import { assertLocalePair, PathValidationError, twinOf, type LocalePair } from '../wiki/locale.js';
+import { scoreChecklist } from '../migrate-score.js';
+import { selfReviewChecklist, type Genre } from '../templates/genres.js';
 
 /** Per-tool dependency bag; the client is a thunk so a bad key surface at
  *  buildTools time as nothing — only the first execution that touches the
@@ -288,4 +290,34 @@ export function collisionAdvisory(input: CollisionInput): string | null {
     }
   }
   return parts.length === 0 ? null : parts.join('\n');
+}
+
+// --- Create-path pre-write checklist gate (v4 todo 4) --------------------------
+
+/** Failing items needed to speak up: 1-2 stragglers are noise, 3+ is a draft
+ *  worth flagging. Threshold per the plan (todo 4). */
+const CHECKLIST_FAIL_TRIGGER = 3;
+
+/** The zh short name of a checklist item: its label up to the first
+ *  full-width/latin colon or bracket — '导言占比 10–15%'. */
+function itemShortName(label: string): string {
+  const cut = (label.split(/[：:（(]/u, 1)[0] ?? label).trim();
+  return cut === '' ? label.trim() : cut;
+}
+
+/**
+ * Pre-write self-check advisory (plan todo 4): score the draft with the SAME
+ * 10-item gate the migrate pipeline uses (scoreChecklist — no duplicated
+ * scoring logic), purely locally, zero network. 3+ failing items produce a
+ * hint naming them; items 9-10 are 'deferred' pre-write by the scorer's own
+ * contract (migrate-score.ts) and can never count as fail. Informational
+ * only — the write always proceeds; evidence tier is exempt (callers pass
+ * front only: raw material is not a genre page).
+ */
+export function checklistAdvisory(genre: Genre, draft: string): string | null {
+  const failed = scoreChecklist(genre, draft).filter((v) => v.verdict === 'fail');
+  if (failed.length < CHECKLIST_FAIL_TRIGGER) return null;
+  const labels = new Map(selfReviewChecklist(genre).map((item) => [item.id, item.label]));
+  const names = failed.map((v) => `#${v.id} ${itemShortName(labels.get(v.id) ?? '?')}`).join('; ');
+  return `自检 ${failed.length}/10 未通过: ${names} (不阻断, 发布前请补齐)`;
 }

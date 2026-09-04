@@ -9,9 +9,10 @@ import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { validatePath } from '../wiki/locale.js';
 import { createPage } from '../wiki/pages.js';
 import { listPages, readPage, type PageListItem } from '../wiki/pages.read.js';
-import { classifyGenre, genreSkeleton } from '../templates/genres.js';
+import { classifyGenre, genreSkeleton, type Genre } from '../templates/genres.js';
 import { evidenceSkeleton } from '../templates/evidence.js';
 import {
+  checklistAdvisory,
   collisionAdvisory,
   enforceTierPath,
   errEnvelope,
@@ -96,6 +97,10 @@ export function makeCreateTool(deps: ToolDeps): ToolDefinition {
         isEvidence && args.locale === 'zh'
           ? 'evidence pages are monolingual en — the locale argument was forced to "en"'
           : undefined;
+      // Genre is resolved ONCE, above the template/content fork (v4 todo 4):
+      // the template branch feeds it the skeleton, the content branch the
+      // pre-write checklist gate. Explicit arg wins over classification.
+      const genre: Genre = args.genre ?? classifyGenre({ title: args.title, body: args.description ?? '' }).genre;
       if (args.content === undefined || args.content.trim() === '') {
         if (isEvidence) {
           // Evidence pages are not genre-templated: echo the machine skeleton.
@@ -117,7 +122,6 @@ export function makeCreateTool(deps: ToolDeps): ToolDefinition {
             ...(localeHint === undefined ? {} : { localeHint }),
           });
         }
-        const genre = args.genre ?? classifyGenre({ title: args.title, body: args.description ?? '' }).genre;
         return okJson({
           mode: 'template',
           genre,
@@ -146,9 +150,12 @@ export function makeCreateTool(deps: ToolDeps): ToolDefinition {
           twin: isEvidence ? false : args.twin,
           description: args.description,
         });
-        const advisories = [frontDumpAdvisory(tier, args.content), collision].filter(
-          (a): a is string => a !== null,
-        );
+        const advisories = [
+          frontDumpAdvisory(tier, args.content),
+          collision,
+          // Evidence raw material is not a genre page — the gate is front-only.
+          isEvidence ? null : checklistAdvisory(genre, args.content),
+        ].filter((a): a is string => a !== null);
         return okJson({
           mode: 'create',
           path: args.path,

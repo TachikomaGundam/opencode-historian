@@ -699,6 +699,145 @@ describe('historian_page_create collision advisory (envelope)', () => {
 
 // --- historian_page_update ---------------------------------------------------
 
+// --- create pre-write checklist gate (v4 todo 4) ------------------------------
+
+import { checklistAdvisory } from '../src/tools/shared.js';
+import { scoreChecklist } from '../src/migrate-score.js';
+
+const THIN_DRAFT = '# Alpha\nbody';
+
+describe('checklistAdvisory (pure)', () => {
+  it('≥3 failing items → 自检 N/10 advisory naming them, marked 不阻断', () => {
+    // Given: a G1 (事件页) draft failing items 1,3,5,6 (measured: 4 fails)
+    const out = checklistAdvisory('G1', THIN_DRAFT);
+    // Then: count + item names + non-blocking wording, all present
+    expect(out).not.toBeNull();
+    expect(out).toContain('自检 4/10 未通过');
+    expect(out).toContain('#1 导言占比 10–15%');
+    expect(out).toContain('#3 表格判据');
+    expect(out).toContain('(不阻断, 发布前请补齐)');
+  });
+
+  it('≤2 failing items → null (the gate stays quiet below the trigger)', () => {
+    expect(checklistAdvisory('G4', THIN_DRAFT)).toBeNull();
+    expect(checklistAdvisory('G3', THIN_DRAFT)).toBeNull();
+  });
+
+  it('post-write items 9-10 are deferred by contract and NEVER counted as fail', () => {
+    for (const genre of ['G1', 'G2', 'G3', 'G4', 'G5'] as const) {
+      const failedIds = scoreChecklist(genre, THIN_DRAFT)
+        .filter((v) => v.verdict === 'fail')
+        .map((v) => v.id);
+      expect(failedIds).not.toContain(9);
+      expect(failedIds).not.toContain(10);
+    }
+    const out = checklistAdvisory('G1', THIN_DRAFT);
+    expect(out).not.toContain('#9');
+    expect(out).not.toContain('#10');
+  });
+
+  it('degenerate drafts never throw', () => {
+    for (const draft of ['', '#', '   ', '|a|b|\n|---|---|\n|1|2|', '中文内容。'.repeat(30)]) {
+      const out = checklistAdvisory('G2', draft);
+      expect(out === null || typeof out === 'string').toBe(true);
+    }
+  });
+});
+
+describe('historian_page_create checklist gate (envelope)', () => {
+  it('thin draft with genre G1: advisory rides the success envelope, write still performed', async () => {
+    // Given: an empty wiki
+    const { tools, captured, fetchCount } = makeWired(createWiki());
+
+    // When: creating a thin G3 draft (4 gate fails ≥ trigger 3)
+    const out = await run(tools.historian_page_create, {
+      path: PATH,
+      title: 'Alpha',
+      content: THIN_DRAFT,
+      genre: 'G1',
+      twin: false,
+    });
+
+    // Then: the page WAS created and the envelope carries the advisory
+    expect(out.ok).toBe(true);
+    expect(out.pageId).toBe(76);
+    expect(String(out.advisory)).toContain('自检 4/10 未通过');
+    expect(varsOf(captured, 'create(').length).toBe(1);
+    expect(fetchCount()).toBe(4);
+  });
+
+  it('default classification (no genre arg) leaves the thin draft under the trigger: no advisory key', async () => {
+    // Given / When: same thin draft, genre inferred (G4 → 2 fails ≤ 2 trigger)
+    const { tools } = makeWired(createWiki());
+    const out = await run(tools.historian_page_create, {
+      path: PATH,
+      title: 'Alpha',
+      content: THIN_DRAFT,
+      twin: false,
+    });
+
+    // Then: the key is omitted entirely
+    expect(out.ok).toBe(true);
+    expect('advisory' in out).toBe(false);
+  });
+
+  it('evidence tier is exempt: a failing draft stays silent (raw material is not a genre page)', async () => {
+    // Given / When: G1 thin draft forced onto the evidence tier
+    const { tools } = makeWired(createWiki());
+    const out = await run(tools.historian_page_create, {
+      path: '_evidence/run-9',
+      title: 'Gate',
+      content: THIN_DRAFT,
+      genre: 'G1',
+      tier: 'evidence',
+    });
+
+    // Then: machine-tier note present, checklist advisory absent
+    expect(out.ok).toBe(true);
+    expect(out.note).toBe(MACHINE_NOTE);
+    expect('advisory' in out).toBe(false);
+  });
+
+  it('template mode never scores: zero writes, no advisory key', async () => {
+    // Given / When: no content, genre G3 — the lifted genre resolution feeds the
+    // skeleton, the checklist gate does not run on a skeleton with no draft
+    const { tools, fetchCount } = makeWired(createWiki());
+    const out = await run(tools.historian_page_create, { path: PATH, title: 'Alpha', genre: 'G3' });
+
+    // Then: pure-local template envelope, unchanged
+    expect(out.mode).toBe('template');
+    expect(out.genre).toBe('G3');
+    expect('advisory' in out).toBe(false);
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('collision + dump + checklist advisories merge into ONE advisory string', async () => {
+    // Given: path already exists, a foreign page shares the title, and the
+    // draft both over-fences and fails the gate (G3)
+    const fence = '```text\n' + Array.from({ length: 31 }, (_, i) => `line ${i + 1}`).join('\n') + '\n```';
+    const { tools } = makeWired(
+      createWiki({
+        existing: [[PATH, 'en']],
+        list: [{ id: 5, path: 'llm/alpha', locale: 'en', title: 'Alpha' }],
+      }),
+    );
+    const out = await run(tools.historian_page_create, {
+      path: PATH,
+      title: 'Alpha',
+      content: `# Alpha\n${fence}`,
+      genre: 'G1',
+      twin: false,
+    });
+
+    // Then: ok stays true and all three hints share one key
+    expect(out.ok).toBe(true);
+    expect(String(out.advisory)).toContain('path exists');
+    expect(String(out.advisory)).toContain('疑似重复');
+    expect(String(out.advisory)).toContain('fenced block');
+    expect(String(out.advisory)).toContain('自检');
+  });
+});
+
 describe('historian_page_update', () => {
   it('partial patch: undefined fields are kept (full RMW payload still sent)', async () => {
     // Given: a mutable wiki state; only the title changes
