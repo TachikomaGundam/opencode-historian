@@ -162,7 +162,7 @@ Whenever a raw artifact (log, transcript, big diff) destined for a page exceeds 
 
 `/historian-capture` 命令的正文契约（模板实现 `CAPTURE_COMMAND_TEMPLATE`，见 `src/index.ts`）：只有命中触发条件的素材才写页，正文按证据链顺序四段组织。
 
-**捕获触发条件**（任一命中才动笔）：事故闭环（有根因）| 部署完成 | bug 修复合入 | 探针/评测结论 | 被否决方案（须记录否决理由）。
+**捕获触发条件**（任一命中才动笔）：事故闭环（有根因）| 部署完成 | bug 修复合入 | 探针结论 | 被否决方案（须记录否决理由）。
 
 **四段正文顺序**：
 
