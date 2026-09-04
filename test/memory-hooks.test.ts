@@ -143,9 +143,14 @@ describe('reading-loop system.transform (v3 double-signal gate)', () => {
     expect(output.system).toHaveLength(1);
     expect(output.system[0]).toContain('base prompt');
     expect(output.system[0]).toContain('historian_search');
-    expect(output.system[0]).toContain('historian_map action:"timeline"');
+    expect(output.system[0]).toContain('index-first');
+    expect(output.system[0]).toContain('historian_read wiki-index');
+    expect(output.system[0]).toContain('historian_map action:"show"');
+    expect(output.system[0]).toContain('PREFER UPDATE over CREATE');
+    expect(output.system[0]).toContain('historian_page_update');
+    expect(output.system[0]).toContain('CITE evidence');
+    expect(output.system[0]).toContain('MARK stale');
     expect(output.system[0]).toContain('G5');
-    expect(output.system[0]).toContain('Cite');
     expect(output.system[0]).toContain('\n\n');
     expect(output.system[0].split('\n').length).toBeLessThanOrEqual(13);
     expect(spy).not.toHaveBeenCalled();
@@ -158,7 +163,7 @@ describe('reading-loop system.transform (v3 double-signal gate)', () => {
     await hook(noInput, output);
     expect(output.system).toHaveLength(1);
     expect(output.system[0]).toContain('historian_search');
-    expect(output.system[0].split('\n').length).toBeLessThanOrEqual(6);
+    expect(output.system[0].split('\n').length).toBeLessThanOrEqual(8);
   });
 
   it('is idempotent: double invocation injects the advisory exactly once', async () => {
