@@ -7,7 +7,7 @@
 
 import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { deletePage, movePage } from '../wiki/pages.js';
-import { selfReviewChecklist } from '../templates/genres.js';
+import { GENRES, selfReviewChecklist } from '../templates/genres.js';
 import {
   confirmRequiredJson,
   errEnvelope,
@@ -22,8 +22,6 @@ import { reformatPageDraft } from '../migrate.js';
 import { applyMigration } from '../migrate-apply.js';
 
 const s = tool.schema;
-
-const GENRES = ['G1', 'G2', 'G3', 'G4', 'G5'] as const;
 
 const DELETE_ARGS = {
   path: s.string(),
