@@ -237,6 +237,21 @@ describe('tool surface (buildTools)', () => {
     const searchSchema = s.object(tools.historian_search.args);
     expect(searchSchema.safeParse({ query: 'x', kind: 'bogus' }).success).toBe(false);
   });
+
+  it('accepts G6 and rejects G7 for genre at the schema boundary', () => {
+    // Given: create + migrate schemas
+    const { tools } = makeTools();
+    const s = tool.schema;
+    const createSchema = s.object(tools.historian_page_create.args);
+    const migrateSchema = s.object(tools.historian_migrate.args);
+    // When: parsing G5/G6 (in range) and G7 (out of range)
+    // Then: both tools accept G6, keep accepting G5, and still reject G7
+    expect(createSchema.safeParse({ path: 'a/b', title: 'T', genre: 'G5' }).success).toBe(true);
+    expect(createSchema.safeParse({ path: 'a/b', title: 'T', genre: 'G6' }).success).toBe(true);
+    expect(createSchema.safeParse({ path: 'a/b', title: 'T', genre: 'G7' }).success).toBe(false);
+    expect(migrateSchema.safeParse({ path: 'a/b', genre: 'G6' }).success).toBe(true);
+    expect(migrateSchema.safeParse({ path: 'a/b', genre: 'G7' }).success).toBe(false);
+  });
 });
 
 // --- historian_page_create ---------------------------------------------------
@@ -385,6 +400,20 @@ describe('historian_page_create', () => {
     expect(out.mode).toBe('template');
     expect(out.genre).toBe('G3');
     expect(out.skeleton).toBe(genreSkeleton('G3', 'en'));
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('template mode accepts explicit G6 and renders the G6 skeleton', async () => {
+    // Given: fetch spy that fails loudly
+    const { tools, fetchCount } = makeWired({});
+
+    // When: creating without content but with genre G6
+    const out = await run(tools.historian_page_create, { path: PATH, title: 'Alpha', genre: 'G6' });
+
+    // Then: G6 passes the validator and the envelope carries the how-to skeleton
+    expect(out.mode).toBe('template');
+    expect(out.genre).toBe('G6');
+    expect(out.skeleton).toBe(genreSkeleton('G6', 'en'));
     expect(fetchCount()).toBe(0);
   });
 
@@ -724,7 +753,7 @@ describe('checklistAdvisory (pure)', () => {
   });
 
   it('post-write items 9-10 are deferred by contract and NEVER counted as fail', () => {
-    for (const genre of ['G1', 'G2', 'G3', 'G4', 'G5'] as const) {
+    for (const genre of ['G1', 'G2', 'G3', 'G4', 'G5', 'G6'] as const) {
       const failedIds = scoreChecklist(genre, THIN_DRAFT)
         .filter((v) => v.verdict === 'fail')
         .map((v) => v.id);
@@ -1524,6 +1553,23 @@ describe('historian_migrate', () => {
     expect((out.checklist as unknown[]).length).toBe(10);
     expect((out.checklistResults as unknown[]).length).toBe(10);
     expect(out.urls).toEqual({ en: EN_URL, zh: ZH_URL });
+    expect(fetchCount()).toBe(3);
+  });
+
+  it('dry-run accepts an explicit G6 genre argument', async () => {
+    // Given: an existing legacy page without a zh twin
+    const { tools, fetchCount } = makeMigrateWired({
+      'singleByPath(': (vars) => ({ data: { pages: { singleByPath: vars.locale === 'zh' ? null : rawPage() } } }),
+    }, DRAFT);
+
+    // When: running the dry-run with the G6 genre argument
+    const out = await run(tools.historian_migrate, { path: PATH, genre: 'G6' });
+
+    // Then: G6 passes the validator and drives the explicit-genre preview
+    expect(out.ok).toBe(true);
+    expect(out.mode).toBe('dry-run');
+    expect(out.suggestedGenre).toBe('G6');
+    expect(out.confidence).toBe('explicit');
     expect(fetchCount()).toBe(3);
   });
 
