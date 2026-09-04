@@ -93,6 +93,7 @@ V6 的机构记忆层由三条回路组成，共用同一套 10 个 `historian_*
 - **原始转储** — 聊天记录和 shell 输出是原材料，不是页面内容。先提取决定性摘录（每段 ≤10 行）；完整原文转存 `_evidence/` 证据页（`tier:"evidence"`），页面里只放链接。
 - **重复** — 已有页面覆盖的知识 → 整合到那里，不要创建新页。
 - **琐碎临时** — 今天的时间戳状态，明天就过时。
+- **咨询求助** — 咨询/求助类内容走正确求助渠道，史官只沉淀已定性知识；未定性的疑问帖不构成机构记忆。
 
 拒绝是有效的、有价值的结果。说："这不构成可沉淀的知识，因为…；如需留痕我可以写入 scratch/ 便签。"
 
@@ -204,6 +205,8 @@ G5 现状卡的硬约束：状态块是机读单行（`Active` / `Superseded-by:
 | `historian_delete` | 删除页面 | `path`, `locale`, `confirm`(必须 "yes") |
 | `historian_move` | 移动页面 | `path`, `locale`, `newPath`, `newLocale?`, `confirm`(必须 "yes") |
 
+删除/移动前，先确认内容已在别处留存（preimage 快照、`_evidence/` 证据页或备份）：`confirm: "yes"` 只是防误触闸门，口头确认不等于已留存。
+
 ### 翻译失败处理
 
 `historian_page_create(twin:true)` 翻译失败时，en 页照常成功落库，返回 `zh_status: 'pending'`。在报告中声明此状态，不重试创建（避免空页污染）。后续可用 `historian_translate_snippet` + `historian_page_update` 手动补全。
@@ -303,6 +306,8 @@ historian_map action:'refresh'
 4. **函数级实现/Implementation** — 落到 `file:symbol` 粒度的实现细节
 
 超 10 行的原始件一律拆到 `_evidence/` 证据页（`historian_page_create` 传 `tier:"evidence"`：单语 en、不发布），主页面只放引用/摘要 + 证据页链接。
+
+引用模型的字面特殊标记文本（如 `<|im_start|>` 一类控制 token）时，永不把原始 token 写入档案：用语言描述它（如"思考结束标记 / end-of-thinking marker"），避免原始标记回流污染下游模型会话。
 
 #### SRE 元数据表
 
