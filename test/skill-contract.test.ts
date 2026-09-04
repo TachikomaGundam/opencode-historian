@@ -4,7 +4,8 @@
  * (行为契约 v3 / V4-era 机构记忆层 title / bare V5) may survive anywhere
  * under skills/, the v6 three-loop contract (capture triggers + 四段式
  * evidence chain + maintain protocol + reorg freeze) must be documented, and
- * the retired v2 four-part 过程/原因/后果/改进 must be gone from SKILL.md.
+ * the retired v2 four-part wording must be gone from SKILL.md (char-level) and
+ * from every shipped doc (README + all skills markdown, joined-string level).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -15,6 +16,7 @@ import { join } from 'node:path';
 const SKILLS_DIR = fileURLToPath(new URL('../skills/', import.meta.url));
 const SKILL_MD_PATH = join(SKILLS_DIR, 'historian', 'SKILL.md');
 const SKILL_MD = readFileSync(SKILL_MD_PATH, 'utf8');
+const README_MD_PATH = fileURLToPath(new URL('../README.md', import.meta.url));
 
 function markdownFiles(dir: string): string[] {
   const found: string[] = [];
@@ -81,6 +83,22 @@ describe('SKILL.md v6 three-loop contract', () => {
     for (const dead of ['过程', '原因', '后果', '改进']) {
       expect(SKILL_MD).not.toContain(dead);
     }
+  });
+
+  it('keeps the retired v2 four-part joined strings out of every shipped doc', () => {
+    // Root-cause lock: the char-level SKILL.md scan above let README.md ship
+    // the retired label; this scans README + all skills markdown (incl.
+    // references/) for the joined legacy strings (assembled at runtime, like
+    // the stale-marker scanner, so the tree-wide needle grep stays clean).
+    const deadJoined = [
+      ['过程', '原因', '后果', '改进'].join('/'),
+      ['过程', '原因', '结果', '改进'].join('/'),
+    ];
+    const shipped = [README_MD_PATH, ...markdownFiles(SKILLS_DIR)];
+    const offenders = shipped.filter((f) =>
+      deadJoined.some((d) => readFileSync(f, 'utf8').includes(d)),
+    );
+    expect(offenders).toEqual([]);
   });
 });
 
