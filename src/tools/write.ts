@@ -16,6 +16,7 @@ import {
   MACHINE_TIER_NOTE,
   monolingualRefusalJson,
   okJson,
+  sectionRefusalJson,
   tierMismatchJson,
   TIERS,
   urlPair,
@@ -46,6 +47,8 @@ export function makeUpdateTool(deps: ToolDeps): ToolDefinition {
     args: UPDATE_ARGS,
     execute: async (raw) => {
       const args = UpdateArgsSchema.parse(raw);
+      const offSections = sectionRefusalJson(args.path, deps.options.sections);
+      if (offSections !== null) return offSections;
       try {
         const page = await readPage(deps.getClient(), args.path, args.locale);
         if (page === null) {
@@ -149,6 +152,8 @@ export function makeAppendTool(deps: ToolDeps): ToolDefinition {
       if (isEvidence && args.sectionZh !== undefined) {
         return monolingualRefusalJson('historian_page_append', 'sectionZh');
       }
+      const offSections = sectionRefusalJson(args.path, deps.options.sections);
+      if (offSections !== null) return offSections;
       try {
         const appended = await appendSection(pageDeps(deps), args.path, args.locale, args.section);
         let zhStatus: string;

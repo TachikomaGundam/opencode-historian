@@ -321,3 +321,58 @@ export function checklistAdvisory(genre: Genre, draft: string): string | null {
   const names = failed.map((v) => `#${v.id} ${itemShortName(labels.get(v.id) ?? '?')}`).join('; ');
   return `自检 ${failed.length}/10 未通过: ${names} (不阻断, 发布前请补齐)`;
 }
+// --- options.sections enforcement (v4 todo 5) ---------------------------------
+
+/** Config-level write refusal, paralleling PathValidationError's shape. The
+ *  class NAME is the routing key errEnvelope dispatches on: this shares the
+ *  'ConfigError' hint case with jsonc.ConfigError (which adds a code field
+ *  this pure path rule does not need). */
+export class ConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConfigError';
+  }
+}
+
+/** First path segments the plugin maintains for its own bookkeeping — always
+ *  writable regardless of sections: a topic taxonomy configured for human
+ *  knowledge must never lock out the home landing page, the wiki-index map,
+ *  the _sandbox scratch area, the _data store, or the machine namespaces. */
+const SECTION_EXEMPT_SEGMENTS: readonly string[] = [
+  'home',
+  'wiki-index',
+  '_sandbox',
+  '_data',
+  ...INTERNAL_NAMESPACES,
+];
+
+/** Section entry as configured → comparable form (strip slashes/whitespace). */
+function normalizeSection(entry: string): string {
+  return entry.trim().replace(/^\/+|\/+$/gu, '');
+}
+
+/** Pure allow-list check on a write target path: null = allowed, string =
+ *  refusal message. Empty/undefined allow-list = allow-all (the documented
+ *  default, config.ts HistorianOptions.sections). Match is segment-wise and
+ *  case-sensitive: section 'doc' authorizes 'doc' and 'doc/x', never 'docs/x'. */
+export function sectionGuard(
+  path: string,
+  allowedSections: readonly string[] | undefined,
+): string | null {
+  if (allowedSections === undefined) return null;
+  const sections = allowedSections.map(normalizeSection).filter((sec) => sec !== '');
+  if (sections.length === 0) return null;
+  const first = path.split('/')[0];
+  if (SECTION_EXEMPT_SEGMENTS.includes(first)) return null;
+  if (sections.some((sec) => path === sec || path.startsWith(`${sec}/`))) return null;
+  return (
+    `section '${first}' is not in the configured sections [${sections.join(', ')}] — ` +
+    `write the page under an allowed section or add '${first}' to the plugin's sections option`
+  );
+}
+
+/** Guard + envelope in one step: null = proceed, ToolResult = refuse. */
+export function sectionRefusalJson(path: string, allowedSections: readonly string[] | undefined): ToolResult | null {
+  const violation = sectionGuard(path, allowedSections);
+  return violation === null ? null : errEnvelope(new ConfigError(violation));
+}
