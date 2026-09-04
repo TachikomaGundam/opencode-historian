@@ -20,6 +20,7 @@ import {
   MACHINE_TIER_NOTE,
   okJson,
   pageDeps,
+  sectionRefusalJson,
   tierMismatchJson,
   TIERS,
   urlPair,
@@ -87,6 +88,8 @@ export function makeCreateTool(deps: ToolDeps): ToolDefinition {
       } catch (err) {
         return errEnvelope(err);
       }
+      const offSections = sectionRefusalJson(args.path, deps.options.sections);
+      if (offSections !== null) return offSections;
       const mismatch = enforceTierPath(tier, args.path);
       if (mismatch !== null) return tierMismatchJson(mismatch);
       // Evidence pages are monolingual en: a zh locale is FORCED to en with an

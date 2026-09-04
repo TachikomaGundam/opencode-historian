@@ -8,7 +8,16 @@
 import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { deletePage, movePage } from '../wiki/pages.js';
 import { selfReviewChecklist } from '../templates/genres.js';
-import { confirmRequiredJson, errEnvelope, okJson, urlPair, URL_MANDATE, pageDeps, type ToolDeps } from './shared.js';
+import {
+  confirmRequiredJson,
+  errEnvelope,
+  okJson,
+  sectionRefusalJson,
+  urlPair,
+  URL_MANDATE,
+  pageDeps,
+  type ToolDeps,
+} from './shared.js';
 import { reformatPageDraft } from '../migrate.js';
 import { applyMigration } from '../migrate-apply.js';
 
@@ -35,6 +44,8 @@ export function makeDeleteTool(deps: ToolDeps): ToolDefinition {
     execute: async (raw) => {
       const args = DeleteArgsSchema.parse(raw);
       if (args.confirm !== 'yes') return confirmRequiredJson('historian_delete', args.confirm);
+      const offSections = sectionRefusalJson(args.path, deps.options.sections);
+      if (offSections !== null) return offSections;
       try {
         const result = await deletePage(pageDeps(deps), args.path, args.locale, 'yes');
         return okJson({
@@ -72,6 +83,10 @@ export function makeMoveTool(deps: ToolDeps): ToolDefinition {
     execute: async (raw) => {
       const args = MoveArgsSchema.parse(raw);
       if (args.confirm !== 'yes') return confirmRequiredJson('historian_move', args.confirm);
+      // The allow-list guards the DESTINATION (the write target); the source
+      // page may legally live somewhere the new configuration no longer admits.
+      const offSections = sectionRefusalJson(args.newPath, deps.options.sections);
+      if (offSections !== null) return offSections;
       try {
         const destLocale = args.newLocale ?? args.locale;
         const result = await movePage(pageDeps(deps), args.path, args.locale, args.newPath, destLocale, 'yes');
