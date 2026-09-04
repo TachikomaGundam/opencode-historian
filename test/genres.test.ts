@@ -354,7 +354,7 @@ describe('genreSkeleton G1', () => {
     expect(zh).toContain('5 Whys');
     // Digest action-item table: 措施 | 类型 | 负责人 | 期限 | 验证 | 状态
     expect(zh).toContain('| 措施 | 类型 | 负责人 | 期限 | 验证 | 状态 |');
-    // V5 appendix doctrine: decisive excerpts + evidence-page links, not raw dumps.
+    // V6 appendix doctrine: decisive excerpts + evidence-page links, not raw dumps.
     expect(zh).toContain('决定性摘录（每段 ≤10 行）');
     expect(zh).toContain('`_evidence/...`');
     expect(zh).toContain('tier:"evidence"');
