@@ -2010,3 +2010,204 @@ describe('front-tier raw-dump soft gate', () => {
     expect('advisory' in out).toBe(false);
   });
 });
+// --- options.sections enforcement (v4 todo 5) ---------------------------------
+
+import { ConfigError, sectionGuard } from '../src/tools/shared.js';
+import type { HistorianOptions } from '../src/config.js';
+
+describe('sectionGuard (pure)', () => {
+  it('undefined or empty allow-list = allow-all (the documented default)', () => {
+    expect(sectionGuard('llm/anything', undefined)).toBeNull();
+    expect(sectionGuard('llm/anything', [])).toBeNull();
+    expect(sectionGuard('llm/anything', ['  '])).toBeNull();
+  });
+
+  it('matching section (exact or nested prefix) → allowed', () => {
+    expect(sectionGuard('docs', ['docs'])).toBeNull();
+    expect(sectionGuard('docs/guide/x', ['docs'])).toBeNull();
+  });
+
+  it('entries are normalized: surrounding slashes/whitespace are tolerated', () => {
+    expect(sectionGuard('llm/a', ['llm/'])).toBeNull();
+    expect(sectionGuard('infra/b', [' infra '])).toBeNull();
+  });
+
+  it('non-matching first segment → violation string naming segment + allow-list', () => {
+    const out = sectionGuard('llm/notes', ['docs', 'ops']);
+    expect(out).not.toBeNull();
+    expect(out).toContain("section 'llm'");
+    expect(out).toContain('docs, ops');
+    expect(out).toContain('sections');
+  });
+
+  it('prefix match is SEGMENT-wise: section "doc" does not authorize "docs/x"', () => {
+    expect(sectionGuard('docs/x', ['doc'])).not.toBeNull();
+  });
+
+  it('system paths stay exempt even under a restrictive allow-list', () => {
+    for (const p of ['home', 'wiki-index', '_sandbox/probe', '_data/blob', '_meta/page-map', '_evidence/run-1']) {
+      expect(sectionGuard(p, ['docs'])).toBeNull();
+    }
+  });
+
+  it('dirty paths never crash the guard', () => {
+    for (const p of ['', '..', '/home', 'HOME/x', '///', './x', 'docs/']) {
+      const out = sectionGuard(p, ['docs']);
+      expect(out === null || typeof out === 'string').toBe(true);
+    }
+    expect(sectionGuard('HOME/x', ['home'])).not.toBeNull();
+  });
+
+  it('ConfigError carries the routed name for errEnvelope', () => {
+    const err = new ConfigError('boom');
+    expect(err.name).toBe('ConfigError');
+    expect(err).toBeInstanceOf(Error);
+  });
+});
+
+/** Wired variant under an explicit sections allow-list. */
+function makeWiredSections(
+  sections: readonly string[],
+  handlers: Record<string, (vars: Record<string, unknown>, query: string) => unknown>,
+): { tools: Tools; captured: Captured[]; fetchCount: () => number } {
+  const r = makeResponder(handlers);
+  const tools = buildTools({ ...OPTS, sections }, { fetchImpl: r.fetchImpl, homeDir: makeKeyHome() });
+  return { tools, captured: r.captured, fetchCount: r.fetchCount };
+}
+
+const expectRefused = (out: Record<string, unknown>, segment: string): void => {
+  expect(out.ok).toBe(false);
+  expect(out.errorKind).toBe('ConfigError');
+  expect(String(out.message)).toContain(`section '${segment}'`);
+  expect(String(out.actionableHint)).not.toBe('');
+};
+
+describe('historian_page_create sections enforcement', () => {
+  it('path outside the allow-list → ConfigError envelope, ZERO fetches, nothing written', async () => {
+    // Given: only docs/* may be written
+    const { tools, fetchCount } = makeWiredSections(['docs'], createWiki());
+
+    // When: creating under llm/
+    const out = await run(tools.historian_page_create, {
+      path: 'llm/notes',
+      title: 'N',
+      content: '# N\nbody',
+      twin: false,
+    });
+
+    // Then: refused before the wiki was contacted
+    expectRefused(out, 'llm');
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('violation refuses BOTH locales and template mode too (path-level rule)', async () => {
+    const { tools, fetchCount } = makeWiredSections(['docs'], createWiki());
+    const zh = await run(tools.historian_page_create, {
+      path: 'llm/notes',
+      title: 'N',
+      content: '# N\n正文',
+      locale: 'zh',
+    });
+    const tmpl = await run(tools.historian_page_create, { path: 'llm/notes', title: 'N' });
+    expectRefused(zh, 'llm');
+    expectRefused(tmpl, 'llm');
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('allowed section writes proceed untouched; system paths pass even when restrictive', async () => {
+    // Given: docs-only wiki
+    const { tools } = makeWiredSections(['docs'], createWiki());
+
+    // When / Then: a docs page creates normally…
+    const ok = await run(tools.historian_page_create, {
+      path: 'docs/guide',
+      title: 'G',
+      content: '# G\nbody',
+      twin: false,
+    });
+    expect(ok.ok).toBe(true);
+    expect(ok.mode).toBe('create');
+
+    // …and each exempt surface passes the guard (the create below reaches the
+    // wiki; only the guard outcome is under test — non-ConfigError = passed)
+    const exempt = await run(tools.historian_page_create, {
+      path: '_sandbox/probe',
+      title: 'S',
+      content: 'x',
+      twin: false,
+    });
+    expect(exempt.errorKind).not.toBe('ConfigError');
+  });
+});
+
+describe('sections enforcement on update / append / move / delete', () => {
+  it('page_update on a disallowed path refuses before any read', async () => {
+    const { tools, fetchCount } = makeWiredSections(['docs'], createWiki());
+    const out = await run(tools.historian_page_update, { path: 'llm/notes', content: 'x' });
+    expectRefused(out, 'llm');
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('page_append on a disallowed path refuses before any read', async () => {
+    const { tools, fetchCount } = makeWiredSections(['docs'], createWiki());
+    const out = await run(tools.historian_page_append, { path: 'llm/notes', section: '## x' });
+    expectRefused(out, 'llm');
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('page_move checks the TARGET path: forbidden destination refuses, allowed destination proceeds', async () => {
+    const { tools, fetchCount } = makeWiredSections(['docs'], createWiki());
+
+    // Destination outside the allow-list → refused, zero fetches
+    const bad = await run(tools.historian_move, {
+      path: 'docs/src',
+      locale: 'en',
+      newPath: 'llm/dst',
+      confirm: 'yes',
+    });
+    expectRefused(bad, 'llm');
+    expect(fetchCount()).toBe(0);
+
+    // Allowed destination → guard silent (the disallowed SOURCE is not the
+    // guard's business; the request reaches the fake wiki)
+    const moveHandlers: Record<string, () => unknown> = {
+      'singleByPath(': () => ({ data: { pages: { singleByPath: null } } }),
+      'single(': () => ({ data: { pages: { single: null } } }),
+    };
+    const passThrough = makeWiredSections(['docs'], {
+      ...moveHandlers,
+      'move(': () => ({ errors: [{ message: 'fixture: move never completes' }] }),
+    });
+    const far = await run(passThrough.tools.historian_move, {
+      path: 'llm/src',
+      locale: 'en',
+      newPath: 'docs/dst',
+      confirm: 'yes',
+    });
+    expect(far.errorKind).not.toBe('ConfigError');
+  });
+
+  it('delete refuses a disallowed path, but the confirm gate still precedes everything', async () => {
+    const { tools, fetchCount } = makeWiredSections(['docs'], createWiki());
+
+    // Without confirm → the pre-existing refusal wins (zero fetches either way)
+    const noConfirm = await run(tools.historian_delete, { path: 'llm/notes', locale: 'en', confirm: 'no' });
+    expect(noConfirm.errorKind).toBe('ConfirmRequiredError');
+
+    const out = await run(tools.historian_delete, { path: 'llm/notes', locale: 'en', confirm: 'yes' });
+    expectRefused(out, 'llm');
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('default options (empty sections) stay allow-all: llm/* creates', async () => {
+    // Given: OPTS ships sections: [] — the whole pre-v4 behaviour must not drift
+    const { tools } = makeWired(createWiki());
+    const out = await run(tools.historian_page_create, {
+      path: 'llm/free',
+      title: 'F',
+      content: '# F\nbody',
+      twin: false,
+    });
+    expect(out.ok).toBe(true);
+  });
+});
