@@ -61,15 +61,19 @@ function unique<T>(items: readonly T[]): T[] {
   return [...new Set(items)];
 }
 
-/** Reading-loop advisory (plan v2 todo 8): the machine wiki is the
- *  authoritative institutional memory; consult it before acting, cite URLs.
- *  Shipped text — generic wording only (privacy-audit scans dist). */
+/** Reading-loop advisory (plan v4 todo 8 / D6): the machine wiki is the
+ *  authoritative institutional memory; consult it index-first before acting,
+ *  prefer updating over duplicating, cite pages+dates, mark staleness.
+ *  Hard budget ≤8 lines (context-rot). Shipped text — generic wording only
+ *  (privacy-audit scans dist). */
 const READING_LOOP_ADVISORY = [
   'You have a historian: a wiki.js knowledge base acting as this machine\'s authoritative institutional memory.',
-  'Before doing work that touches this machine\'s deployments, history, pitfalls, or decisions, consult it first:',
-  '- historian_search by topic for relevant pages; historian_map action:"timeline" for what changed recently;',
-  '- G5 current-state ledger pages answer "what is deployed/running now" — check each row\'s verified date before trusting it.',
-  'Cite the wiki page URLs you relied on. If you learn something new worth keeping, offer to record it as a page.',
+  'Before doing work that touches this machine\'s deployments, history, pitfalls, or decisions, consult it index-first:',
+  '- Read the curated map before blind search: historian_read wiki-index or historian_map action:"show", then historian_search by topic;',
+  '- PREFER UPDATE over CREATE: if a page may already exist, historian_read it first, then historian_page_update rather than creating a duplicate;',
+  '- CITE evidence: name the wiki page URL and its date whenever you quote it;',
+  '- MARK stale rows instead of silently overwriting: supersede or review-stamp contradictions (G5 ledger: check each row\'s verified date).',
+  'If you learn something new worth keeping, offer to record it as a page.',
 ].join('\n');
 
 /** /historian-capture command (plan v2 todo 9): the always-available manual
