@@ -21,7 +21,9 @@ Six-step self-onboarding for pointing the historian plugin at your own Wiki.js i
 ## 2. 章节白名单 / sections 白名单
 
 - 选项 `sections` 默认空数组 = 插件端**不限制**路径前缀；真正的写权限由你的 wiki.js token 的 page rules 决定。
-- 想把 AI 写入约束在特定区：`"sections": ["team-notes/", "scratch/"]`——越界写入直接报 ConfigError 类错误。
+- v4 起非空即强制生效：`historian_page_create` / `page_update` / `page_append` / `delete` / `move`（检查 `newPath`）五个写工具在发出任何请求前过 `sectionGuard`（`src/tools/shared.ts`），越界路径直接返回 `ConfigError` 类错误信封，并点名越界的首段、提示把它加进 `sections`。
+- 匹配语义：按**首路径段**、**区分大小写**地做段前缀匹配——`"sections": ["team-notes", "scratch"]` 授权 `team-notes` 与 `team-notes/x/y`，但不授权 `docs/x` 这类不同首段；配置项里的首尾斜杠可省（`"team-notes/"` 与 `"team-notes"` 等价）。
+- 豁免表（恒可写，与 `sections` 配置无关）：`home`、`wiki-index`、`_sandbox`、`_data`、`_meta`、`_evidence`。理由：主题白名单管的是人读知识页的归处，插件自记账（索引缓存、机器命名空间）与落地页/沙箱不该被锁死。
 - 不要复用别人的章节表；接入后先 `historian_map action=show` 看你自己的布局。
 
 ## 3. 翻译腿是可选项 / The translate leg is optional
@@ -60,4 +62,4 @@ Six-step self-onboarding for pointing the historian plugin at your own Wiki.js i
 
 ---
 
-配完六步，你的史官即就位：consult（reading loop 双信号启用后自动引路）、notice（capture 提醒留痕）、record（G1-G5 骨架 + `_evidence/` 证据页 + map/timeline 归档）。
+配完六步，你的史官即就位：consult（reading loop 双信号启用后自动引路）、notice（capture 提醒留痕）、record（G1-G6 骨架 + `_evidence/` 证据页 + map/timeline/maintain 归档）。
