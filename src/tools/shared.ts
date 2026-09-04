@@ -13,7 +13,7 @@ import type { ToolResult } from '@opencode-ai/plugin';
 import type { GqlClient } from '../wiki/client.js';
 import type { HistorianOptions } from '../config.js';
 import type { PageDeps } from '../wiki/pages.write.js';
-import type { TranslateFn, Locale } from '../wiki/pages.read.js';
+import type { TranslateFn, Locale, PageListItem } from '../wiki/pages.read.js';
 import { assertLocalePair, PathValidationError, twinOf, type LocalePair } from '../wiki/locale.js';
 
 /** Per-tool dependency bag; the client is a thunk so a bad key surface at
@@ -222,4 +222,70 @@ export function frontDumpAdvisory(tier: Tier, content: string): string | null {
     `content contains a ${lines}-line fenced block; per contract, move raw material to a ` +
     `tier:"evidence" page under _evidence/ and link it from the human page (SYN-16)`
   );
+}
+
+// --- Create-path collision advisory (v4 todo 3) --------------------------------
+
+/** Title equality for duplicate detection: trim, collapse internal whitespace,
+ *  casefold — 'LLM Eval' == ' llm\neval '. */
+function normalizeTitle(title: string): string {
+  return title.trim().replace(/\s+/gu, ' ').toLocaleLowerCase();
+}
+
+/** Number of duplicate paths shown verbatim before the overflow count. */
+const COLLISION_DUPE_DISPLAY_LIMIT = 3;
+
+export interface CollisionInput {
+  readonly tier: Tier;
+  readonly path: string;
+  readonly locale: Locale;
+  readonly title: string;
+  readonly baseUrl: string;
+  /** Exact-(path, locale) pre-read result. A FAILED read must pass false — a
+   *  transport hiccup never masquerades as a collision (the write proceeds
+   *  with no advice rather than with wrong advice). */
+  readonly exists: boolean;
+  /** listPages inventory snapshot; a failed listPages read yields [] → no
+   *  duplicate advice, only the (independent) path-existence line can fire. */
+  readonly inventory: readonly PageListItem[];
+}
+
+/** Advisory-only duplicate detector for historian_page_create:
+ *  (a) the exact target (path, locale) already exists → prefer
+ *      historian_page_update, with the page URL;
+ *  (b) the same normalized title lives on a DIFFERENT non-machine path →
+ *      疑似重复 … 先读再写, with each path's URLs (first 3, then a count).
+ *  Pure over its inputs and advisory-only: it NEVER throws and NEVER blocks —
+ *  a same-path other-locale twin is not a duplicate, evidence-tier writes skip
+ *  (b) (raw-material pages legitimately echo human titles), and machine
+ *  namespaces (_meta/, _evidence/) never surface as duplicates. */
+export function collisionAdvisory(input: CollisionInput): string | null {
+  const parts: string[] = [];
+  if (input.exists) {
+    const urls = reportUrls(input.baseUrl, input.path, input.locale);
+    parts.push(
+      `path exists — '${input.path}' (${input.locale}) already holds a page; ` +
+        `prefer historian_page_update to amend it; ${urls[input.locale]}`,
+    );
+  }
+  const norm = normalizeTitle(input.title);
+  if (input.tier === 'front' && norm !== '') {
+    const dupes = input.inventory.filter(
+      (row) => row.path !== input.path && !isInternalPath(row.path) && normalizeTitle(row.title) === norm,
+    );
+    const paths = [...new Set(dupes.map((row) => row.path))];
+    if (paths.length > 0) {
+      const shown = paths.slice(0, COLLISION_DUPE_DISPLAY_LIMIT).map((p) => {
+        const urls = reportUrls(input.baseUrl, p, input.locale);
+        return `${p} (en=${urls.en} zh=${urls.zh})`;
+      });
+      const overflow = paths.length - shown.length;
+      parts.push(
+        `疑似重复: title matches other path(s) ${shown.join('; ')}` +
+          (overflow > 0 ? ` +${overflow} more` : '') +
+          ` — 先读再写 (historian_read the existing page, prefer historian_page_update over a new twin)`,
+      );
+    }
+  }
+  return parts.length === 0 ? null : parts.join('\n');
 }
