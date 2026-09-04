@@ -239,10 +239,73 @@ function scoreG5Item6(draft: string): ChecklistVerdict {
   };
 }
 
+// --- G6 how-to scorers (selfReviewChecklist G6 variants of items 4-6) --------
+
+const G6_GOAL_H1 = /(?:如何|怎么|怎样|how\s+to)/i;
+const G6_STEPS_HEADING = /^#{2,3}\s.*(?:操作步骤|\bsteps\b)/i;
+
+function stepsSectionOf(draft: string): string | undefined {
+  const lines = draft.split('\n');
+  const start = lines.findIndex((l) => /^#{2,3}\s/.test(l) && G6_STEPS_HEADING.test(l));
+  if (start === -1) return undefined;
+  const end = lines.findIndex((l, i) => i > start && /^#{1,3}\s/.test(l));
+  return lines.slice(start + 1, end === -1 ? lines.length : end).join('\n');
+}
+
+function scoreG6Item4(draft: string): ChecklistVerdict {
+  const h1 = draft.split('\n').find((l) => /^#\s/.test(l)) ?? '';
+  const pass = G6_GOAL_H1.test(h1);
+  return {
+    id: 4,
+    verdict: pass ? 'pass' : 'fail',
+    note: pass ? undefined : `H1 is not goal-titled ("How to X" / "如何(怎么)做X"): "${h1.replace(/^#\s*/, '').slice(0, 40)}"`,
+  };
+}
+
+function scoreG6Item5(draft: string): ChecklistVerdict {
+  const section = stepsSectionOf(draft);
+  if (section === undefined) {
+    return { id: 5, verdict: 'fail', note: 'no 操作步骤/Steps section' };
+  }
+  const numbered = /^\s*1[.、]/m.test(section);
+  const expected = /(预期|expected)/i.test(section);
+  const failure = /(失败|on failure|fallback)/i.test(section);
+  const pass = numbered && expected && failure;
+  return {
+    id: 5,
+    verdict: pass ? 'pass' : 'fail',
+    note: pass ? undefined : `steps section lacks ${numbered ? '' : 'numbered items '}${expected ? '' : 'expected-result leg '}${failure ? '' : 'on-failure leg '}`.trim(),
+  };
+}
+
+function scoreG6Item6(draft: string): ChecklistVerdict {
+  const verified = /(上次核实|last verified)/i.test(draft);
+  const review = /(复核周期|review[- ]by|cadence)/i.test(draft);
+  const pass = verified && review;
+  return {
+    id: 6,
+    verdict: pass ? 'pass' : 'fail',
+    note: pass ? undefined : `metadata table lacks ${verified ? '' : 'last-verified (上次核实) '}${review ? '' : 'review-by (复核周期)'}row(s)`,
+  };
+}
+
+type ItemScorer = (draft: string) => ChecklistVerdict;
+type ScorerTriple = readonly [ItemScorer, ItemScorer, ItemScorer];
+
+/** Items 4-6 genre variants: G5 ledgers and G6 how-tos swap in their own
+ *  gates; every other genre keeps the base trio. */
+const GENRE_SCORERS: Readonly<Partial<Record<Genre, ScorerTriple>>> = {
+  G5: [scoreG5Item4, scoreG5Item5, scoreG5Item6],
+  G6: [scoreG6Item4, scoreG6Item5, scoreG6Item6],
+};
+
+const BASE_SCORERS: ScorerTriple = [scoreItem4, scoreItem5, scoreItem6];
+
 /** Score the full 10-item gate on a draft. `genre` decides items 4-6:
  *  the base gate's item 4 applies to G2 only and items 5-6 to G1 only
  *  (G3/G4 → 'na'); G5 pages get the ledger variants of all three
- *  (last-verified column, verification commands, table-not-prose). */
+ *  (last-verified column, verification commands, table-not-prose) and G6
+ *  pages the how-to variants (goal-titled H1, step triples, freshness rows). */
 export function scoreChecklist(genre: Genre, draft: string): readonly ChecklistVerdict[] {
   const items = selfReviewChecklist(genre);
   const na = (item: ChecklistItem): ChecklistVerdict => ({
@@ -255,16 +318,16 @@ export function scoreChecklist(genre: Genre, draft: string): readonly ChecklistV
     verdict: 'deferred',
     note: 'post-write item — score after apply and write into the pilot report',
   });
-  const ledger = genre === 'G5';
+  const [score4, score5, score6] = GENRE_SCORERS[genre] ?? BASE_SCORERS;
   return items.map((item) => {
     const applies = item.appliesTo === 'all' || item.appliesTo.includes(genre);
     switch (item.id) {
       case 1: return scoreItem1(draft);
       case 2: return scoreItem2(draft);
       case 3: return scoreItem3(draft);
-      case 4: return applies ? (ledger ? scoreG5Item4(draft) : scoreItem4(draft)) : na(item);
-      case 5: return applies ? (ledger ? scoreG5Item5(draft) : scoreItem5(draft)) : na(item);
-      case 6: return applies ? (ledger ? scoreG5Item6(draft) : scoreItem6(draft)) : na(item);
+      case 4: return applies ? score4(draft) : na(item);
+      case 5: return applies ? score5(draft) : na(item);
+      case 6: return applies ? score6(draft) : na(item);
       case 7: return scoreItem7(draft);
       case 8: return scoreItem8(draft);
       default: return deferred(item);

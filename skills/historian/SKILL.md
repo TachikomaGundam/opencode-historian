@@ -129,6 +129,7 @@ historian_search query="<核心主题关键词>" kind=content
 | G3 清单索引 | 清单/列表/inventory/checklist/catalog/命令速查 | 罗列同类对象 |
 | G4 概念原理 | 原理/为什么/how it works/概念/机制 | 解释概念或机制 |
 | G5 现状账本 | 端口/版本/已部署/当前状态/上次核实/last verified + 组件表 | 记录此刻部署/运行态 |
+| G6 操作手册 | 如何/怎么/上手/指南/操作步骤/操作手册/how to/steps to/runbook + 编号步骤 | 教读者按目标做成一件事（Diátaxis how-to 腿），标题即目标 |
 
 声明格式：`页型: G<N> <类型名>`
 

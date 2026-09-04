@@ -167,6 +167,47 @@ const CLASSIFY_CASES: readonly ClassifyCase[] = [
     genre: 'G5',
     confidence: 'medium',
   },
+  // G6 × 6 (zh goal-title / en how-to / runbook body / three non-steal guards)
+  {
+    name: 'G6 zh 如何 title + 操作步骤 body',
+    input: { title: '如何部署 Wiki.js', body: '按操作步骤逐条执行，每步带预期结果。' },
+    genre: 'G6',
+    confidence: 'high',
+    expectSignalsContain: ['如何', '操作步骤'],
+  },
+  {
+    name: 'G6 en how to title + steps to body',
+    input: { title: 'How to rotate API keys', body: 'steps to revoke and reissue a key' },
+    genre: 'G6',
+    confidence: 'high',
+    expectSignalsContain: ['how to', 'steps to'],
+  },
+  {
+    name: 'G6 single body cue runbook → medium',
+    input: { title: '夜间备份手册', body: 'This is the backup runbook for the cluster.' },
+    genre: 'G6',
+    confidence: 'medium',
+  },
+  // Non-steal guards: lookalikes that merely mention steps stay in their genre.
+  {
+    name: 'G6 does not steal G3 清单 mentioning 验证/操作步骤',
+    input: { title: '运维验收清单', body: '每项都有验证步骤，另附安装操作步骤汇总。' },
+    genre: 'G3',
+    confidence: 'medium',
+  },
+  {
+    name: 'G6 does not steal G2 对比 mentioning 操作步骤',
+    input: { title: '向量库方案对比', body: '选型维度含操作步骤复杂度。' },
+    genre: 'G2',
+    confidence: 'high',
+  },
+  {
+    name: 'G6 does not steal scratch note 今日操作记录',
+    input: { title: '今日操作记录', body: '重启了一次容器，恢复正常运行，无特殊原因。' },
+    genre: 'G4',
+    confidence: 'low',
+    expectSignals: [],
+  },
 ];
 
 // Harness corpus regression: one fixture per eval scenario 01–07, modeled on
@@ -520,5 +561,127 @@ describe('scoreChecklist G5 ledger scorers catch non-conformant pages', () => {
     expect(item('G1', ledger, 4).verdict).toBe('na');
     expect(item('G2', ledger, 5).verdict).toBe('na');
     expect(item('G4', ledger, 6).verdict).toBe('na');
+  });
+});
+
+// --- G6 how-to manual (goal-titled operational manual) ------------------------
+
+describe('genreSkeleton G6', () => {
+  it('zh: goal section, prerequisites table, triple-tagged steps, rollback, D4 freshness metadata', () => {
+    const zh = genreSkeleton('G6', 'zh');
+    expect(zh).toContain('## 目标');
+    expect(zh).toContain('| 条件 | 检查方法 | 预期结果 |');
+    expect(zh).toContain('## 操作步骤');
+    expect(zh).toContain('**动作**');
+    expect(zh).toContain('**预期结果**');
+    expect(zh).toContain('**失败处置**');
+    expect(zh).toContain('## 回退');
+    expect(zh).toContain('| 上次核实 |');
+    expect(zh).toContain('| 复核周期 |');
+    expect(zh).toContain('| 被取代于 |');
+    expect(zh).toContain('| 来源类型 |');
+  });
+  it('en: section-for-section twin of the zh how-to', () => {
+    const en = genreSkeleton('G6', 'en');
+    expect(en).toContain('## Goal');
+    expect(en).toContain('| Condition | Check | Expected |');
+    expect(en).toContain('## Steps');
+    expect(en).toContain('**Action**');
+    expect(en).toContain('**Expected result**');
+    expect(en).toContain('**On failure**');
+    expect(en).toContain('## Rollback');
+    expect(en).toContain('| Last verified |');
+    expect(en).toContain('| Review by |');
+    expect(en).toContain('| Superseded by |');
+    expect(en).toContain('| Source kind |');
+  });
+  it('both H1 placeholders are goal-titled (如何 / How to)', () => {
+    const zhH1 = genreSkeleton('G6', 'zh').split('\n')[0]!;
+    const enH1 = genreSkeleton('G6', 'en').split('\n')[0]!;
+    expect(/如何|怎么/.test(zhH1)).toBe(true);
+    expect(/how to/i.test(enH1)).toBe(true);
+  });
+});
+
+describe('selfReviewChecklist G6 how-to variants', () => {
+  it('G6 swaps items 4-6 to how-to gates (appliesTo [G6]); 1-3/7-10 shared', () => {
+    const items = selfReviewChecklist('G6');
+    expect(items).toHaveLength(10);
+    expect(items.map((i) => i.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(items[3]!.label).toContain('目标句式');
+    expect(items[3]!.label).toContain('How to X');
+    expect(items[5]!.label).toContain('上次核实');
+    for (const i of [3, 4, 5]) {
+      expect(items[i]!.kind).toBe('genre-specific');
+      expect(items[i]!.appliesTo).toEqual(['G6']);
+    }
+    const g1 = selfReviewChecklist('G1');
+    for (const id of [1, 2, 3, 7, 8, 9, 10]) {
+      expect(items[id - 1]!.label).toBe(g1[id - 1]!.label);
+    }
+  });
+
+  it('base gate items 4-6 never include G6 (how-to gates are opt-in per genre)', () => {
+    for (const genre of ['G1', 'G2', 'G3', 'G4'] as const) {
+      for (const item of selfReviewChecklist(genre).slice(3, 6)) {
+        expect(item.appliesTo).not.toContain('G6');
+      }
+    }
+  });
+
+  it('G6 gate passes its own skeleton in both languages (items 1-8 pass, 9-10 deferred)', () => {
+    for (const lang of LANGS) {
+      const verdicts = scoreChecklist('G6', genreSkeleton('G6', lang));
+      expect(verdicts).toHaveLength(10);
+      for (const v of verdicts) {
+        if (v.id <= 8) {
+          expect([lang, v.id, v.verdict, v.note ?? '']).toEqual([lang, v.id, 'pass', '']);
+        } else {
+          expect(v.verdict).toBe('deferred');
+        }
+      }
+    }
+  });
+});
+
+describe('scoreChecklist G6 how-to scorers catch non-conformant pages', () => {
+  const item = (genre: Genre, draft: string, id: number) =>
+    scoreChecklist(genre, draft).find((v) => v.id === id)!;
+
+  const STEPS_ZH =
+    '## 操作步骤\n\n1. **动作**：运行部署脚本。\n   **预期结果**：日志出现 done。\n   **失败处置**：回滚并查看 G1 事件页。\n';
+  const META_ZH =
+    '\n## 元数据表\n\n| 元数据 | 值 |\n| --- | --- |\n| 上次核实 | 2026-09-01 |\n| 复核周期 | 每 90 天 |\n';
+
+  it('item 4: non-goal H1 fails; 如何 / How to H1 passes', () => {
+    const bad = `# 备份手册\n\n${STEPS_ZH}${META_ZH}`;
+    expect(item('G6', bad, 4).verdict).toBe('fail');
+    expect(item('G6', `# 如何做每日备份\n\n${STEPS_ZH}${META_ZH}`, 4).verdict).toBe('pass');
+    expect(item('G6', `# How to do the daily backup\n\n${STEPS_ZH}${META_ZH}`, 4).verdict).toBe('pass');
+  });
+
+  it('item 5: missing steps section or missing on-failure leg fails; full triples pass', () => {
+    expect(item('G6', `# 如何做备份\n\n${META_ZH}`, 5).verdict).toBe('fail');
+    const noFallback =
+      '# 如何做备份\n\n## 操作步骤\n\n1. 运行脚本。\n   预期结果：done。\n';
+    expect(item('G6', noFallback, 5).verdict).toBe('fail');
+    expect(item('G6', `# 如何做备份\n\n${STEPS_ZH}${META_ZH}`, 5).verdict).toBe('pass');
+    const enSection = '# How to back up\n\n## Steps\n\n1. **Action**: run it.\n   **Expected result**: done.\n   **On failure**: revert.\n';
+    expect(item('G6', enSection, 5).verdict).toBe('pass');
+  });
+
+  it('item 6: metadata without last-verified/review-by fails; both rows pass', () => {
+    expect(item('G6', `# 如何做备份\n\n${STEPS_ZH}`, 6).verdict).toBe('fail');
+    expect(item('G6', `# 如何做备份\n\n${STEPS_ZH}${META_ZH}`, 6).verdict).toBe('pass');
+    const enMeta = '# How to back up\n\n| Field | Value |\n| --- | --- |\n| Last verified | 2026-09-01 |\n| Review by | every 90 days |\n';
+    expect(item('G6', enMeta, 6).verdict).toBe('pass');
+  });
+
+  it('non-G6 genres keep base/ledger scorers on the same drafts (G1 → na, G5 → ledger)', () => {
+    const howto = `# 如何做备份\n\n${STEPS_ZH}${META_ZH}`;
+    expect(item('G1', howto, 4).verdict).toBe('na');
+    expect(item('G3', howto, 5).verdict).toBe('na');
+    expect(item('G4', howto, 6).verdict).toBe('na');
+    expect(item('G5', howto, 4).verdict).toBe('fail');
   });
 });
