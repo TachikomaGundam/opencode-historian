@@ -21,7 +21,10 @@ export const OPTS: HistorianOptions = {
     apiKey: 'sk-translate',
     providerKey: 'my-provider',
   },
-  sections: ['_sandbox'],
+  // [] = allow-all (the shipped default): tools.test.ts writes fixture paths
+  // across namespaces (docs, llm, _evidence…); section limits are applied by
+  // the dedicated T5 tests via {...OPTS, sections: [...]}.
+  sections: [],
   locales: ['en', 'zh'],
   readingLoop: false,
   capture: { enabled: false },
