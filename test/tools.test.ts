@@ -244,18 +244,28 @@ describe('tool surface (buildTools)', () => {
 describe('historian_page_create', () => {
   it('creates a page with twin (translate wired) and reports both URLs', async () => {
     // Given: a wiki where the en create and the zh twin create both succeed
+    // (stateful: both pages are absent until their create lands)
     const translates: string[][] = [];
     const translate = async (text: string, from: string, to: string): Promise<string> => {
       translates.push([text, from, to]);
       return TWIN_TEXT(text);
     };
+    let createdEn = false;
+    let createdZh = false;
     const { tools, captured, fetchCount } = makeWired(
       {
-        'create(': (vars) => ({
-          data: { pages: { create: { ...RESP_OK, page: { id: vars.locale === 'zh' ? 998 : 999, path: vars.path, locale: vars.locale } } } },
-        }),
+        'list(': () => ({ data: { pages: { list: [] } } }),
+        'create(': (vars) => {
+          if (vars.locale === 'zh') createdZh = true;
+          else createdEn = true;
+          return {
+            data: { pages: { create: { ...RESP_OK, page: { id: vars.locale === 'zh' ? 998 : 999, path: vars.path, locale: vars.locale } } } },
+          };
+        },
         'singleByPath(': (vars) => ({
-          data: { pages: { singleByPath: vars.locale === 'zh' ? rawPage({ id: 998, locale: 'zh', title: '阿尔法' }) : rawPage() } },
+          data: { pages: { singleByPath: vars.locale === 'zh'
+            ? createdZh ? rawPage({ id: 998, locale: 'zh', title: '阿尔法' }) : null
+            : createdEn ? rawPage() : null } },
         }),
       },
       translate,
@@ -276,13 +286,14 @@ describe('historian_page_create', () => {
     expect(out.twinStatus).toBe('created');
     expect(out.twinId).toBe(998);
     expect(out.urls).toEqual({ en: EN_URL, zh: ZH_URL });
+    expect('advisory' in out).toBe(false);
     expect(translates).toEqual([[ 'Alpha', 'en', 'zh' ], ['# Alpha\nbody', 'en', 'zh']]);
     const creates = varsOf(captured, 'create(');
     expect(creates[0].locale).toBe('en');
     expect(creates[0].isPublished).toBe(true);
     expect(creates[1].locale).toBe('zh');
     expect(creates[1].title).toBe('译:Alpha');
-    expect(fetchCount()).toBe(4);
+    expect(fetchCount()).toBe(6);
   });
 
   it('no-deps buildTools feeds a live translator into createPage — twinStatus created, not pending (THE GAP)', async () => {
@@ -333,12 +344,7 @@ describe('historian_page_create', () => {
 
   it('twin:false skips the twin and sends exactly one create', async () => {
     // Given: a wiki that would answer any write
-    const { tools, captured, fetchCount } = makeWired({
-      'create(': (vars) => ({
-        data: { pages: { create: { ...RESP_OK, page: { id: 999, path: vars.path, locale: vars.locale } } } },
-      }),
-      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage() } } }),
-    });
+    const { tools, captured, fetchCount } = makeWired(createWiki());
 
     // When: creating with twin:false
     const out = await run(tools.historian_page_create, { path: PATH, title: 'Alpha', content: 'c', twin: false });
@@ -347,7 +353,7 @@ describe('historian_page_create', () => {
     expect(out.twinStatus).toBe('skipped');
     expect(varsOf(captured, 'create(').length).toBe(1);
     expect(out.urls).toEqual({ en: EN_URL, zh: ZH_URL });
-    expect(fetchCount()).toBe(2);
+    expect(fetchCount()).toBe(4);
   });
 
   it('template mode (no content): returns a local genre skeleton with ZERO fetches', async () => {
@@ -429,6 +435,265 @@ describe('historian_page_create', () => {
     expect(String(out.message)).toContain('invalid path');
     expect(typeof out.actionableHint).toBe('string');
     expect(JSON.stringify(out)).not.toContain('at ');
+  });
+});
+
+// --- create collision advisory (v4 todo 3) -----------------------------------
+
+import { collisionAdvisory } from '../src/tools/shared.js';
+import type { PageListItem } from '../src/wiki/pages.read.js';
+
+/** PageListItem factory — collisionAdvisory unit inputs. */
+function listItem(path: string, locale: string, title: string): PageListItem {
+  return {
+    id: 1,
+    path,
+    locale: locale as PageListItem['locale'],
+    title,
+    description: '',
+    contentType: 'markdown',
+    isPublished: true,
+    isPrivate: false,
+    privateNS: null,
+    createdAt: '',
+    updatedAt: '',
+    tags: [],
+  };
+}
+
+const COLLISION_BASE = {
+  tier: 'front' as const,
+  path: PATH,
+  locale: 'en' as const,
+  title: 'Alpha',
+  baseUrl: 'http://localhost:3000',
+  exists: false,
+  inventory: [] as readonly PageListItem[],
+};
+
+/** Stateful create wiki: (path, locale) reads null until a create lands —
+ *  models a genuinely NEW page so the collision pre-read sees absence while
+ *  createPage's authoritative post-read sees the page. `existing` pre-seeds
+ *  live pages; `list` is the listPages inventory payload. */
+function createWiki(over: {
+  existing?: ReadonlyArray<readonly [string, string]>;
+  list?: readonly Record<string, unknown>[];
+} = {}): Record<string, (vars: Record<string, unknown>) => unknown> {
+  const live = new Set<string>((over.existing ?? []).map(([p, l]) => `${p}|${l}`));
+  const key = (vars: Record<string, unknown>): string => `${String(vars.path)}|${String(vars.locale)}`;
+  const echo = (vars: Record<string, unknown>, id: number, title: string): Record<string, unknown> =>
+    rawPage({ id, path: String(vars.path), locale: String(vars.locale), title });
+  return {
+    'list(': () => ({ data: { pages: { list: over.list ?? [] } } }),
+    'create(': (vars) => {
+      live.add(key(vars));
+      return {
+        data: {
+          pages: { create: { ...RESP_OK, page: { id: vars.locale === 'zh' ? 998 : 999, path: vars.path, locale: vars.locale } } },
+        },
+      };
+    },
+    'singleByPath(': (vars) => ({
+      data: {
+        pages: {
+          singleByPath: live.has(key(vars))
+            ? vars.locale === 'zh'
+              ? echo(vars, 998, '阿尔法')
+              : echo(vars, 76, 'Alpha')
+            : null,
+        },
+      },
+    }),
+  };
+}
+
+describe('collisionAdvisory (pure)', () => {
+  it('target (path, locale) exists → update-preference advisory carrying the page URL', () => {
+    // Given: the exact target already lives on the wiki
+    const out = collisionAdvisory({ ...COLLISION_BASE, exists: true });
+    // Then: actionable wording — prefer update, URL present
+    expect(out).not.toBeNull();
+    expect(out).toContain('path exists');
+    expect(out).toContain('prefer historian_page_update');
+    expect(out).toContain(EN_URL);
+  });
+
+  it('clean target and clean inventory → null (no advisory noise)', () => {
+    expect(collisionAdvisory(COLLISION_BASE)).toBeNull();
+    expect(collisionAdvisory({ ...COLLISION_BASE, inventory: [listItem('llm/other', 'en', 'Beta')] })).toBeNull();
+  });
+
+  it('same normalized title on a different path → 疑似重复 + 先读再写 + path + URL', () => {
+    // Given: a different-path page sharing the exact title
+    const out = collisionAdvisory({ ...COLLISION_BASE, inventory: [listItem('llm/alpha', 'en', 'Alpha')] });
+    expect(out).not.toBeNull();
+    expect(out).toContain('疑似重复');
+    expect(out).toContain('先读再写');
+    expect(out).toContain('llm/alpha');
+    expect(out).toContain('http://localhost:3000/en/llm/alpha');
+  });
+
+  it('title matching normalizes case + internal whitespace and spans locales', () => {
+    // Given: a zh row whose title differs only in case/whitespace
+    const out = collisionAdvisory({
+      ...COLLISION_BASE,
+      title: '  LLM   Eval ',
+      inventory: [listItem('docs/eval', 'zh', 'llm\neval')],
+    });
+    // Then: normalized equality fires the advisory, zh URL reported
+    expect(out).not.toBeNull();
+    expect(out).toContain('疑似重复');
+    expect(out).toContain('http://localhost:3000/zh/docs/eval');
+  });
+
+  it('a same-path other-locale twin sharing the title is NOT a duplicate', () => {
+    // Given: the (path, locale) twin rows of the very page being created
+    const out = collisionAdvisory({
+      ...COLLISION_BASE,
+      inventory: [listItem(PATH, 'zh', 'Alpha')],
+    });
+    expect(out).toBeNull();
+  });
+
+  it('evidence tier skips the title-duplicate advice but still flags path existence', () => {
+    // Given: an evidence create whose title collides with a human page
+    const dup = collisionAdvisory({
+      ...COLLISION_BASE,
+      tier: 'evidence',
+      path: '_evidence/run-1',
+      inventory: [listItem('llm/alpha', 'en', 'Alpha')],
+    });
+    expect(dup).toBeNull();
+    // But: an exact existing evidence path is still worth the update pointer
+    const exists = collisionAdvisory({ ...COLLISION_BASE, tier: 'evidence', path: '_evidence/run-1', exists: true });
+    expect(exists).not.toBeNull();
+    expect(exists).toContain('prefer historian_page_update');
+    expect(exists).toContain('http://localhost:3000/en/_evidence/run-1');
+  });
+
+  it('machine-namespace inventory rows never trigger the duplicate advice', () => {
+    const out = collisionAdvisory({
+      ...COLLISION_BASE,
+      inventory: [listItem('_meta/page-map', 'en', 'Alpha'), listItem('_evidence/raw-1', 'en', 'Alpha')],
+    });
+    expect(out).toBeNull();
+  });
+
+  it('blank/whitespace title yields no duplicate advice', () => {
+    const out = collisionAdvisory({
+      ...COLLISION_BASE,
+      title: '   ',
+      inventory: [listItem('llm/blank', 'en', '   ')],
+    });
+    expect(out).toBeNull();
+  });
+
+  it('many duplicate paths: first 3 reported, overflow counted', () => {
+    const inv = [1, 2, 3, 4, 5].map((n) => listItem(`llm/dup-${n}`, 'en', 'Alpha'));
+    const out = collisionAdvisory({ ...COLLISION_BASE, inventory: inv });
+    expect(out).toContain('llm/dup-1');
+    expect(out).toContain('llm/dup-3');
+    expect(out).not.toContain('llm/dup-4');
+    expect(out).toContain('+2');
+  });
+});
+
+describe('historian_page_create collision advisory (envelope)', () => {
+  it('path exists: the write still lands, advisory names update + the URL', async () => {
+    // Given: the target page already lives there (pre-read sees it, create still runs)
+    const { tools, captured, fetchCount } = makeWired(createWiki({ existing: [[PATH, 'en']] }));
+    // When: creating on top of it anyway
+    const out = await run(tools.historian_page_create, { path: PATH, title: 'Alpha', content: '# Alpha\nbody', twin: false });
+    // Then: NEVER blocked — ok true, the create mutation ran, advisory present
+    expect(out.ok).toBe(true);
+    expect(out.pageId).toBe(76);
+    expect(varsOf(captured, 'create(').length).toBe(1);
+    expect(String(out.advisory)).toContain('path exists');
+    expect(String(out.advisory)).toContain(EN_URL);
+    expect(fetchCount()).toBe(4); // pre-read + list + create + authoritative post-read
+  });
+
+  it('title duplicate on another path: advisory carries 疑似重复 + the other URL', async () => {
+    const { tools } = makeWired(createWiki({ list: [{ id: 5, path: 'llm/alpha', locale: 'en', title: 'Alpha' }] }));
+    const out = await run(tools.historian_page_create, { path: PATH, title: 'Alpha', content: 'c', twin: false });
+    expect(out.ok).toBe(true);
+    expect(String(out.advisory)).toContain('疑似重复');
+    expect(String(out.advisory)).toContain('先读再写');
+    expect(String(out.advisory)).toContain('http://localhost:3000/en/llm/alpha');
+  });
+
+  it('clean create: no advisory key, envelope byte-for-byte unchanged', async () => {
+    const { tools, fetchCount } = makeWired(createWiki());
+    const out = await run(tools.historian_page_create, { path: PATH, title: 'Alpha', content: '# Alpha\nbody', twin: false });
+    expect(out).toEqual({
+      ok: true,
+      mode: 'create',
+      path: PATH,
+      locale: 'en',
+      pageId: 76,
+      twinStatus: 'skipped',
+      urls: { en: EN_URL, zh: ZH_URL },
+    });
+    expect(fetchCount()).toBe(4);
+  });
+
+  it('listPages read failure: create succeeds, advisory silently absent, never throws', async () => {
+    // Given: no 'list(' handler — the fake fetch THROWS on the inventory query
+    let exists = false;
+    const { tools } = makeWired({
+      'create(': (vars) => {
+        exists = true;
+        return { data: { pages: { create: { ...RESP_OK, page: { id: 777, path: vars.path, locale: vars.locale } } } } };
+      },
+      'singleByPath(': () => ({ data: { pages: { singleByPath: exists ? rawPage({ id: 777 }) : null } } }),
+    });
+    const out = await run(tools.historian_page_create, { path: PATH, title: 'Alpha', content: 'c', twin: false });
+    expect(out.ok).toBe(true);
+    expect(out.pageId).toBe(777);
+    expect('advisory' in out).toBe(false);
+  });
+
+  it('pre-read failure: create succeeds with the advisory silently absent', async () => {
+    // Given: the FIRST singleByPath (the collision pre-read) fails, later
+    // engine reads succeed
+    let calls = 0;
+    let exists = false;
+    const { tools, captured } = makeWired({
+      'list(': () => ({ data: { pages: { list: [] } } }),
+      'create(': (vars) => {
+        exists = true;
+        return { data: { pages: { create: { ...RESP_OK, page: { id: 778, path: vars.path, locale: vars.locale } } } } };
+      },
+      'singleByPath(': () => {
+        calls++;
+        if (calls === 1) throw new Error('transient read outage');
+        return { data: { pages: { singleByPath: exists ? rawPage({ id: 778 }) : null } } };
+      },
+    });
+    const out = await run(tools.historian_page_create, { path: PATH, title: 'Alpha', content: 'c', twin: false });
+    expect(out.ok).toBe(true);
+    expect(out.pageId).toBe(778);
+    expect('advisory' in out).toBe(false);
+    expect(varsOf(captured, 'create(').length).toBe(1);
+  });
+
+  it('template branch is untouched: zero fetches, no advisory', async () => {
+    const { tools, fetchCount } = makeWired(createWiki({ existing: [[PATH, 'en']] }));
+    const out = await run(tools.historian_page_create, { path: PATH, title: 'Alpha' });
+    expect(out.mode).toBe('template');
+    expect('advisory' in out).toBe(false);
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('collision + raw-dump advisories merge into the single advisory key', async () => {
+    const { tools } = makeWired(createWiki({ existing: [[PATH, 'en']], list: [{ id: 5, path: 'llm/alpha', locale: 'en', title: 'Alpha' }] }));
+    const content = `preamble\n${fenceBlock(31)}\ntrailer`;
+    const out = await run(tools.historian_page_create, { path: PATH, title: 'Alpha', content, twin: false });
+    expect(out.ok).toBe(true);
+    const advisory = String(out.advisory);
+    expect(advisory).toContain('path exists');
+    expect(advisory).toContain('疑似重复');
+    expect(advisory).toContain(dumpAdvisory(31));
   });
 });
 
@@ -1197,12 +1462,7 @@ const MACHINE_NOTE = 'machine-tier page; anonymous visits 404 by design';
 describe('evidence tier + internal namespace guards', () => {
   it('front regression: default-tier create payload and envelope are byte-for-byte 0.2.0', async () => {
     // Given: a wiki that answers the en create + its authoritative lookup
-    const { tools, captured, fetchCount } = makeWired({
-      'create(': (vars) => ({
-        data: { pages: { create: { ...RESP_OK, page: { id: 999, path: vars.path, locale: vars.locale } } } },
-      }),
-      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage() } } }),
-    });
+    const { tools, captured, fetchCount } = makeWired(createWiki());
 
     // When: creating on the front tier with NO tier argument (today's call shape)
     const out = await run(tools.historian_page_create, {
@@ -1239,7 +1499,7 @@ describe('evidence tier + internal namespace guards', () => {
         tags: ['t1'],
       },
     ]);
-    expect(fetchCount()).toBe(2);
+    expect(fetchCount()).toBe(4);
   });
 
   it('rejects tier evidence + front path docs/foo before any fetch', async () => {
@@ -1319,12 +1579,7 @@ describe('evidence tier + internal namespace guards', () => {
 
   it('evidence create carries the machine flags and never calls twin create', async () => {
     // Given: a wiki answering the en create + lookup
-    const { tools, captured, fetchCount } = makeWired({
-      'create(': (vars) => ({
-        data: { pages: { create: { ...RESP_OK, page: { id: 901, path: vars.path, locale: vars.locale } } } },
-      }),
-      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage({ id: 901, path: '_evidence/run-1' }) } } }),
-    });
+    const { tools, captured, fetchCount } = makeWired(createWiki());
 
     // When: creating with tier evidence while explicitly ASKING for the human
     // defaults (isPublished/twin true) — the tier must override them
@@ -1345,17 +1600,12 @@ describe('evidence tier + internal namespace guards', () => {
     expect(creates[0].isPrivate).toBe(true);
     expect(creates[0].tags).toEqual(['gate', 'evidence']);
     expect(out.twinStatus).toBe('skipped');
-    expect(fetchCount()).toBe(2);
+    expect(fetchCount()).toBe(4);
   });
 
   it('evidence create with locale zh hints the monolingual invariant and still creates as en', async () => {
     // Given: a wiki answering the en create + lookup
-    const { tools, captured, fetchCount } = makeWired({
-      'create(': (vars) => ({
-        data: { pages: { create: { ...RESP_OK, page: { id: 902, path: vars.path, locale: vars.locale } } } },
-      }),
-      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage({ id: 902, path: '_evidence/run-2' }) } } }),
-    });
+    const { tools, captured, fetchCount } = makeWired(createWiki());
 
     // When: passing locale:'zh' with tier evidence — spec says hint, never throw
     const out = await run(tools.historian_page_create, {
@@ -1371,7 +1621,7 @@ describe('evidence tier + internal namespace guards', () => {
     expect(out.locale).toBe('en');
     expect(varsOf(captured, 'create(')[0].locale).toBe('en');
     expect(String(out.localeHint)).toContain('monolingual');
-    expect(fetchCount()).toBe(2);
+    expect(fetchCount()).toBe(4);
   });
 
   it('front append with a missing twin and wired translator bootstraps the twin (positive control)', async () => {
@@ -1449,12 +1699,7 @@ describe('evidence tier + internal namespace guards', () => {
 
   it('evidence success envelopes (create + append) carry the machine-tier note', async () => {
     // Given: an evidence-capable wiki for both tools
-    const { tools: createTools } = makeWired({
-      'create(': (vars) => ({
-        data: { pages: { create: { ...RESP_OK, page: { id: 903, path: vars.path, locale: vars.locale } } } },
-      }),
-      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage({ id: 903, path: '_evidence/n1' }) } } }),
-    });
+    const { tools: createTools } = makeWired(createWiki());
     const { tools: appendTools } = makeWired({
       'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage({ path: '_evidence/n2' }) } } }),
       'single(': () => ({ data: { pages: { single: rawPage({ path: '_evidence/n2' }) } } }),
@@ -1497,12 +1742,7 @@ const dumpAdvisory = (n: number): string =>
 describe('front-tier raw-dump soft gate', () => {
   it('clean front create: envelope key set unchanged, no advisory key', async () => {
     // Given: the standard front create wiki (byte-for-byte 0.2.0 fixture)
-    const { tools } = makeWired({
-      'create(': (vars) => ({
-        data: { pages: { create: { ...RESP_OK, page: { id: 999, path: vars.path, locale: vars.locale } } } },
-      }),
-      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage() } } }),
-    });
+    const { tools } = makeWired(createWiki());
 
     // When: creating with short, fence-free content
     const out = await run(tools.historian_page_create, {
@@ -1527,12 +1767,7 @@ describe('front-tier raw-dump soft gate', () => {
 
   it('front create with a 31-line fence: advisory present naming the count, write still performed', async () => {
     // Given: the same front create wiki
-    const { tools, captured } = makeWired({
-      'create(': (vars) => ({
-        data: { pages: { create: { ...RESP_OK, page: { id: 999, path: vars.path, locale: vars.locale } } } },
-      }),
-      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage() } } }),
-    });
+    const { tools, captured } = makeWired(createWiki());
 
     // When: creating with a fenced block just OVER the 30-line soft limit
     const content = `preamble\n${fenceBlock(31)}\ntrailer`;
@@ -1547,12 +1782,7 @@ describe('front-tier raw-dump soft gate', () => {
 
   it('front create with an exactly-30-line fence: at the limit, no advisory', async () => {
     // Given: the same front create wiki
-    const { tools } = makeWired({
-      'create(': (vars) => ({
-        data: { pages: { create: { ...RESP_OK, page: { id: 999, path: vars.path, locale: vars.locale } } } },
-      }),
-      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage() } } }),
-    });
+    const { tools } = makeWired(createWiki());
 
     // When: creating at the boundary (30 inside lines ≤ limit)
     const out = await run(tools.historian_page_create, {
@@ -1568,13 +1798,13 @@ describe('front-tier raw-dump soft gate', () => {
   });
 
   it('evidence tier is NEVER checked: create AND inferred-path append with a 40-line fence stay silent', async () => {
-    // Given: an evidence-capable wiki for create and append
-    const { tools: createTools } = makeWired({
-      'create(': (vars) => ({
-        data: { pages: { create: { ...RESP_OK, page: { id: 911, path: vars.path, locale: vars.locale } } } },
-      }),
-      'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage({ id: 911, path: '_evidence/dump-1' }) } } }),
-    });
+    // Given: an evidence-capable wiki for create and append. The inventory
+    // carries a FRONT page with the exact title 'Raw': if the evidence tier
+    // leaked into the collision soft check, the create envelope would grow a
+    // 疑似重复 advisory — raw dumps are the evidence tier's PURPOSE.
+    const { tools: createTools } = makeWired(
+      createWiki({ list: [{ id: 5, path: 'llm/alpha', locale: 'en', title: 'Raw' }] }),
+    );
     const { tools: appendTools } = makeWired({
       'singleByPath(': () => ({ data: { pages: { singleByPath: rawPage({ path: '_evidence/dump-2' }) } } }),
       'single(': () => ({ data: { pages: { single: rawPage({ path: '_evidence/dump-2' }) } } }),
