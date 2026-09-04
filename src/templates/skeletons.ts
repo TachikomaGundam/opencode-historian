@@ -566,3 +566,106 @@ export const G5_EN: string = `# Page Title (placeholder: replace with the real t
 ## Related Pages
 
 <!-- List the real page paths that link here and back. Event histories go in G1 pages, cited in Evidence. -->`;
+
+/** G6 — 操作手册/how-to 页 (goal-titled operational manual), zh. Diátaxis doing
+ *  leg: a reader with one goal follows the numbered steps to the outcome; every
+ *  step carries 动作 + 预期结果 + 失败处置. Concepts stay in G4 pages, raw
+ *  command lists in G3 pages, linked from 相关页面. */
+export const G6_ZH: string = `# 如何做某事（占位：目标句式标题，须与页面 title 一致）
+
+**状态/Status**: Active <!-- or Superseded-by: <path> / Deprecated --> · **日期/Date**: YYYY-MM-DD
+
+**本页回答：** 如何完成某事（占位：写明具体目标）
+
+> **提示**
+> 操作手册面向带着目标来的读者：步骤可复制、可执行、可核对。
+> 原理写 G4 概念页，命令清单写 G3 页，从相关页面链过来。
+{.is-info}
+
+## 目标
+
+<!-- 1–2 句：完成后读者得到什么结果。成功判据须可观察。 -->
+
+## 前置条件
+
+<!-- 权限、版本、依赖、环境变量逐项列出。每项须能当场自检。 -->
+
+| 条件 | 检查方法 | 预期结果 |
+| --- | --- | --- |
+| example-service 可达 | \`curl -s http://example.com:8000/health\` | HTTP 200 |
+
+## 操作步骤
+
+<!-- 编号步骤，每步三段：动作、预期结果、失败处置。命令须可直接复制。 -->
+
+1. **动作**：<!-- 做什么或运行哪条命令。 -->
+   **预期结果**：<!-- 正常时看到的输出或状态。 -->
+   **失败处置**：<!-- 未达预期时的补救，或链向 G1/G4 页。 -->
+
+## 回退
+
+<!-- 出错后如何恢复原状：撤销命令、备份位置。不可逆操作须前置警告。 -->
+
+## 元数据表
+
+| 元数据 | 值 |
+| --- | --- |
+| 状态 | <!-- Active / Superseded-by: <path> / Deprecated --> |
+| 上次核实 | <!-- YYYY-MM-DD，在哪套环境按本页步骤重跑过 --> |
+| 复核周期 | <!-- 如每 90 天，到期重跑本页步骤 --> |
+| 被取代于 | <!-- 新手册路径，无则填 — --> |
+| 来源类型 | <!-- human / agent / imported --> |
+
+## 相关页面
+
+<!-- 列出互链的真实页面路径。原理在 G4，清单在 G3，事故史在 G1。 -->`;
+
+/** G6 — how-to manual, en (section-for-section twin of G6_ZH). */
+export const G6_EN: string = `# How to Do X (placeholder: goal-titled heading, must match the page title)
+
+**状态/Status**: Active <!-- or Superseded-by: <path> / Deprecated --> · **日期/Date**: YYYY-MM-DD
+
+**This page answers:** how to finish one concrete task (placeholder: name the goal)
+
+> **Tip**
+> A how-to serves readers who arrive with a goal: steps are copy-pasteable and checkable.
+> Concepts belong in G4 pages, raw command lists in G3 pages, linked under Related Pages.
+{.is-info}
+
+## Goal
+
+<!-- One or two sentences: the outcome the reader gets. State an observable success test. -->
+
+## Prerequisites
+
+<!-- Permissions, versions, dependencies, env vars: one row each. Every row must be self-checkable. -->
+
+| Condition | Check | Expected |
+| --- | --- | --- |
+| example-service reachable | \`curl -s http://example.com:8000/health\` | HTTP 200 |
+
+## Steps
+
+<!-- Numbered steps, three legs per step: action, expected result, on failure. Commands must be copy-pasteable. -->
+
+1. **Action**: <!-- what to run or change. -->
+   **Expected result**: <!-- the output or state that proves success. -->
+   **On failure**: <!-- the fix, or a link to the G1/G4 page. -->
+
+## Rollback
+
+<!-- How to restore the prior state: revert commands, backup locations. Warn before any irreversible step. -->
+
+## Metadata
+
+| Field | Value |
+| --- | --- |
+| Status | <!-- Active / Superseded-by: <path> / Deprecated --> |
+| Last verified | <!-- YYYY-MM-DD and the environment the steps were re-run in --> |
+| Review by | <!-- e.g. every 90 days; re-run the steps when due --> |
+| Superseded by | <!-- path of the newer manual, or — --> |
+| Source kind | <!-- human / agent / imported --> |
+
+## Related Pages
+
+<!-- Real page paths that link here and back. Why-it-works lives in G4, checklists in G3, incidents in G1. -->`;

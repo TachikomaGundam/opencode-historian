@@ -36,6 +36,8 @@ import {
   G4_ZH,
   G5_EN,
   G5_ZH,
+  G6_EN,
+  G6_ZH,
 } from './skeletons.js';
 
 // Contract re-exports: raw skeleton data stays reachable through the barrel
@@ -51,15 +53,17 @@ export {
   G4_ZH,
   G5_EN,
   G5_ZH,
+  G6_EN,
+  G6_ZH,
 } from './skeletons.js';
 
 // --- Public types -----------------------------------------------------------
 
-export type Genre = 'G1' | 'G2' | 'G3' | 'G4' | 'G5';
+export type Genre = 'G1' | 'G2' | 'G3' | 'G4' | 'G5' | 'G6';
 export type GenreLang = 'en' | 'zh';
 export type Confidence = 'high' | 'medium' | 'low';
 
-export const GENRES: readonly Genre[] = ['G1', 'G2', 'G3', 'G4', 'G5'];
+export const GENRES: readonly Genre[] = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6'];
 
 export interface ClassifyInput {
   readonly title: string;
@@ -92,6 +96,7 @@ const SKELETONS: Readonly<Record<Genre, Readonly<Record<GenreLang, string>>>> = 
   G3: { en: G3_EN, zh: G3_ZH },
   G4: { en: G4_EN, zh: G4_ZH },
   G5: { en: G5_EN, zh: G5_ZH },
+  G6: { en: G6_EN, zh: G6_ZH },
 };
 
 /** Full markdown skeleton for a genre × language pair. Pure string data —
@@ -120,6 +125,9 @@ const GENRE_KEYWORDS: Readonly<Record<Genre, readonly string[]>> = {
   // Deployed-state cues only — bare 部署/版本 would collide with G3 "部署清单"
   // and general changelog talk, regressing existing corpus classifications.
   G5: ['现状卡', '当前状态', '已部署', '部署物', '现役', '上线', '端口', '上次核实', '失效策略', '验证命令', 'current state', 'deployed', 'last verified', 'running now'],
+  // Goal-titled how-to cues only — bare 步骤/操作 would steal G3 清单 pages
+  // that merely mention 验证步骤 and scratch notes titled 今日操作记录.
+  G6: ['如何', '怎么', '上手', '指南', '操作手册', '操作步骤', 'how to', 'steps to', 'runbook'],
 };
 
 function escapeRegex(s: string): string {
@@ -226,6 +234,29 @@ const G5_CHECKLIST_VARIANTS: Readonly<Record<number, ChecklistItem>> = {
   },
 };
 
+/** G6 swaps the genre-specific items 4–6 for how-to gates (goal-titled H1,
+ *  step triples, D4 freshness metadata); everything else is shared. */
+const G6_CHECKLIST_VARIANTS: Readonly<Record<number, ChecklistItem>> = {
+  4: {
+    id: 4,
+    label: '标题是目标句式 "How to X" / "如何/怎么做X"（goal-titled H1: the page name IS the reader\'s goal）',
+    kind: 'genre-specific',
+    appliesTo: ['G6'],
+  },
+  5: {
+    id: 5,
+    label: '操作步骤每条三段：动作 + 预期结果 + 失败处置（every numbered step carries action + expected result + on-failure handling）',
+    kind: 'genre-specific',
+    appliesTo: ['G6'],
+  },
+  6: {
+    id: 6,
+    label: '元数据表含「上次核实」与「复核周期」行（metadata table carries last-verified + review-by rows; 被取代于 once retired）',
+    kind: 'genre-specific',
+    appliesTo: ['G6'],
+  },
+};
+
 export function selfReviewChecklist(genre: Genre): readonly ChecklistItem[] {
   if (!GENRES.includes(genre)) {
     throw new Error(`unknown genre: ${genre}`);
@@ -292,8 +323,9 @@ export function selfReviewChecklist(genre: Genre): readonly ChecklistItem[] {
       appliesTo: 'all',
     },
   ];
-  if (genre === 'G5') {
-    return items.map((item) => G5_CHECKLIST_VARIANTS[item.id] ?? item);
+  const variants = genre === 'G5' ? G5_CHECKLIST_VARIANTS : genre === 'G6' ? G6_CHECKLIST_VARIANTS : undefined;
+  if (variants !== undefined) {
+    return items.map((item) => variants[item.id] ?? item);
   }
   return items;
 }
