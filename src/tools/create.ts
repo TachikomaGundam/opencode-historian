@@ -9,7 +9,7 @@ import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { validatePath } from '../wiki/locale.js';
 import { createPage } from '../wiki/pages.js';
 import { listPages, readPage, type PageListItem } from '../wiki/pages.read.js';
-import { classifyGenre, genreSkeleton, type Genre } from '../templates/genres.js';
+import { classifyGenre, genreSkeleton, GENRES, type Genre } from '../templates/genres.js';
 import { evidenceSkeleton } from '../templates/evidence.js';
 import {
   checklistAdvisory,
@@ -32,13 +32,11 @@ import {
 
 const s = tool.schema;
 
-const GENRES = ['G1', 'G2', 'G3', 'G4', 'G5'] as const;
-
 const ARGS_SHAPE = {
   path: s.string().describe('Wiki path, e.g. docs/guides/foo (first segment must NOT look like a locale code)'),
   title: s.string().describe('Page title'),
   content: s.string().optional().describe('Page body (markdown). ABSENT → local template mode, nothing written'),
-  genre: s.enum(GENRES).optional().describe('Genre hint: G1..G5 (template mode / classification)'),
+  genre: s.enum(GENRES).optional().describe('Genre hint: G1..G6 (template mode / classification)'),
   locale: s.enum(['en', 'zh']).default('en'),
   isPublished: s.boolean().default(true),
   tags: s.array(s.string()).default([]),

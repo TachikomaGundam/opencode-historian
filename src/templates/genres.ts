@@ -63,7 +63,7 @@ export type Genre = 'G1' | 'G2' | 'G3' | 'G4' | 'G5' | 'G6';
 export type GenreLang = 'en' | 'zh';
 export type Confidence = 'high' | 'medium' | 'low';
 
-export const GENRES: readonly Genre[] = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6'];
+export const GENRES = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6'] as const satisfies readonly Genre[];
 
 export interface ClassifyInput {
   readonly title: string;
