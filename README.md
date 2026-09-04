@@ -423,7 +423,7 @@ harness repo（与本插件仓库同工作区）提供 7 个行为验收场景�
 
 ```bash
 npm run build       # tsc 编译到 dist/
-npm test            # vitest run（478 tests, 20 files）
+npm test            # vitest run（493 tests, 20 files）
 npm pack --dry-run  # 检查打包文件列表
 ```
 
