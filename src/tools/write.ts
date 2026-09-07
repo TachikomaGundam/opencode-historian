@@ -16,6 +16,7 @@ import {
   MACHINE_TIER_NOTE,
   monolingualRefusalJson,
   okJson,
+  publishGateRefusalJson,
   sectionRefusalJson,
   tierMismatchJson,
   TIERS,
@@ -53,6 +54,10 @@ export function makeUpdateTool(deps: ToolDeps): ToolDefinition {
         const page = await readPage(deps.getClient(), args.path, args.locale);
         if (page === null) {
           return errEnvelope(new PageNotFoundError(`page '${args.path}' (${args.locale}) does not exist`));
+        }
+        if (args.content !== undefined) {
+          const gate = publishGateRefusalJson(args.content, args.locale, page.path, deps.options.baseUrl);
+          if (gate !== null) return gate;
         }
         const result = await updatePage(pageDeps(deps), page.id, {
           title: args.title,
