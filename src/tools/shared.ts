@@ -17,6 +17,7 @@ import type { TranslateFn, Locale, PageListItem } from '../wiki/pages.read.js';
 import { assertLocalePair, PathValidationError, twinOf, type LocalePair } from '../wiki/locale.js';
 import { scoreChecklist } from '../migrate-score.js';
 import { selfReviewChecklist, type Genre } from '../templates/genres.js';
+import { lintBody, publishGateViolations } from '../lint.js';
 
 /** Per-tool dependency bag; the client is a thunk so a bad key surface at
  *  buildTools time as nothing — only the first execution that touches the
@@ -110,6 +111,8 @@ function hintFor(errorKind: string): string {
       return 'The wiki endpoint is unreachable or misconfigured — check baseUrl and network.';
     case 'GraphQLError':
       return 'The wiki answered a GraphQL error — check the path/locale arguments.';
+    case 'PublishGateError':
+      return '消除 TODO/空节并把状态置 Active，或保留 状态:draft 待自检通过后发布；重定向存根正文必须带可点击的 [链接](目标URL)。';
     default:
       return 'Inspect the message and retry.';
   }
@@ -375,4 +378,32 @@ export function sectionGuard(
 export function sectionRefusalJson(path: string, allowedSections: readonly string[] | undefined): ToolResult | null {
   const violation = sectionGuard(path, allowedSections);
   return violation === null ? null : errEnvelope(new ConfigError(violation));
+}
+
+// --- publish gate (V6.1, HANDOFF #5.1 / #6.1) --------------------------------
+
+export class PublishGateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PublishGateError';
+  }
+}
+
+/** Hard gate on front-tier writes: refuses the two shapes that shipped real
+ *  incidents — a page claiming Active with TODO markers or empty skeleton
+ *  sections, and a redirect stub whose body carries no clickable exit.
+ *  `_sandbox/*` and internal namespaces are exempt; 状态:draft stays the
+ *  sanctioned work-in-progress escape hatch. Null = proceed. */
+export function publishGateRefusalJson(
+  content: string,
+  locale: Locale,
+  path: string,
+  baseUrl: string,
+): ToolResult | null {
+  if (path.startsWith('_sandbox/') || isInternalPath(path)) return null;
+  const violations = publishGateViolations(lintBody(content, { locale, baseUrl }));
+  if (violations.length === 0) return null;
+  return errEnvelope(
+    new PublishGateError(`publish-gate: ${violations.join('; ')} on '${path}' (${locale})`),
+  );
 }
