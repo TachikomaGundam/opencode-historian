@@ -317,6 +317,7 @@ describe('historian_map action:"maintain"', () => {
     expect(out.ok).toBe(true);
     expect(out.action).toBe('maintain');
     expect(out.deep).toBe(false);
+    expect(out.schema).toBe('historian.maintain.v2');
     const report = out.report as Record<string, Record<string, unknown>>;
     expect(report.rowCount).toBe(3);
     expect(report.tags).toEqual({
@@ -332,7 +333,9 @@ describe('historian_map action:"maintain"', () => {
       zh: 'http://localhost:3000/zh/_meta/page-map',
     });
     const tail = tailJson(String(out.markdown));
-    expect(tail.schema).toBe('historian.maintain.v1');
+    expect(tail.schema).toBe('historian.surface.v1');
+    const surface = out.surface as Record<string, unknown>;
+    expect((surface.nav as { sectionLandingMissing: { dir: string }[] }).sectionLandingMissing.map((s) => s.dir)).toContain('llm');
   });
 
   it('deep: reads each page body once via singleByPath and surfaces freshness + stubs', async () => {

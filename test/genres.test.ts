@@ -311,7 +311,7 @@ describe('genreSkeleton anatomy per genre × lang', () => {
         const s = genreSkeleton(genre, lang);
 
         // Rubric dimension C: near-top status block with date + lifecycle value.
-        expect(s).toContain('**状态/Status**: Active');
+        expect(s).toContain('**状态/Status**: draft');
         expect(s).toContain('**日期/Date**: YYYY-MM-DD');
         expect(s).toMatch(/Active|Historical|Superseded/);
         expect(s.indexOf('**状态/Status**')).toBeLessThan(500);

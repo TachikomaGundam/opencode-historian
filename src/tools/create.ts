@@ -20,6 +20,7 @@ import {
   MACHINE_TIER_NOTE,
   okJson,
   pageDeps,
+  publishGateRefusalJson,
   sectionRefusalJson,
   tierMismatchJson,
   TIERS,
@@ -133,6 +134,8 @@ export function makeCreateTool(deps: ToolDeps): ToolDefinition {
         });
       }
       try {
+        const gate = publishGateRefusalJson(args.content, locale, args.path, deps.options.baseUrl);
+        if (gate !== null) return gate;
         const collision = await collisionAdvice(deps, {
           tier,
           path: args.path,

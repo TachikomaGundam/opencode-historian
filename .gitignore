@@ -8,3 +8,7 @@ results/*
 results/*.json
 .omo/
 tools/redlines.local.json
+
+.codegraph
+.git-crashed-backup/
+*.tgz
