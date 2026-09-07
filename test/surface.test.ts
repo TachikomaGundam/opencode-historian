@@ -27,6 +27,8 @@ const LEDGER_BODY = `# 服务台账 当前状态\n\n**状态/Status**: Active ·
 const ORPHAN = `# Orphan Page\n\n${LONG}\n\n孤立页面没有任何入链除了自身。\n\n## 相关页面\n- [索引](/wiki-index)`;
 const HOME_EN = `# Home\n\n${LONG}\n\n## 相关页面\n- [索引](/wiki-index)`;
 const SKELETON = `# Wrong Title H1\n\n**状态/Status**: Active\n\n${LONG}\n\nTODO: 补齐端口表\n\n## 硬件清单\n\n## 相关页面\n- [索引](/wiki-index)`;
+const CJK_TWIN_EN = `# CJK Faithful Twin EN\n\n${LONG}\n\n${LONG}\n\n## Section Alpha\nEnglish body sentence alpha carries the full explanation of the layer composition and the request path details end to end.\n## Section Beta\nEnglish body sentence beta with boundary conditions failure handling and the verification commands described inline per row.\n## Section Gamma\nEnglish body gamma notes the trade offs and the exceptions observed during the live scan incident window earlier this week.\n## Section Delta\nEnglish body delta wraps up cross references to the ledger the runbook and the postmortem appendix table rows below.\n## Related Pages\n- [Index](/wiki-index)`;
+const CJK_TWIN_ZH = `# 双生忠实中文版\n\n本页用于验证跨脚本的长度加权判据，中文版忠实翻译英文结构且小节数量完全一致。\n\n## 甲节\n分层组成与请求链路的完整说明，逐段对齐英文原文。\n## 乙节\n边界条件、失败处置与每行对应的验证命令说明。\n## 丙节\n本周扫描事故窗口内观察到的取舍与例外记录。\n## 丁节\n指向台账、手册与复盘附录表格的交叉引用。\n## 相关页面\n- [索引](/zh/wiki-index)`;
 
 const bodies = new Map<string, string>([
   ['en\u0000wiki-index', INDEX_EN], ['zh\u0000wiki-index', INDEX_ZH],
@@ -36,6 +38,7 @@ const bodies = new Map<string, string>([
   ['en\u0000llm-eval/dup', DUP_STUB_EN], ['zh\u0000llm-eval/dup', DUP_LIVE_ZH],
   ['en\u0000llm-eval/cluster', CLUSTER_EN],
   ['en\u0000infra/twin', TWIN_EN], ['zh\u0000infra/twin', TWIN_ZH],
+  ['en\u0000infra/cjk-twin', CJK_TWIN_EN], ['zh\u0000infra/cjk-twin', CJK_TWIN_ZH],
   ['zh\u0000ops/english-zh', ENGLISH_ZH],
   ['en\u0000ops/twin', LEDGER_BODY], ['zh\u0000ops/twin', `${LEDGER_BODY}\n上次核实于 2026-09-07。\n`],
   ['en\u0000infra/orphan', ORPHAN], ['zh\u0000infra/orphan', ORPHAN.replace(/\/wiki-index/g, '/zh/wiki-index')],
@@ -57,6 +60,7 @@ const rows: MaintainRow[] = [
   mkRow('llm-eval/dup', 'en', 'Dup Stub'), mkRow('llm-eval/dup', 'zh', '重复页'),
   mkRow('llm-eval/cluster', 'en', 'Cluster'),
   mkRow('infra/twin', 'en', 'Twin Page'), mkRow('infra/twin', 'zh', '双生页'),
+  mkRow('infra/cjk-twin', 'en', 'CJK Twin EN'), mkRow('infra/cjk-twin', 'zh', 'CJK 双生页'),
   mkRow('ops/english-zh', 'zh', 'English Dominant zh Page'),
   mkRow('ops/twin', 'en', '服务台账 当前状态'), mkRow('ops/twin', 'zh', '服务台账 当前状态'),
   mkRow('infra/orphan', 'en', 'Orphan Page'), mkRow('infra/orphan', 'zh', '孤立页'),
@@ -132,6 +136,9 @@ describe('buildSurfaceReport — deep tier', () => {
     const twin = d.twinParity.find((t) => t.path === 'infra/twin')!;
     expect(twin.divergent).toBe(true);
     expect(d.twinParity.find((t) => t.path === 'ops/twin')?.divergent).toBe(false);
+    const cjk = d.twinParity.find((t) => t.path === 'infra/cjk-twin')!;
+    expect(cjk.divergent).toBe(false);
+    expect(cjk.lenRatio).toBeGreaterThanOrEqual(0.5);
     expect(d.zhEnglishDominant.map((z) => z.path)).toContain('ops/english-zh');
   });
 

@@ -145,8 +145,12 @@ function countTodoMarkers(masked: string): number {
 export interface HeadingSpan {
   readonly level: number;
   readonly heading: string;
-  /** Body between this heading and the next heading ≤ level (masked+comment-free), weighted length. */
+  /** Subtree body: weighted length until the next heading ≤ level, INCLUDING
+   *  descendant sections' content (masked+comment-free). */
   readonly bodyChars: number;
+  /** Direct body only: weighted length until the next heading at ANY level.
+   *  Used for the intro ratio so an H1 span never swallows the whole page. */
+  readonly directChars: number;
 }
 
 const HEADING_RE = /^(#{1,6})\s+(.+?)\s*#*$/;
@@ -160,7 +164,7 @@ function parseStructure(masked: string): { headings: HeadingSpan[]; introEmpty: 
   const headings: HeadingSpan[] = [];
   let h1: string | null = null;
   let intro = 0;
-  let cur: { level: number; heading: string; chars: number } | null = null;
+  const stack: { level: number; heading: string; direct: number; subtree: number }[] = [];
   // CJK glyphs carry ~3x the visual weight of a latin char per cell — count
   // weight, not raw chars, so a terse Chinese intro is not flagged empty.
   const weight = (s: string): number => {
@@ -168,33 +172,46 @@ function parseStructure(masked: string): { headings: HeadingSpan[]; introEmpty: 
     const cjk = (stripped.match(CJK_WEIGHT_RE) ?? []).length;
     return cjk * 3 + (stripped.length - cjk);
   };
+  const closeTo = (level: number): void => {
+    const closing: HeadingSpan[] = [];
+    for (;;) {
+      const s = stack[stack.length - 1];
+      if (s === undefined || s.level < level) break;
+      stack.pop();
+      closing.push({ level: s.level, heading: s.heading, bodyChars: s.subtree, directChars: s.direct });
+    }
+    // inner-first pop order must be flipped back to document order
+    headings.push(...closing.reverse());
+  };
   for (const line of lines) {
     const m = HEADING_RE.exec(line);
     if (m !== null) {
       const level = (m[1] as string).length;
-      if (cur !== null) headings.push({ level: cur.level, heading: cur.heading, bodyChars: cur.chars });
+      closeTo(level);
       if (level === 1 && h1 === null) h1 = (m[2] as string).trim();
-      cur = { level, heading: (m[2] as string).trim(), chars: 0 };
+      stack.push({ level, heading: (m[2] as string).trim(), direct: 0, subtree: 0 });
       continue;
     }
-    if (cur === null) {
-      if (!STATUS_BOILERPLATE_RE.test(line)) intro += weight(line);
-    } else if (!STATUS_BOILERPLATE_RE.test(line)) {
-      cur.chars += weight(line);
+    if (STATUS_BOILERPLATE_RE.test(line)) continue;
+    const w = weight(line);
+    if (stack.length === 0) {
+      intro += w;
+      continue;
     }
+    for (const s of stack) s.subtree += w;
+    stack[stack.length - 1]!.direct += w;
   }
-  if (cur !== null) headings.push({ level: cur.level, heading: cur.heading, bodyChars: cur.chars });
-  // The intro is the H1 section's own span (real pages all open with `# 标题`);
-  // the pre-heading accumulator only carries weight on heading-less bodies.
+  closeTo(1);
+  // The intro is the H1 section's DIRECT span (real pages all open with
+  // `# 标题`); the pre-heading accumulator only carries weight on heading-less bodies.
   const firstH1 = headings.find((h) => h.level === 1);
-  const introWeight = firstH1 !== undefined ? firstH1.bodyChars : intro;
+  const introWeight = firstH1 !== undefined ? firstH1.directChars : intro;
   return { headings, introEmpty: introWeight < 40, h1 };
 }
 
-/** Section headings (##+) whose own span holds no content; deeper non-empty
- *  subsections do NOT rescue an empty parent only when the parent span itself
- *  is empty — a heading immediately followed by a deeper heading with content
- *  counts as structural grouping and is still empty prose at that level. */
+/** Section headings (##+) whose SUBTREE holds no content. A parent that groups
+ *  non-empty subsections is an outline container, not an unfinished product;
+ *  only wholly-empty subtrees indicate an unfilled skeleton section. */
 export function emptySectionsOf(headings: readonly HeadingSpan[]): readonly string[] {
   return headings.filter((h) => h.level >= 2 && h.bodyChars === 0).map((h) => h.heading);
 }
