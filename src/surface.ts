@@ -286,6 +286,10 @@ function buildDeep(input: SurfaceInput, scans: ScanRow[]): SurfaceDeep | null {
       const enLen = (en.body.match(/\S/g) ?? []).length;
       const zhLen = (zh.body.match(/\S/g) ?? []).length;
       if (enLen === 0 || zhLen === 0) continue;
+      // Length must be script-weighted: a CJK glyph carries ~3x the information
+      // of a latin char, so raw lengths flagged faithful zh translations as
+      // "truncated" (0.47 ratio at 1.0 section parity in the live scan).
+      const eff = (n: number, cjkRatio: number) => n * (1 + 2 * cjkRatio);
       // Structural, not literal: en/zh heading STRINGS are translations, so
       // text-jaccard measured 0 on 85/98 live pairs (pure noise). What survives
       // translation: level>=2 section count + Related Pages tail (SYN-9).
@@ -296,7 +300,8 @@ function buildDeep(input: SurfaceInput, scans: ScanRow[]): SurfaceDeep | null {
       const sectionCountRatio = Math.max(nEn, nZh) === 0 ? 1 : Math.min(nEn, nZh) / Math.max(nEn, nZh);
       const relatedMismatch =
         (en.lint?.hasRelatedPages ?? false) !== (zh.lint?.hasRelatedPages ?? false);
-      const lenRatio = Math.min(enLen, zhLen) / Math.max(enLen, zhLen);
+      const lenRatio = Math.min(eff(enLen, en.lint?.cjkRatio ?? 0), eff(zhLen, zh.lint?.cjkRatio ?? 0))
+        / Math.max(eff(enLen, en.lint?.cjkRatio ?? 0), eff(zhLen, zh.lint?.cjkRatio ?? 0));
       twinParity.push({
         path: p,
         lenRatio: Number(lenRatio.toFixed(2)),
