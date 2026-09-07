@@ -200,7 +200,7 @@ G5 现状卡的硬约束：状态块是机读单行（`Active` / `Superseded-by:
 | `historian_translate_snippet` | 翻译片段 | `text`, `from`(en/zh), `to`(en/zh) |
 | `historian_search` | 搜索页面 | `query`, `kind`(title/content), `tags?`(1-5 个), `tagsMode?`(all 缺省/any) |
 | `historian_read` | 读取页面 | `path`, `locale` |
-| `historian_map` | 页面地图/时间线/维护扫描 | `action`(show/refresh/timeline/maintain)；maintain 可选 `deep`（缺省 false=light 扫）；timeline 可选 `days`（近 N 天）与 `path`（前缀过滤）；输出人读 markdown + 机读 JSON，zh/en 行独立 |
+| `historian_map` | 页面地图/时间线/维护扫描 | `action`(show/refresh/timeline/maintain)；maintain 可选 `deep`（缺省 false=light 扫）；timeline 可选 `days`（近 N 天）与 `path`（前缀过滤）；输出人读 markdown + 机读 JSON，zh/en 行独立；maintain 同时返回 surface 接口面体检（信封 `historian.maintain.v2`） |
 | `historian_migrate` | 迁移页面到规范 | `path`, `genre?`, `apply`(false/true) |
 | `historian_delete` | 删除页面 | `path`, `locale`, `confirm`(必须 "yes") |
 | `historian_move` | 移动页面 | `path`, `locale`, `newPath`, `newLocale?`, `confirm`(必须 "yes") |
@@ -327,6 +327,8 @@ historian_map action:'refresh'
 - **light 扫：每次批量写后必跑**——只基于地图行 + 每 locale 一次只读 `pages.list`（便宜，随批走）
 - **deep 扫：每周至多一次**——逐页读正文，跑新鲜度（缺「上次核实于」/ 复核过期）与 `> Redirect:` 存根计数（贵，克制用）
 
+light 扫在 maintain 行之外附带 **surface-light**：`coverage`（live 页面与地图不一致）、`nav`（`_*` 机器命名空间暴露于侧栏 / 章节缺落地页→面包屑 404）、`tagsEmpty`；deep 扫附带 **surface-deep**：正文级检测，逐页一次读取、双消费者共享缓存。
+
 报告行 → 处置映射表：
 
 | 报告行 | 含义 | 处置 |
@@ -338,6 +340,16 @@ historian_map action:'refresh'
 | `tags.vocabulary` | 标签漂移 | 词表映射：近义标签收敛到主词，`historian_page_update` 批量改 |
 | `redirects.stubs`（deep） | 重定向存根清单 | 核对目标存在、入链已改写；死链存根即修 |
 | `freshness`（deep） | 缺核实戳 / reviewBy 过期 | 回 G5 卡补核；到期页列入下周复核 |
+| `coverage.missingFromMap`（surface） | 新页/迁移未进地图 | `action:'refresh'` 后重扫 |
+| `nav.machineSections`（surface） | `_*` 机器命名空间进侧栏 | 导航树手工策划，只挂主题章节 |
+| `nav.sectionLandingMissing`（surface） | 章节缺落地页（面包屑 404） | 建章节总览页并链入 wiki-index |
+| `unfinished`（surface deep） | Active 页含 TODO/空节/导言空 | 补全或降回 draft |
+| `stubs` / `links.broken` / `toStubs` / `sameTargetStacks`（deep） | 存根无可点出口 / 死链 / 指存根 / 同页多锚点 | 修出口与目标；锚点收敛到规范页 |
+| `orphanPages` / `indexMissing`（deep） | 无入链 / 未入索引 | 归架：从相关页与 wiki-index 补链 |
+| `roleDivergence`（deep） | 同题页 en/zh 一存根一活页 | 双侧收敛到同一权威页 |
+| `twinParity`（deep） | 孪生正文分叉（长度/节结构） | 重译或重排落后的孪生腿 |
+| `zhEnglishDominant`（deep） | zh 页英文为主（违反中文为主） | 按 zh-first 政策重写 |
+| `ledgerClaims`（deep） | 事实密集页缺「上次核实于」戳 | 逐条对机器核实后补戳，或标 stale |
 
 ### 闸门回路 (gate)：reading loop + sections guard
 
@@ -349,6 +361,14 @@ historian_map action:'refresh'
 - 配置已开而哨兵缺失时，插件加载期打一条 console.error（给出哨兵路径与内容），不会静默失灵。
 - 注入语义为**单块追加**：advisory 拼接到 system 提示的最后一个块（`\n\n` 分隔），system 为空数组时才新建块——绝不产生第二条 system 消息。严格 OpenAI 兼容后端（如 vLLM）会以 `System message must be at the beginning.` 拒绝多 system 请求，单块追加从根上规避此坑。
 - 幂等去重：同一请求的任一 system 块已含 `historian_search` 字样则跳过注入。
+
+#### 发布闸门 publish gate（写入硬拒，v0.5.0）
+
+`historian_page_create` 与带 `content` 的 `historian_page_update` 在**任何写入前**硬检正文，违例即零写入拒绝（`errorKind: PublishGateError`）：
+
+- **R1 存根须有出口**：`> Redirect:` 开头的正文必须含 ≥1 条可点击链接；纯行内代码路径不算出口
+- **R2 Active 不许半成品**：状态行为 `Active` 且正文含 TODO/TBD/占位注释或空节 → 拒绝；未完稿保持 `draft`——G1-G6 骨架状态行缺省即 `draft`，翻 Active 就是过闸动作
+- 豁免：`_sandbox/**` 与内部层（`_meta/`、`_evidence/`）；`append` 不过闸（增量语义），由 deep 扫描兜底
 
 #### sections guard（路径闸门）
 
