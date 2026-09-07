@@ -10,6 +10,7 @@ import { TranslateError } from '../translate.js';
 import { buildChronology, filterRowsByPath } from '../chronology.js';
 import { getMap, refreshMapCache, CACHE_PATH, type MapDeps, type MapSnapshot } from '../map.js';
 import { buildMaintainReport, renderMaintainMarkdown, type MaintainRow } from '../maintain.js';
+import { buildSurfaceReport, renderSurfaceMarkdown } from '../surface.js';
 import { normalizeLocale, PathValidationError } from '../wiki/locale.js';
 import { listPages, readPage, type Locale } from '../wiki/pages.read.js';
 import { errEnvelope, okJson, reportUrls, URL_MANDATE, type ToolDeps } from './shared.js';
@@ -74,7 +75,7 @@ const MAP_ARGS = {
   action: s.enum(['show', 'refresh', 'timeline', 'maintain']).default('show'),
   days: s.number().int().positive().optional().describe('timeline: keep only rows updated within the last N days'),
   path: s.string().optional().describe('timeline: section/path prefix filter (e.g. ops)'),
-  deep: s.boolean().optional().describe('maintain: additionally read every page body (freshness stamps + redirect stubs) — one bounded read per row'),
+  deep: s.boolean().optional().describe('maintain: additionally read every page body (freshness + stubs + broken/stacked links + twin parity + zh-first + unfinished skeletons + claim ledgers) — one bounded read per row, cached across both scans'),
 } as const;
 
 const MapArgsSchema = s.object(MAP_ARGS);
@@ -86,35 +87,55 @@ const MapArgsSchema = s.object(MAP_ARGS);
 async function runMaintain(deps: ToolDeps, mapDeps: MapDeps, snapshot: MapSnapshot, deep: boolean) {
   const client = deps.getClient();
   const tagIndex = new Map<string, readonly string[]>();
+  const liveInventory: { path: string; locale: Locale; isPublished: boolean }[] = [];
   const locales = [...new Set(deps.options.locales.map(normalizeLocale))].sort();
   for (const locale of locales) {
     for (const item of await listPages(client, { locale })) {
       tagIndex.set(`${item.locale}\u0000${item.path}`, item.tags);
+      liveInventory.push({ path: item.path, locale: item.locale, isPublished: item.isPublished });
     }
   }
   const rows: MaintainRow[] = snapshot.rows.map((r) => ({ ...r, tags: tagIndex.get(`${r.locale}\u0000${r.path}`) ?? [] }));
+  const bodyCache = new Map<string, Promise<string | null>>();
   const readBody = deep
-    ? async (path: string, locale: Locale): Promise<string | null> => {
-        try {
-          return (await readPage(client, path, locale))?.content ?? null;
-        } catch (err) {
-          // Unreadable page (invalid path / transport) is a scan miss, not a report failure.
-          if (err instanceof PathValidationError) return null;
-          throw err;
-        }
+    ? (path: string, locale: Locale): Promise<string | null> => {
+        const key = `${locale}\u0000${path}`;
+        const hit = bodyCache.get(key);
+        if (hit !== undefined) return hit;
+        const pending = (async () => {
+          try {
+            return (await readPage(client, path, locale))?.content ?? null;
+          } catch (err) {
+            // Unreadable page (invalid path / transport) is a scan miss, not a report failure.
+            if (err instanceof PathValidationError) return null;
+            throw err;
+          }
+        })();
+        bodyCache.set(key, pending);
+        return pending;
       }
     : undefined;
   const report = await buildMaintainReport(
     { rows, mapGeneratedAt: snapshot.generatedAt, mapStaleSeconds: snapshot.staleSeconds },
     { deep, readBody },
   );
+  const surface = await buildSurfaceReport({
+    rows,
+    generatedAt: report.generatedAt,
+    baseUrl: deps.options.baseUrl,
+    liveInventory,
+    deep,
+    readBody,
+  });
   return {
     action: 'maintain',
+    schema: 'historian.maintain.v2',
     deep: report.deep,
     generatedAt: report.generatedAt,
     rowCount: report.rowCount,
     report,
-    markdown: renderMaintainMarkdown(report),
+    surface,
+    markdown: `${renderMaintainMarkdown(report)}\n\n${renderSurfaceMarkdown(surface)}`,
     urls: reportUrls(deps.options.baseUrl, CACHE_PATH, 'en'),
   };
 }
@@ -130,8 +151,10 @@ export function makeMapTool(deps: ToolDeps): ToolDefinition {
       `show reads the local mirror (zero writes); refresh rebuilds from the wiki and writes the mirror + cache page ` +
       `(idempotent — the engine upserts via full RMW); timeline groups mirror rows by ISO week (newest first, ` +
       `optional days window + section/path prefix filter) into a human markdown table + machine-readable weeks JSON. ` +
-      `maintain runs the read-only curation sweep (twin gap, near-duplicate titles, staleness, diffusion/orphan ` +
-      `candidates, tag vocab, section distribution; deep:true adds per-body freshness stamps + redirect stubs) and ` +
+      `maintain runs the read-only curation sweep + surface report (twin gap, near-duplicate titles, staleness, ` +
+      `diffusion/orphan candidates, tag vocab, section distribution, map-vs-live coverage, nav hygiene; ` +
+      `deep:true adds per-body freshness, stub reachability, broken/stacked/index-less links, twin parity, ` +
+      `unfinished skeletons, claim ledgers) and ` +
       `answers a markdown report with a stable-key JSON tail. ${URL_MANDATE}.`,
     args: MAP_ARGS,
     execute: async (raw) => {
