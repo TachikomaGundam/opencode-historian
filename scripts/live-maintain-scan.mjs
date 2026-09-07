@@ -7,7 +7,7 @@
  */
 
 import { writeFileSync } from 'node:fs';
-import { resolveOptions } from '../dist/config.js';
+import { liveOptions } from './live-options.mjs';
 import { createClient } from '../dist/wiki/client.js';
 import { listPages, readPage } from '../dist/wiki/pages.read.js';
 import { normalizeLocale, PathValidationError } from '../dist/wiki/locale.js';
@@ -21,7 +21,7 @@ const OUT = process.argv[2] ?? '/tmp/live-maintain.md';
 // resolveOptions eagerly requires a translation key, but this scan is pure
 // read-only and never calls translate — the jsonc provider leg satisfies the
 // resolver without embedding any secret here.
-const options = resolveOptions({ translate: { providerKey: 'bailian-token-plan' } });
+const options = liveOptions();
 const client = createClient(options);
 const snapshot = await getMap({ client, options });
 
