@@ -64,6 +64,39 @@ describe('lintBody — publish-gate rules', () => {
     expect(publishGateViolations(l)).toEqual([]);
   });
 
+  it('H2 grouping non-empty H3 subsections is an outline, not an empty section', () => {
+    const body = [
+      '# Infra 基础设施总览',
+      '',
+      '**状态/Status**: Active · **日期/Date**: 2026-09-07',
+      '',
+      '本页汇总 Infra 章节的全部知识页：拓扑、认证、自托管服务运维与复盘，先在这里找入口再进具体页面。',
+      '',
+      '## 页面清单',
+      '',
+      '### 网络与认证',
+      '',
+      '| 页面 | 标题 | 最近更新 |',
+      '| --- | --- | --- |',
+      '| [infra/authentik](/zh/infra/authentik) | Authentik | 2026-09-06 |',
+      '',
+      '## 相关页面',
+      '- [Wiki 总索引](/zh/wiki-index)',
+    ].join('\n');
+    const l = lintBody(body, { ...BASE, title: 'Infra 基础设施总览' });
+    expect(l.emptySections).toEqual([]);
+    expect(publishGateViolations(l)).toEqual([]);
+  });
+
+  it('flags a parent whose whole subtree is empty', () => {
+    const body =
+      '# Y\n\n**状态/Status**: Active\n\n' +
+      '导言导言导言导言导言导言导言导言导言导言导言导言导言导言导言。\n\n' +
+      '## 容器\n\n### 孩子\n\n## 相关页面\n- [x](/home)\n';
+    const l = lintBody(body, { ...BASE, title: 'Y' });
+    expect(l.emptySections).toEqual(expect.arrayContaining(['容器', '孩子']));
+  });
+
   it('redirect stub without a clickable exit is refused; with <a>/md link it passes (#5.1)', () => {
     const dead = [
       '> Redirect: /zh/llm-eval/deepseek-v4-pro-0813-comparison',
