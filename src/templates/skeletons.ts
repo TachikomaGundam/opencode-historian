@@ -7,7 +7,7 @@
  *
  * Contract of every skeleton constant:
  *  - Rubric dimension C anatomy: H1 placeholder → status line
- *    `**状态/Status**: Active <!-- or Historical/Superseded --> · **日期/Date**: YYYY-MM-DD`
+ *    `**状态/Status**: draft <!-- 自检通过后改 Active/Historical/Superseded --> · **日期/Date**: YYYY-MM-DD`
  *    → one-line scope (`This page answers:` / `本页回答：`) → tail
  *    `Related Pages`/`相关页面` section with a real-link hint (SYN-9 fixed tail).
  *  - wiki.js 2.x expression pieces only: blockquote admonitions
@@ -27,7 +27,7 @@
 /** G1 — 事件/复盘页 (incident postmortem), zh. */
 export const G1_ZH: string = `# 页面标题（占位：写完后替换为实际标题，须与页面 title 一致）
 
-**状态/Status**: Active <!-- or Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
+**状态/Status**: draft <!-- 自检通过后改 Active/Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
 
 **本页回答：** 一句话范围句（占位：本页记录哪次故障/事件的起因、影响与处置）
 
@@ -119,7 +119,7 @@ export const G1_ZH: string = `# 页面标题（占位：写完后替换为实际
 /** G1 — incident postmortem, en (section-for-section twin of G1_ZH). */
 export const G1_EN: string = `# Page Title (placeholder: replace with the real title, must match the page title)
 
-**状态/Status**: Active <!-- or Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
+**状态/Status**: draft <!-- 自检通过后改 Active/Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
 
 **This page answers:** one-line scope sentence (placeholder: which incident this page records, its impact and handling)
 
@@ -211,7 +211,7 @@ See footnote[^1].
 /** G2 — 对比/选型页 (comparison / selection), zh. */
 export const G2_ZH: string = `# 页面标题（占位：写完后替换为实际标题，须与页面 title 一致）
 
-**状态/Status**: Active <!-- or Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
+**状态/Status**: draft <!-- 自检通过后改 Active/Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
 
 **本页回答：** 一句话范围句（占位：本页在哪些对象之间、按什么维度对比，结论是什么）
 
@@ -262,7 +262,7 @@ export const G2_ZH: string = `# 页面标题（占位：写完后替换为实际
 /** G2 — comparison / selection, en (section-for-section twin of G2_ZH). */
 export const G2_EN: string = `# Page Title (placeholder: replace with the real title, must match the page title)
 
-**状态/Status**: Active <!-- or Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
+**状态/Status**: draft <!-- 自检通过后改 Active/Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
 
 **This page answers:** one-line scope sentence (placeholder: what is compared, on which dimensions, and the pick)
 
@@ -313,7 +313,7 @@ export const G2_EN: string = `# Page Title (placeholder: replace with the real t
 /** G3 — 清单/参考页 (inventory / reference), zh. */
 export const G3_ZH: string = `# 页面标题（占位：写完后替换为实际标题，须与页面 title 一致）
 
-**状态/Status**: Active <!-- or Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
+**状态/Status**: draft <!-- 自检通过后改 Active/Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
 
 **本页回答：** 一句话范围句（占位：本页收录哪类条目、覆盖到哪里、不覆盖什么）
 
@@ -349,7 +349,7 @@ export const G3_ZH: string = `# 页面标题（占位：写完后替换为实际
 /** G3 — inventory / reference, en (section-for-section twin of G3_ZH). */
 export const G3_EN: string = `# Page Title (placeholder: replace with the real title, must match the page title)
 
-**状态/Status**: Active <!-- or Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
+**状态/Status**: draft <!-- 自检通过后改 Active/Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
 
 **This page answers:** one-line scope sentence (placeholder: which entries are covered, up to what boundary)
 
@@ -385,7 +385,7 @@ export const G3_EN: string = `# Page Title (placeholder: replace with the real t
 /** G4 — 概念/原理解析页 (concept / explanation), zh. */
 export const G4_ZH: string = `# 页面标题（占位：写完后替换为实际标题，须与页面 title 一致）
 
-**状态/Status**: Active <!-- or Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
+**状态/Status**: draft <!-- 自检通过后改 Active/Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
 
 **本页回答：** 一句话范围句（占位：本页解释哪个概念，读者看完能理解什么）
 
@@ -424,7 +424,7 @@ export const G4_ZH: string = `# 页面标题（占位：写完后替换为实际
 /** G4 — concept / explanation, en (section-for-section twin of G4_ZH). */
 export const G4_EN: string = `# Page Title (placeholder: replace with the real title, must match the page title)
 
-**状态/Status**: Active <!-- or Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
+**状态/Status**: draft <!-- 自检通过后改 Active/Historical/Superseded --> · **日期/Date**: YYYY-MM-DD
 
 **This page answers:** one-line scope sentence (placeholder: which concept is explained and what the reader will understand)
 
@@ -466,7 +466,7 @@ export const G4_EN: string = `# Page Title (placeholder: replace with the real t
  *  belongs to G1 event pages, linked from 变更记录. */
 export const G5_ZH: string = `# 页面标题（占位：写完后替换为实际标题，须与页面 title 一致）
 
-**状态/Status**: Active <!-- or Superseded-by: <path> / Deprecated --> · **日期/Date**: YYYY-MM-DD
+**状态/Status**: draft <!-- 复核后改 Active / Superseded-by: <path> / Deprecated --> · **日期/Date**: YYYY-MM-DD
 
 **本页回答：** 当前部署状态（占位：写明范围）
 
@@ -518,7 +518,7 @@ export const G5_ZH: string = `# 页面标题（占位：写完后替换为实际
 /** G5 — current-state ledger, en (section-for-section twin of G5_ZH). */
 export const G5_EN: string = `# Page Title (placeholder: replace with the real title, must match the page title)
 
-**状态/Status**: Active <!-- or Superseded-by: <path> / Deprecated --> · **日期/Date**: YYYY-MM-DD
+**状态/Status**: draft <!-- 复核后改 Active / Superseded-by: <path> / Deprecated --> · **日期/Date**: YYYY-MM-DD
 
 **This page answers:** what is deployed and running right now (placeholder: name the system and scope)
 
@@ -573,7 +573,7 @@ export const G5_EN: string = `# Page Title (placeholder: replace with the real t
  *  command lists in G3 pages, linked from 相关页面. */
 export const G6_ZH: string = `# 如何做某事（占位：目标句式标题，须与页面 title 一致）
 
-**状态/Status**: Active <!-- or Superseded-by: <path> / Deprecated --> · **日期/Date**: YYYY-MM-DD
+**状态/Status**: draft <!-- 复核后改 Active / Superseded-by: <path> / Deprecated --> · **日期/Date**: YYYY-MM-DD
 
 **本页回答：** 如何完成某事（占位：写明具体目标）
 
@@ -623,7 +623,7 @@ export const G6_ZH: string = `# 如何做某事（占位：目标句式标题，
 /** G6 — how-to manual, en (section-for-section twin of G6_ZH). */
 export const G6_EN: string = `# How to Do X (placeholder: goal-titled heading, must match the page title)
 
-**状态/Status**: Active <!-- or Superseded-by: <path> / Deprecated --> · **日期/Date**: YYYY-MM-DD
+**状态/Status**: draft <!-- 复核后改 Active / Superseded-by: <path> / Deprecated --> · **日期/Date**: YYYY-MM-DD
 
 **This page answers:** how to finish one concrete task (placeholder: name the goal)
 
