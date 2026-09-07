@@ -2257,3 +2257,74 @@ describe('sections enforcement on update / append / move / delete', () => {
     expect(out.ok).toBe(true);
   });
 });
+
+// --- publish gate (v0.5.0): unfinished skeletons / exit-less stubs are refused --
+
+const GATE_BAD = [
+  '# Gated',
+  '',
+  '**状态/Status**: Active · **日期/Date**: 2026-09-07',
+  '',
+  '导言足够长导言足够长导言足够长导言足够长导言足够长。',
+  '',
+  '## 组件',
+  '',
+  '<!-- TODO: 补组件表 -->',
+  '',
+  '## 相关页面',
+  '',
+  '- [首页](/home)',
+  '',
+].join('\n');
+
+const GATE_CLEAN = GATE_BAD.replace('<!-- TODO: 补组件表 -->', '| 组件 | 说明 |\n| --- | --- |\n| web | 前端 |');
+
+describe('publish gate', () => {
+  it('create: refuses an Active page with TODO markers + empty section, zero writes', async () => {
+    const { tools, fetchCount } = makeWired(createWiki());
+    const out = await run(tools.historian_page_create, { path: PATH, title: 'Gated', content: GATE_BAD, twin: false });
+    expect(out.ok).toBe(false);
+    expect(out.errorKind).toBe('PublishGateError');
+    expect(String(out.message)).toContain('active-with-unfinished-skeleton');
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('create: same skeleton stays legal while draft', async () => {
+    const { tools } = makeWired(createWiki());
+    const out = await run(tools.historian_page_create, { path: PATH, title: 'Gated', content: GATE_BAD.replace('Active', 'draft'), twin: false });
+    expect(out.ok).toBe(true);
+  });
+
+  it('create: filled skeleton with Active status passes', async () => {
+    const { tools } = makeWired(createWiki());
+    const out = await run(tools.historian_page_create, { path: PATH, title: 'Gated', content: GATE_CLEAN, twin: false });
+    expect(out.ok).toBe(true);
+  });
+
+  it('create: redirect stub without a clickable exit is refused', async () => {
+    const { tools, fetchCount } = makeWired(createWiki());
+    const out = await run(tools.historian_page_create, {
+      path: 'docs/stub', title: '旧页', content: '> Redirect: 已合并 → `llm/old-target`\n', twin: false,
+    });
+    expect(out.ok).toBe(false);
+    expect(String(out.message)).toContain('redirect-stub-no-exit');
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('create: _sandbox paths are exempt (fixtures keep legacy shapes)', async () => {
+    const { tools } = makeWired(createWiki());
+    const out = await run(tools.historian_page_create, { path: '_sandbox/mess/gate', title: 'F', content: GATE_BAD, twin: false });
+    expect(out.ok).toBe(true);
+  });
+
+  it('update: gate fires after read, before any mutation', async () => {
+    const { tools, captured, fetchCount } = makeWired({
+      'singleByPath(': () => ({ data: { pages: { singleByPath: { ...rawPage() } } } }),
+    });
+    const out = await run(tools.historian_page_update, { path: PATH, content: GATE_BAD });
+    expect(out.ok).toBe(false);
+    expect(out.errorKind).toBe('PublishGateError');
+    expect(captured.some((c) => c.query.includes('update('))).toBe(false);
+    expect(fetchCount()).toBe(1); // read happened; write did not
+  });
+});
