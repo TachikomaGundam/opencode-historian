@@ -97,7 +97,7 @@ export interface MaintainReport {
   readonly duplicates: { readonly threshold: number; readonly clusters: readonly DupCluster[] };
   readonly staleness: { readonly topN: number; readonly oldest: readonly StaleEntry[] };
   readonly diffusion: { readonly singleChildDirs: readonly { dir: string; childPath: string }[] };
-  readonly rootOrphans: readonly { section: string; paths: readonly string[] }[];
+  readonly flatRootPages: readonly { section: string; paths: readonly string[] }[];
   readonly tags: { available: boolean; vocabulary: readonly { tag: string; count: number }[] };
   readonly redirects: { available: boolean; count: number; stubs: readonly RedirectStub[] };
   readonly sections: readonly { section: string; paths: number; rows: number }[];
@@ -106,7 +106,7 @@ export interface MaintainReport {
 
 // --- Constants --------------------------------------------------------------
 
-export const MAINTAIN_SCHEMA = 'historian.maintain.v1';
+export const MAINTAIN_SCHEMA = 'historian.maintain.v2';
 /** Trigram-Jaccard bar for calling two (different-path) titles near-duplicates. */
 export const DUP_TITLE_THRESHOLD = 0.75;
 const DAY_MS = 86_400_000;
@@ -148,8 +148,12 @@ function cmpStr(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+// bold-merge deliberately leaves (重定向)/(redirect)-suffixed stubs beside their
+// live twins; clustering those pairs reports non-defects and buries true near-dupes.
+const STUB_TITLE_RE = /[（(]\s*(?:重定向|redirect)\s*[）)]\s*$/i;
+
 function findDuplicates(rows: readonly MaintainRow[]): DupCluster[] {
-  const units = rows.map((r) => ({
+  const units = rows.filter((r) => !STUB_TITLE_RE.test(r.title)).map((r) => ({
     path: r.path,
     title: r.title,
     grams: titleGrams(normalize(r.title).toLowerCase()),
@@ -234,7 +238,7 @@ function singleChildDirs(paths: readonly string[]): { dir: string; childPath: st
   return out;
 }
 
-function rootOrphans(paths: readonly string[]): { section: string; paths: string[] }[] {
+function flatRootPages(paths: readonly string[]): { section: string; paths: string[] }[] {
   const bySection = new Map<string, string[]>();
   for (const path of paths) {
     if (path.split('/').length !== 2) continue;
@@ -354,7 +358,7 @@ export async function buildMaintainReport(input: MaintainInput, opts: MaintainOp
     duplicates: { threshold: DUP_TITLE_THRESHOLD, clusters: findDuplicates(kept) },
     staleness: { topN, oldest: staleness(kept, now, topN) },
     diffusion: { singleChildDirs: singleChildDirs(paths) },
-    rootOrphans: rootOrphans(paths),
+    flatRootPages: flatRootPages(paths),
     tags: tagVocab(kept),
     redirects,
     sections: sectionDist(kept),
@@ -404,9 +408,9 @@ export function renderMaintainMarkdown(r: MaintainReport): string {
   L.push('- single-child dirs (upmerge candidates):');
   if (r.diffusion.singleChildDirs.length === 0) L.push('  - none');
   for (const d of r.diffusion.singleChildDirs) L.push(`  - \`${d.dir}/\` holds only \`${d.childPath}\``);
-  L.push('- root-level orphans (depth-2 pages, no sub-shelf):');
-  if (r.rootOrphans.length === 0) L.push('  - none');
-  for (const o of r.rootOrphans) L.push(`  - \`${o.section}/\` (${fmt(o.paths.length)}): ${o.paths.map((p) => `\`${p}\``).join(', ')}`);
+  L.push('- flat root pages per section (depth-2 listing, shelving hint — NOT inbound analysis; true orphans = surface deep links.orphanPages):');
+  if (r.flatRootPages.length === 0) L.push('  - none');
+  for (const o of r.flatRootPages) L.push(`  - \`${o.section}/\` (${fmt(o.paths.length)}): ${o.paths.map((p) => `\`${p}\``).join(', ')}`);
 
   L.push('', '## Tag vocabulary', '');
   if (!r.tags.available) L.push('- no tag data: rows carry no tags (light mode over a tagless mirror) — refresh or pass list-joined rows');

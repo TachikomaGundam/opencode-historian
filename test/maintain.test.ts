@@ -38,7 +38,7 @@ function mk(id: number, locale: Locale, path: string, title: string, updatedAt: 
 }
 
 /** The canonical chaos fixture: twin gaps, one exact + one near title dup, a
- *  single-child chain, depth-2 root orphans, tag drift, an internal-namespace
+ *  single-child chain, flat depth-2 root pages, tag drift, an internal-namespace
  *  row that must be dropped, and a depth-1 'home' page. */
 function lightRows(): MaintainRow[] {
   return [
@@ -78,7 +78,7 @@ describe('buildMaintainReport (light)', () => {
       { now: NOW },
     );
     // stale_state guard: the report says when it was built and over how many rows
-    expect(report.schema).toBe('historian.maintain.v1');
+    expect(report.schema).toBe('historian.maintain.v2');
     expect(report.generatedAt).toBe('2026-09-04T12:00:00.000Z');
     expect(report.rowCount).toBe(15); // input rows, pre-filter
     expect(report.mapGeneratedAt).toBe('2026-09-04T11:00:00.000Z');
@@ -102,6 +102,20 @@ describe('buildMaintainReport (light)', () => {
     ]);
   });
 
+  it('never clusters (重定向)/(redirect)-suffixed stub titles (bold-merge leftovers are by design)', async () => {
+    const report = await buildMaintainReport(
+      {
+        rows: [
+          mk(1, 'en', 'llm/canon', 'GPU Notes A', '2026-08-20'),
+          mk(2, 'en', 'llm/stub-en', 'GPU Notes A (redirect)', '2026-08-20'),
+          mk(3, 'zh', 'llm/stub-zh', 'GPU Notes A（重定向）', '2026-08-20'),
+        ],
+      },
+      { now: NOW },
+    );
+    expect(report.duplicates.clusters).toEqual([]);
+  });
+
   it('lists the oldest Top-N paths by twin-newest updatedAt', async () => {
     const report = await buildMaintainReport({ rows: lightRows() }, { now: NOW, topN: 3 });
     expect(report.staleness.topN).toBe(3);
@@ -112,14 +126,14 @@ describe('buildMaintainReport (light)', () => {
     ]);
   });
 
-  it('finds single-child dirs (shallowest of a chain only) and depth-2 root orphans', async () => {
+  it('finds single-child dirs (shallowest of a chain only) and flat depth-2 root pages', async () => {
     const report = await buildMaintainReport({ rows: lightRows() }, { now: NOW });
     expect(report.diffusion.singleChildDirs).toEqual([
       { dir: '_sandbox', childPath: '_sandbox/test' },
       { dir: 'eda', childPath: 'eda/one-cat' },
       { dir: 'infra', childPath: 'infra/single-kid/only-page' },
     ]);
-    expect(report.rootOrphans).toEqual([
+    expect(report.flatRootPages).toEqual([
       { section: '_sandbox', paths: ['_sandbox/test'] },
       { section: 'docs', paths: ['docs/alpha'] },
       { section: 'eda', paths: ['eda/one-cat'] },
@@ -175,7 +189,7 @@ describe('buildMaintainReport (light)', () => {
     const tail = tailJson(markdown);
     expect(Object.keys(tail)).toEqual([
       'schema', 'generatedAt', 'rowCount', 'mapGeneratedAt', 'mapStaleSeconds', 'deep',
-      'pages', 'duplicates', 'staleness', 'diffusion', 'rootOrphans', 'tags', 'redirects',
+      'pages', 'duplicates', 'staleness', 'diffusion', 'flatRootPages', 'tags', 'redirects',
       'sections', 'freshness',
     ]);
     expect(tail.rowCount).toBe(15);
@@ -254,7 +268,12 @@ function makeWired(handlers: Record<string, (vars: Record<string, unknown>) => u
     const body = JSON.parse(String((init as RequestInit | undefined)?.body)) as Captured;
     captured.push(body);
     const fragment = Object.keys(handlers).find((f) => body.query.includes(f));
-    if (fragment === undefined) throw new Error(`maintain.test: unhandled query ${body.query}`);
+    if (fragment === undefined) {
+      if (body.query.includes('navigation {')) {
+        return jsonResponse({ data: { navigation: { config: { mode: 'STATIC' }, tree: [] } } });
+      }
+      throw new Error(`maintain.test: unhandled query ${body.query}`);
+    }
     return jsonResponse(handlers[fragment](body.variables ?? {}));
   }) as typeof fetch;
   const tools = buildTools(OPTS, { fetchImpl, homeDir });
@@ -317,7 +336,7 @@ describe('historian_map action:"maintain"', () => {
     expect(out.ok).toBe(true);
     expect(out.action).toBe('maintain');
     expect(out.deep).toBe(false);
-    expect(out.schema).toBe('historian.maintain.v2');
+    expect(out.schema).toBe('historian.maintain.v3');
     const report = out.report as Record<string, Record<string, unknown>>;
     expect(report.rowCount).toBe(3);
     expect(report.tags).toEqual({
@@ -325,9 +344,9 @@ describe('historian_map action:"maintain"', () => {
       vocabulary: [{ tag: 'llm', count: 3 }, { tag: 'gpu', count: 1 }],
     });
     expect(report.redirects.available).toBe(false);
-    // bounded read-only pass: exactly one list query per locale, no writes/bodies
-    expect(fetchCount()).toBe(2);
-    expect(captured.every((c) => c.query.includes('pages { list('))).toBe(true);
+    // bounded read-only pass: one list per locale + one nav read, no writes/bodies
+    expect(fetchCount()).toBe(3);
+    expect(captured.every((c) => c.query.includes('pages { list(') || c.query.includes('navigation {'))).toBe(true);
     expect(out.urls).toEqual({
       en: 'http://localhost:3000/en/_meta/page-map',
       zh: 'http://localhost:3000/zh/_meta/page-map',
@@ -336,6 +355,10 @@ describe('historian_map action:"maintain"', () => {
     expect(tail.schema).toBe('historian.surface.v1');
     const surface = out.surface as Record<string, unknown>;
     expect((surface.nav as { sectionLandingMissing: { dir: string }[] }).sectionLandingMissing.map((s) => s.dir)).toContain('llm');
+    const nav = (surface.nav as { available: boolean; mode: string | null; filesystemExposed: boolean });
+    expect(nav.available).toBe(true);
+    expect(nav.mode).toBe('STATIC');
+    expect(nav.filesystemExposed).toBe(false);
   });
 
   it('deep: reads each page body once via singleByPath and surfaces freshness + stubs', async () => {
@@ -381,7 +404,7 @@ describe('historian_map action:"maintain"', () => {
     expect(freshness.expiredReviewBy.length).toBe(2);
     const reads = captured.filter((c) => c.query.includes('singleByPath('));
     expect(reads.length).toBe(3); // one bounded read per map row
-    expect(fetchCount()).toBe(5); // 2 list + 3 singleByPath
+    expect(fetchCount()).toBe(6); // 2 list + 1 nav + 3 singleByPath
   });
 
   it('rejects unknown actions at the schema (maintain is now a legal enum member)', async () => {

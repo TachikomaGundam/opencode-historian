@@ -200,7 +200,7 @@ G5 现状卡的硬约束：状态块是机读单行（`Active` / `Superseded-by:
 | `historian_translate_snippet` | 翻译片段 | `text`, `from`(en/zh), `to`(en/zh) |
 | `historian_search` | 搜索页面 | `query`, `kind`(title/content), `tags?`(1-5 个), `tagsMode?`(all 缺省/any) |
 | `historian_read` | 读取页面 | `path`, `locale` |
-| `historian_map` | 页面地图/时间线/维护扫描 | `action`(show/refresh/timeline/maintain)；maintain 可选 `deep`（缺省 false=light 扫）；timeline 可选 `days`（近 N 天）与 `path`（前缀过滤）；输出人读 markdown + 机读 JSON，zh/en 行独立；maintain 同时返回 surface 接口面体检（信封 `historian.maintain.v2`） |
+| `historian_map` | 页面地图/时间线/维护扫描 | `action`(show/refresh/timeline/maintain)；maintain 可选 `deep`（缺省 false=light 扫）；timeline 可选 `days`（近 N 天）与 `path`（前缀过滤）；输出人读 markdown + 机读 JSON，zh/en 行独立；maintain 同时返回 surface 接口面体检（信封 `historian.maintain.v3`） |
 | `historian_migrate` | 迁移页面到规范 | `path`, `genre?`, `apply`(false/true) |
 | `historian_delete` | 删除页面 | `path`, `locale`, `confirm`(必须 "yes") |
 | `historian_move` | 移动页面 | `path`, `locale`, `newPath`, `newLocale?`, `confirm`(必须 "yes") |
@@ -327,21 +327,21 @@ historian_map action:'refresh'
 - **light 扫：每次批量写后必跑**——只基于地图行 + 每 locale 一次只读 `pages.list`（便宜，随批走）
 - **deep 扫：每周至多一次**——逐页读正文，跑新鲜度（缺「上次核实于」/ 复核过期）与 `> Redirect:` 存根计数（贵，克制用）
 
-light 扫在 maintain 行之外附带 **surface-light**：`coverage`（live 页面与地图不一致）、`nav`（`_*` 机器命名空间暴露于侧栏 / 章节缺落地页→面包屑 404）、`tagsEmpty`；deep 扫附带 **surface-deep**：正文级检测，逐页一次读取、双消费者共享缓存。
+light 扫在 maintain 行之外附带 **surface-light**：`coverage`（live 页面与地图不一致）、`nav`（侧栏真相=实时导航树：mode 非 STATIC 即把页面树镜像回侧栏 / 树内挂 `_` 段链接 / 章节缺落地页→面包屑 404）、`tagsEmpty`；deep 扫附带 **surface-deep**：正文级检测，逐页一次读取、双消费者共享缓存。
 
 报告行 → 处置映射表：
 
 | 报告行 | 含义 | 处置 |
 |--------|------|------|
 | `missingTwinPaths` | 双语孪生缺口 | 补孪生：翻译腿建 zh（或 en）页，走翻译失败处理 |
-| `duplicates.clusters` | 近重复标题簇（trigram-Jaccard 阈值） | bold-merge 流程：选最完整页为权威（bold），其余走 supersede 或 Redirect 存根 |
+| `duplicates.clusters` | 近重复标题簇（trigram-Jaccard 阈值；「（重定向）」存根不参与聚类） | bold-merge 流程：选最完整页为权威（bold），其余走 supersede 或 Redirect 存根 |
 | `staleness.oldest` | 最陈旧页 | mark/refresh：G5 卡重新核实或标记 stale，不静默覆盖 |
-| `rootOrphans` / `diffusion.singleChildDirs` | 顶级孤儿 / 独子目录 | 归架：并入正确章节、建章节索引，或按冻结协议做 Redirect 存根 |
+| `flatRootPages` / `diffusion.singleChildDirs` | 章节根平铺页清单（归架提示，非入链判定）/ 独子目录 | 归架：并入正确章节、建章节索引，或按冻结协议做 Redirect 存根；真孤儿看 surface deep 的 `orphanPages` |
 | `tags.vocabulary` | 标签漂移 | 词表映射：近义标签收敛到主词，`historian_page_update` 批量改 |
 | `redirects.stubs`（deep） | 重定向存根清单 | 核对目标存在、入链已改写；死链存根即修 |
 | `freshness`（deep） | 缺核实戳 / reviewBy 过期 | 回 G5 卡补核；到期页列入下周复核 |
 | `coverage.missingFromMap`（surface） | 新页/迁移未进地图 | `action:'refresh'` 后重扫 |
-| `nav.machineSections`（surface） | `_*` 机器命名空间进侧栏 | 导航树手工策划，只挂主题章节 |
+| `nav.filesystemExposed` / `nav.machineLinks`（surface） | 侧栏被 DYNAMIC/MIXED 镜像出页面树 / 导航树里挂了 `_` 段链接 | 导航树手工策划只挂主题章节，mode 固定 STATIC；`nav.available=false` 时先修 token 导航读权限再下结论 |
 | `nav.sectionLandingMissing`（surface） | 章节缺落地页（面包屑 404） | 建章节总览页并链入 wiki-index |
 | `unfinished`（surface deep） | Active 页含 TODO/空节/导言空 | 补全或降回 draft |
 | `stubs` / `links.broken` / `toStubs` / `sameTargetStacks`（deep） | 存根无可点出口 / 死链 / 指存根 / 同页多锚点 | 修出口与目标；锚点收敛到规范页 |

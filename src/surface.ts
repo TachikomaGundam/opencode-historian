@@ -17,6 +17,7 @@ import { lintBody, type BodyLint } from './lint.js';
 import { classifyGenre } from './templates/genres.js';
 import type { MaintainRow } from './maintain.js';
 import type { Locale } from './wiki/pages.read.js';
+import type { NavSnapshot } from './wiki/nav.js';
 
 export const SURFACE_SCHEMA = 'historian.surface.v1' as const;
 
@@ -33,6 +34,12 @@ export interface SurfaceInput {
   readonly generatedAt: string;
   readonly baseUrl: string;
   readonly liveInventory?: readonly LiveRow[];
+  /**
+   * Live primary nav. Issue #1's disease is sidebar exposure, so the check
+   * must read the real tree — omit/null reports `available: false` rather
+   * than falsely claiming a clean nav.
+   */
+  readonly nav?: NavSnapshot | null;
   readonly deep?: boolean;
   readonly readBody?: (path: string, locale: Locale) => Promise<string | null>;
 }
@@ -45,7 +52,14 @@ export interface SurfaceCoverage {
 }
 
 export interface SurfaceNav {
-  readonly machineSections: readonly string[];
+  readonly available: boolean;
+  readonly mode: string | null;
+  /** DYNAMIC/MIXED re-mirror the filesystem page tree into the sidebar — the exact Issue #1 relapse. */
+  readonly filesystemExposed: boolean;
+  /** Underscore-prefixed (machine-namespace) links explicitly mounted in the curated tree. */
+  readonly machineLinks: { readonly locale: string; readonly label: string; readonly target: string }[];
+  /** Informational: underscore segments in the PAGE tree — by design (_meta/_evidence/_sandbox/_data). */
+  readonly machinePaths: readonly string[];
   readonly sectionLandingMissing: { readonly dir: string; readonly pagePaths: number }[];
 }
 
@@ -105,6 +119,9 @@ export interface SurfaceReport {
 }
 
 const MACHINE_SEG_RE = /^_/;
+// nav targets carry a leading slash and may pre-pend the locale segment
+// (/zh/_meta/x) — machine check runs on the first real path segment.
+const MACHINE_TARGET_RE = /^\/(?:(?:en|zh)\/)?_[^/]+/;
 const ROOT_EXEMPT = new Set(['home', 'wiki-index']);
 
 const visible = (r: LiveRow): boolean => r.isPublished !== false && r.isPrivate !== true;
@@ -116,13 +133,26 @@ function isFrontPath(path: string): boolean {
 
 // --- light tier ---------------------------------------------------------------
 
-function buildNav(rows: readonly MaintainRow[], live: readonly LiveRow[] | undefined): SurfaceNav {
+function buildNav(
+  rows: readonly MaintainRow[],
+  live: readonly LiveRow[] | undefined,
+  nav: NavSnapshot | null | undefined,
+): SurfaceNav {
   const paths = new Set<string>();
   for (const r of rows) paths.add(r.path);
   for (const r of live ?? []) paths.add(r.path);
-  const machineSections = [...new Set([...paths].map((p) => p.split('/')[0] as string))]
+  const machinePaths = [...new Set([...paths].map((p) => p.split('/')[0] as string))]
     .filter((s) => MACHINE_SEG_RE.test(s))
     .sort();
+  const mode = nav?.mode ?? null;
+  const machineLinks: SurfaceNav['machineLinks'] = [];
+  for (const t of nav?.trees ?? []) {
+    for (const it of t.items) {
+      if (MACHINE_TARGET_RE.test(it.target)) {
+        machineLinks.push({ locale: t.locale, label: it.label, target: it.target });
+      }
+    }
+  }
   const perDir = new Map<string, number>();
   for (const p of paths) {
     const seg = p.split('/');
@@ -133,7 +163,14 @@ function buildNav(rows: readonly MaintainRow[], live: readonly LiveRow[] | undef
     .filter(([dir, n]) => n >= 2 && !paths.has(dir))
     .map(([dir, pagePaths]) => ({ dir, pagePaths }))
     .sort((a, b) => b.pagePaths - a.pagePaths || a.dir.localeCompare(b.dir));
-  return { machineSections, sectionLandingMissing };
+  return {
+    available: nav != null,
+    mode,
+    filesystemExposed: mode === 'DYNAMIC' || mode === 'MIXED',
+    machineLinks,
+    machinePaths,
+    sectionLandingMissing,
+  };
 }
 
 function buildCoverage(rows: readonly MaintainRow[], live: readonly LiveRow[] | undefined): SurfaceCoverage | null {
@@ -358,7 +395,7 @@ export async function buildSurfaceReport(input: SurfaceInput): Promise<SurfaceRe
     generatedAt: input.generatedAt,
     deep: input.deep === true,
     coverage: buildCoverage(input.rows, input.liveInventory),
-    nav: buildNav(input.rows, input.liveInventory),
+    nav: buildNav(input.rows, input.liveInventory, input.nav),
     tagsEmpty: input.rows
       .filter((r) => isFrontPath(r.path) && (r.tags?.length ?? 0) === 0)
       .map((r) => ({ path: r.path, locale: r.locale }))
@@ -383,8 +420,22 @@ export function renderSurfaceMarkdown(r: SurfaceReport): string {
     for (const m of cap(r.coverage.missingFromMap, 40)) L.push(`  - \`${m.locale}/${m.path}\``);
   }
 
-  L.push('', '## 导航 Nav（动态侧栏镜像）', '');
-  L.push(`- 机器命名空间暴露 machineSections: ${r.nav.machineSections.map((s) => `\`${s}/\``).join(' ') || 'none'}`);
+  L.push('', '## 导航 Nav（真相 = 实时导航树，非页面树推断）', '');
+  if (!r.nav.available) {
+    L.push('- ⚠ 导航树不可读（nav.available=false）— 机器段暴露无法核验，请检查 token 的导航读取权限');
+  } else {
+    L.push(
+      `- mode: \`${r.nav.mode}\` · 文件系统暴露 filesystemExposed: ${
+        r.nav.filesystemExposed ? '⚠ 是 — DYNAMIC/MIXED 会把页面树镜像回侧栏（Issue #1 复发）' : '否'
+      }`,
+    );
+    if (r.nav.machineLinks.length > 0) {
+      L.push(`- ⚠ 导航树内机器段链接 machineLinks (${r.nav.machineLinks.length}):`);
+      for (const m of cap(r.nav.machineLinks, 20)) L.push(`  - [${m.locale}] ${m.label} → \`${m.target}\``);
+    } else {
+      L.push(`- 导航树内机器段链接: none ✓（页面树存档段 ${r.nav.machinePaths.map((s) => `\`${s}/\``).join(' ') || '—'} 属设计内，仅备查）`);
+    }
+  }
   if (r.nav.sectionLandingMissing.length > 0) {
     L.push(`- 落地页缺失 sectionLandingMissing（面包屑 404 / 空目录页）:`);
     for (const s of r.nav.sectionLandingMissing) L.push(`  - \`/${s.dir}\` — ${s.pagePaths} 页在此目录下`);
