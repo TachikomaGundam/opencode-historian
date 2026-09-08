@@ -13,6 +13,7 @@ import { buildMaintainReport, renderMaintainMarkdown, type MaintainRow } from '.
 import { buildSurfaceReport, renderSurfaceMarkdown } from '../surface.js';
 import { normalizeLocale, PathValidationError } from '../wiki/locale.js';
 import { listPages, readPage, type Locale } from '../wiki/pages.read.js';
+import { readPrimaryNav } from '../wiki/nav.js';
 import { errEnvelope, okJson, reportUrls, URL_MANDATE, type ToolDeps } from './shared.js';
 
 const s = tool.schema;
@@ -119,17 +120,19 @@ async function runMaintain(deps: ToolDeps, mapDeps: MapDeps, snapshot: MapSnapsh
     { rows, mapGeneratedAt: snapshot.generatedAt, mapStaleSeconds: snapshot.staleSeconds },
     { deep, readBody },
   );
+  const nav = await readPrimaryNav(client);
   const surface = await buildSurfaceReport({
     rows,
     generatedAt: report.generatedAt,
     baseUrl: deps.options.baseUrl,
     liveInventory,
+    nav,
     deep,
     readBody,
   });
   return {
     action: 'maintain',
-    schema: 'historian.maintain.v2',
+    schema: 'historian.maintain.v3',
     deep: report.deep,
     generatedAt: report.generatedAt,
     rowCount: report.rowCount,
