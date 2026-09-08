@@ -20,7 +20,7 @@ const SPEC = {
     h1: '# 史官智能体\n\n**状态/Status**: Active · **日期/Date**: 2026-09-08\n> **上次核实**: 2026-09-08 · Last verified via: 本机实测（npm registry latest=0.5.1；jsonc 钉 @0.5.1；0.5.1 复扫 duplicates=2、空标签 0、断链 0）\n\n',
     sectionAnchor: '## 相关页面',
     sectionFile: '/tmp/evo-zh.md',
-    del: ['> **上次核实**: 2026-09-08 · Last verified via: opencode-wiki-historian 0.5.0 已发布并在会话内生效\n\n'],
+    del: [/^> \*\*上次核实\*\*.*opencode-wiki-historian 0\.5\.0/],
     rep: [
       ['| 技能定义 | `/home/lab/.config/opencode/skills/historian.md` | 由 OpenCode 加载；定义筛选、放置、内容质量标准、变更操作手册及检索模式 |',
        '| 插件包 | `opencode-wiki-historian@0.5.1`（npm；源码 `/home/lab/workspace/opencode-historian`） | 史官插件本体：historian_* 工具集 + SKILL.md 行为契约；由 `~/.config/opencode/opencode.jsonc` 的 plugin 项加载（旧版平面技能文件已停用） |'],
@@ -34,7 +34,7 @@ const SPEC = {
     h1: '# Historian (史官) Agent\n\n**状态/Status**: Active · **日期/Date**: 2026-09-08\n> **上次核实 / Last verified**: 2026-09-08 · via: machine checks (npm registry latest=0.5.1; jsonc pin @0.5.1; 0.5.1 re-scan duplicates=2, empty tags=0, broken links=0)\n\n',
     sectionAnchor: '## Related Pages',
     sectionFile: '/tmp/evo-en.md',
-    del: ['> **上次核实**: 2026-09-08 · Last verified via: opencode-wiki-historian 0.5.0 live on npm + session\n\n'],
+    del: [/^> \*\*上次核实\*\*.*opencode-wiki-historian 0\.5\.0/],
     rep: [
       ['| Skill definition | `/home/lab/.config/opencode/skills/historian.md` | Loaded by OpenCode; defines triage, placement, content-quality bar, mutation playbook, and retrieval patterns |',
        '| Plugin package | `opencode-wiki-historian@0.5.1` (npm; source `/home/lab/workspace/opencode-historian`) | The historian itself: historian_* toolset + SKILL.md behavior contract; loaded via the plugin entry in `~/.config/opencode/opencode.jsonc` (legacy flat skill file retired) |'],
@@ -51,12 +51,15 @@ for (const [locale, s] of Object.entries(SPEC)) {
   if (page === null) { console.log(`FAIL ${locale}: page missing`); continue; }
   let body = page.content ?? '';
   if (!body.startsWith('# ')) body = s.h1 + body; // idempotency guard
+  // line-filter del (v1's whole-string includes silently missed lines whose
+  // trailing context differed by a newline — lesson 2026-09-08)
+  for (const re of s.del) body = body.split('\n').filter((l) => !re.test(l)).join('\n');
+  if (body.includes(locale === 'zh' ? '版本自进化记录' : 'Self-Evolution Log')) { console.log(`${locale}: evolution already woven, nothing to do`); continue; }
   let bad = false;
-  for (const d of s.del) if (body.includes(d)) body = body.replace(d, '');
   for (const [from, to] of s.rep) {
-    if (!body.includes(from)) { console.log(`FAIL ${locale}: anchor missing -> ${from.slice(0, 60)}…`); bad = true; }
+    // tolerate partial re-runs where a row was already replaced
+    if (!body.includes(from) && !body.includes(to)) { console.log(`FAIL ${locale}: anchor missing -> ${from.slice(0, 60)}…`); bad = true; }
   }
-  if (body.includes(s.sectionFile === '/tmp/evo-zh.md' ? '版本自进化记录' : 'Self-Evolution Log')) { console.log(`${locale}: evolution section already present, skipping`); continue; }
   if (bad) continue;
   const anchorIdx = body.indexOf(s.sectionAnchor);
   body = body.slice(0, anchorIdx) + readFileSync(s.sectionFile, 'utf8').trimEnd() + '\n\n' + body.slice(anchorIdx);
