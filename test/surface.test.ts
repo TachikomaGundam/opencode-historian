@@ -80,12 +80,49 @@ describe('buildSurfaceReport — light tier', () => {
     const r = await buildSurfaceReport({ rows, generatedAt: '2026-09-07T00:00:00Z', baseUrl: BASE_URL, liveInventory: live });
     expect(r.coverage?.missingFromMap).toEqual([{ path: 'opencode/brand-new', locale: 'en' }]);
     expect(r.coverage?.removedFromLive).toBe(0);
-    expect(r.nav.machineSections).toEqual(['_meta', '_sandbox']);
+    expect(r.nav.available).toBe(false); // no nav injected = unverifiable, NOT clean
+    expect(r.nav.mode).toBeNull();
+    expect(r.nav.filesystemExposed).toBe(false);
+    expect(r.nav.machinePaths).toEqual(['_meta', '_sandbox']);
     expect(r.nav.sectionLandingMissing.map((s) => s.dir)).toEqual(expect.arrayContaining(['infra', 'ops', 'llm-eval']));
     expect(r.nav.sectionLandingMissing.find((s) => s.dir === 'infra')?.pagePaths).toBeGreaterThanOrEqual(2);
     expect(r.tagsEmpty).toContainEqual({ path: 'infra/services', locale: 'en' });
     expect(r.tagsEmpty.some((t) => t.path.startsWith('_'))).toBe(false);
     expect(r.deepReport).toBeNull();
+  });
+});
+
+describe('buildSurfaceReport — nav truth table (v0.5.1)', () => {
+  const clean = { mode: 'STATIC', trees: [{ locale: 'en', items: [{ label: 'Wiki', targetType: 'page', target: '/wiki-index' }] }] };
+  it('STATIC curated nav without machine links is clean', async () => {
+    const r = await buildSurfaceReport({ rows, generatedAt: 'x', baseUrl: BASE_URL, nav: clean });
+    expect(r.nav.available).toBe(true);
+    expect(r.nav.filesystemExposed).toBe(false);
+    expect(r.nav.machineLinks).toEqual([]);
+  });
+  it('DYNAMIC or MIXED mode = filesystem mirrored into the sidebar (Issue #1 relapse)', async () => {
+    for (const mode of ['DYNAMIC', 'MIXED']) {
+      const r = await buildSurfaceReport({ rows, generatedAt: 'x', baseUrl: BASE_URL, nav: { ...clean, mode } });
+      expect(r.nav.filesystemExposed).toBe(true);
+    }
+  });
+  it('flags machine-namespace links mounted in the tree, with or without locale prefix', async () => {
+    const r = await buildSurfaceReport({
+      rows,
+      generatedAt: 'x',
+      baseUrl: BASE_URL,
+      nav: { mode: 'STATIC', trees: [
+        { locale: 'en', items: [
+          { label: 'Sandbox', targetType: 'page', target: '/_sandbox/probe' },
+          { label: '证据', targetType: 'url', target: '/zh/_evidence/x' },
+          { label: 'Ok', targetType: 'page', target: '/infra/wiki' },
+        ] },
+      ] },
+    });
+    expect(r.nav.machineLinks).toEqual([
+      { locale: 'en', label: 'Sandbox', target: '/_sandbox/probe' },
+      { locale: 'en', label: '证据', target: '/zh/_evidence/x' },
+    ]);
   });
 });
 

@@ -14,6 +14,7 @@ import { normalizeLocale, PathValidationError } from '../dist/wiki/locale.js';
 import { getMap } from '../dist/map.js';
 import { buildMaintainReport, renderMaintainMarkdown } from '../dist/maintain.js';
 import { buildSurfaceReport, renderSurfaceMarkdown } from '../dist/surface.js';
+import { readPrimaryNav } from '../dist/wiki/nav.js';
 
 const OUT = process.argv[2] ?? '/tmp/live-maintain.md';
 
@@ -62,6 +63,7 @@ const surface = await buildSurfaceReport({
   generatedAt: report.generatedAt,
   baseUrl: options.baseUrl,
   liveInventory,
+  nav: await readPrimaryNav(client),
   deep: true,
   readBody,
 });
@@ -72,7 +74,7 @@ writeFileSync(OUT, markdown);
 const s = surface.deepReport;
 console.error(`[scan] mapRows=${rows.length} liveRows=${liveInventory.length} bodyReads=${bodyCache.size}`);
 console.error(`[scan] coverage missingFromMap=${surface.coverage?.missingFromMap.length}`);
-console.error(`[scan] nav machineSections=${surface.nav.machineSections.join(',')} landingMissing=${surface.nav.sectionLandingMissing.length}`);
+console.error(`[scan] nav mode=${surface.nav.mode} exposed=${surface.nav.filesystemExposed} machineLinks=${surface.nav.machineLinks.length} landingMissing=${surface.nav.sectionLandingMissing.length}`);
 console.error(`[scan] maintain dupes=${report.duplicates.clusters.length} staleness=${report.staleness.oldest.length}`);
 console.error(`[scan] deep unfinished=${s?.unfinished.length} stubs=${s?.stubs.length} (dead=${s?.stubs.filter((x) => !x.clickable || !x.targetLive).length}) brokenLinks=${s?.links.broken.length} toStubs=${s?.links.toStubs.length} stacks=${s?.links.sameTargetStacks.length} orphans=${s?.links.orphanPages.length} indexMissing=${s?.links.indexMissing.length}`);
 console.error(`[scan] roleDivergence=${s?.roleDivergence.length} twinDivergent=${s?.twinParity.filter((t) => t.divergent).length} zhEnglishDominant=${s?.zhEnglishDominant.length} ledgerClaims=${s?.ledgerClaims.length}`);
