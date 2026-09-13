@@ -610,7 +610,7 @@ export const G6_ZH: string = `# 如何做某事（占位：目标句式标题，
 
 | 元数据 | 值 |
 | --- | --- |
-| 状态 | <!-- Active / Superseded-by: <path> / Deprecated --> |
+| 状态 | draft <!-- 必须与顶部 状态/Status 头同 token；改状态时两处一起改 --> |
 | 上次核实 | <!-- YYYY-MM-DD，在哪套环境按本页步骤重跑过 --> |
 | 复核周期 | <!-- 如每 90 天，到期重跑本页步骤 --> |
 | 被取代于 | <!-- 新手册路径，无则填 — --> |
@@ -660,7 +660,7 @@ export const G6_EN: string = `# How to Do X (placeholder: goal-titled heading, m
 
 | Field | Value |
 | --- | --- |
-| Status | <!-- Active / Superseded-by: <path> / Deprecated --> |
+| Status | draft <!-- must carry the SAME token as the 状态/Status header above; change both together --> |
 | Last verified | <!-- YYYY-MM-DD and the environment the steps were re-run in --> |
 | Review by | <!-- e.g. every 90 days; re-run the steps when due --> |
 | Superseded by | <!-- path of the newer manual, or — --> |

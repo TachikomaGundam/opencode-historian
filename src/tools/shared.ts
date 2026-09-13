@@ -112,7 +112,7 @@ function hintFor(errorKind: string): string {
     case 'GraphQLError':
       return 'The wiki answered a GraphQL error — check the path/locale arguments.';
     case 'PublishGateError':
-      return '消除 TODO/空节并把状态置 Active，或保留 状态:draft 待自检通过后发布；重定向存根正文必须带可点击的 [链接](目标URL)。';
+      return '消除 TODO/空节并把状态置 Active，或保留 状态:draft 待自检通过后发布；重定向存根正文必须带可点击的 [链接](目标URL)；Active 页的表格行 状态/Status 必须与顶部冒号状态头同 token（改状态两处一起改）。';
     default:
       return 'Inspect the message and retry.';
   }
@@ -389,9 +389,10 @@ export class PublishGateError extends Error {
   }
 }
 
-/** Hard gate on front-tier writes: refuses the two shapes that shipped real
+/** Hard gate on front-tier writes: refuses the three shapes that shipped real
  *  incidents — a page claiming Active with TODO markers or empty skeleton
- *  sections, and a redirect stub whose body carries no clickable exit.
+ *  sections, a redirect stub whose body carries no clickable exit, and (R4/P1)
+ *  an Active write whose table-row 状态/Status token contradicts the header.
  *  `_sandbox/*` and internal namespaces are exempt; 状态:draft stays the
  *  sanctioned work-in-progress escape hatch. Null = proceed. */
 export function publishGateRefusalJson(
