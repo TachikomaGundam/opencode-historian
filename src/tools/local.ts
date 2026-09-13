@@ -9,12 +9,13 @@ import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { TranslateError } from '../translate.js';
 import { buildChronology, filterRowsByPath } from '../chronology.js';
 import { getMap, refreshMapCache, CACHE_PATH, type MapDeps, type MapSnapshot } from '../map.js';
-import { buildMaintainReport, renderMaintainMarkdown, type MaintainRow } from '../maintain.js';
+import { buildMaintainReport, renderMaintainMarkdown, type MaintainRow, type ReadBodyFn } from '../maintain.js';
 import { buildSurfaceReport, renderSurfaceMarkdown } from '../surface.js';
+import { lintBody, statusTokenFindings } from '../lint.js';
 import { normalizeLocale, PathValidationError } from '../wiki/locale.js';
 import { listPages, readPage, type Locale } from '../wiki/pages.read.js';
 import { readPrimaryNav } from '../wiki/nav.js';
-import { errEnvelope, okJson, reportUrls, URL_MANDATE, type ToolDeps } from './shared.js';
+import { errEnvelope, isInternalPath, okJson, reportUrls, URL_MANDATE, type ToolDeps } from './shared.js';
 
 const s = tool.schema;
 
@@ -81,6 +82,35 @@ const MAP_ARGS = {
 
 const MapArgsSchema = s.object(MAP_ARGS);
 
+/** P1 surfacing: lint's status-token-conflict finding per scanned body,
+ *  reusing runMaintain's per-page body cache (zero extra wiki reads). Machine
+ *  rows carry the `status-token-conflict` key so harness graders can count it
+ *  without re-deriving the rule. */
+async function scanStatusTokenConflicts(
+  rows: readonly MaintainRow[],
+  readBody: ReadBodyFn,
+  baseUrl: string,
+): Promise<readonly StatusTokenConflictRow[]> {
+  const out: StatusTokenConflictRow[] = [];
+  for (const r of rows) {
+    if (isInternalPath(r.path)) continue;
+    const body = await readBody(r.path, r.locale);
+    if (body === null || body === '') continue;
+    const findings = statusTokenFindings(
+      lintBody(body, { locale: r.locale, baseUrl, title: r.title }),
+    );
+    for (const f of findings) out.push({ path: r.path, locale: r.locale, key: f.key, detail: f.detail });
+  }
+  return out;
+}
+
+interface StatusTokenConflictRow {
+  readonly path: string;
+  readonly locale: Locale;
+  readonly key: 'status-token-conflict';
+  readonly detail: string;
+}
+
 /** maintain: light tier is map rows + ONE read-only pages.list pass per locale
  *  (the mirror's MapRow carries no tags; the list join restores the vocab view);
  *  deep additionally reads each body via readPage. Reserved-path pages (e.g.
@@ -130,15 +160,25 @@ async function runMaintain(deps: ToolDeps, mapDeps: MapDeps, snapshot: MapSnapsh
     deep,
     readBody,
   });
+  const statusTokenConflicts =
+    deep && readBody !== undefined
+      ? await scanStatusTokenConflicts(rows, readBody, deps.options.baseUrl)
+      : [];
+  const conflictNote =
+    statusTokenConflicts.length === 0
+      ? ''
+      : `\n\n## 状态令牌冲突 Status-token conflicts (${statusTokenConflicts.length})\n` +
+        statusTokenConflicts.map((c) => `- \`${c.locale}/${c.path}\` status-token-conflict: ${c.detail}`).join('\n') +
+        '\n';
   return {
     action: 'maintain',
     schema: 'historian.maintain.v3',
     deep: report.deep,
     generatedAt: report.generatedAt,
     rowCount: report.rowCount,
-    report,
+    report: { ...report, statusTokenConflicts },
     surface,
-    markdown: `${renderMaintainMarkdown(report)}\n\n${renderSurfaceMarkdown(surface)}`,
+    markdown: `${renderMaintainMarkdown(report)}${conflictNote}\n\n${renderSurfaceMarkdown(surface)}`,
     urls: reportUrls(deps.options.baseUrl, CACHE_PATH, 'en'),
   };
 }
