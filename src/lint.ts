@@ -15,7 +15,8 @@ import type { Locale } from './wiki/pages.read.js';
 /** Machine rule keys; the human report renders zh labels from these. */
 export type GateViolation =
   | 'redirect-stub-no-exit' // Issue #5.1: stub a reader cannot follow
-  | 'active-with-unfinished-skeleton'; // Issue #6.5:谎报 Active
+  | 'active-with-unfinished-skeleton' // Issue #6.5:谎报 Active
+  | 'status-token-conflict'; // P1/R4: header Active vs contradicting table row
 
 export interface LintFinding {
   readonly key:
@@ -26,7 +27,8 @@ export interface LintFinding {
     | 'no-state-block'
     | 'h1-mismatch'
     | 'zh-english-dominant'
-    | 'claims-without-stamp';
+    | 'claims-without-stamp'
+    | 'status-token-conflict';
   readonly detail: string;
 }
 
@@ -50,6 +52,15 @@ export interface BodyLint {
   readonly stubHasLink: boolean;
   readonly hasStateBlock: boolean;
   readonly state: 'active' | 'draft' | 'superseded' | 'deprecated' | null;
+  /** First state token parsed from a `| Status | X |` metadata table row
+   *  (P1); null when the body carries no parseable table token. The colon
+   *  header in `state` stays the AUTHORITY — this is the view, never a fix. */
+  readonly tableState: 'active' | 'draft' | 'superseded' | 'deprecated' | null;
+  /** Every state token found in table rows, document order, deduped. */
+  readonly tableStates: readonly NonNullable<BodyLint['state']>[];
+  /** True when the header token and at least one table token disagree (P1:
+   *  the machine-induced contradiction of live ids 9/92). */
+  readonly statusTokenConflict: boolean;
   readonly todoMarkers: number;
   /** Heading text of sections whose body (before the next heading ≤ level) is empty. */
   readonly emptySections: readonly string[];
@@ -115,15 +126,58 @@ function hasClickableExit(visibleNoAnchors: number): boolean {
 const STATE_LINE_RE =
   /(?:^|\n)\s*\*{0,2}\s*(?:状态\s*\/\s*Status|状态|Status)\s*\*{0,2}\s*[:：]\s*([A-Za-z\u4e00-\u9fff][^\n·|<]*)/i;
 
+/** `| Status | X |` metadata-table row (P1). Line-anchored so only the FIRST
+ *  cell is the label — column headers like `| Action | … | Status |` and
+ *  separator rows never match. CJK-tolerant label (状态 / Status / 状态/Status
+ *  in either order), optional bold. Run on fence-masked, comment-stripped
+ *  text, so an injected fake token inside a code fence or HTML comment is
+ *  inert. The value is only a token when classifyState() recognizes it —
+ *  `| Status | — |` and free-form cells carry no token. */
+const TABLE_STATE_RE =
+  /^\s*\|\s*(?:\*\*)?\s*(?:状态|Status)(?:\s*\/\s*(?:状态|Status))?\s*(?:\*\*)?\s*\|\s*([^|\n]+?)\s*\|/i;
+
+function classifyState(raw: string): BodyLint['state'] {
+  const v = raw.trim().toLowerCase();
+  if (v.startsWith('active')) return 'active';
+  if (v.startsWith('draft')) return 'draft';
+  if (v.startsWith('superseded')) return 'superseded';
+  if (v.startsWith('deprecated')) return 'deprecated';
+  return null;
+}
+
 function parseState(maskedNoComments: string): { has: boolean; state: BodyLint['state'] } {
   const m = STATE_LINE_RE.exec(maskedNoComments);
   if (m === null) return { has: false, state: null };
-  const v = (m[1] as string).trim().toLowerCase();
-  if (v.startsWith('active')) return { has: true, state: 'active' };
-  if (v.startsWith('draft')) return { has: true, state: 'draft' };
-  if (v.startsWith('superseded')) return { has: true, state: 'superseded' };
-  if (v.startsWith('deprecated')) return { has: true, state: 'deprecated' };
-  return { has: true, state: null };
+  return { has: true, state: classifyState(m[1] as string) };
+}
+
+/** Deduped state tokens of every `| Status | X |` row, in document order. */
+function parseTableStates(visible: string): readonly NonNullable<BodyLint['state']>[] {
+  const out: NonNullable<BodyLint['state']>[] = [];
+  for (const line of visible.split('\n')) {
+    const m = TABLE_STATE_RE.exec(line);
+    if (m === null) continue;
+    const st = classifyState(m[1] as string);
+    if (st !== null && !out.includes(st)) out.push(st);
+  }
+  return out;
+}
+
+/** The one finding kind {@link statusTokenFindings} emits. */
+export type StatusTokenFinding = LintFinding & { readonly key: 'status-token-conflict' };
+
+/** Finding-key emission for status-token integrity (P1): both tokens present
+ *  and disagreeing. The colon header remains the authority — this reports the
+ *  contradiction, it never resolves it. */
+export function statusTokenFindings(lint: BodyLint): readonly StatusTokenFinding[] {
+  if (!lint.statusTokenConflict || lint.state === null) return [];
+  const table = lint.tableStates.filter((s) => s !== lint.state).join(', ');
+  return [
+    {
+      key: 'status-token-conflict',
+      detail: `colon header '${lint.state}' vs table row '${table}' on '${lint.h1 ?? '?'}'`,
+    },
+  ];
 }
 
 // --- markers, headings, intro -------------------------------------------------------
@@ -303,12 +357,18 @@ export function lintBody(body: string, opts: LintOpts): BodyLint {
     commands: distinct(visible, CMD_RE),
   };
   const stateInfo = parseState(visible);
+  const tableStates = parseTableStates(visible);
+  const statusTokenConflict =
+    stateInfo.state !== null && tableStates.some((s) => s !== stateInfo.state);
   return {
     isRedirectStub,
     redirectTarget: target,
     stubHasLink: !isRedirectStub || hasClickableExit(links.length),
     hasStateBlock: stateInfo.has,
     state: stateInfo.state,
+    tableState: tableStates.length > 0 ? (tableStates[0] as NonNullable<BodyLint['state']>) : null,
+    tableStates,
+    statusTokenConflict,
     todoMarkers: countTodoMarkers(masked),
     emptySections: emptySectionsOf(headings),
     introEmpty,
@@ -335,6 +395,9 @@ export function publishGateViolations(lint: BodyLint): readonly GateViolation[] 
   if (lint.isRedirectStub && !lint.stubHasLink) out.push('redirect-stub-no-exit');
   if (lint.state === 'active' && (lint.todoMarkers > 0 || lint.emptySections.length > 0)) {
     out.push('active-with-unfinished-skeleton');
+  }
+  if (lint.state === 'active' && lint.statusTokenConflict) {
+    out.push('status-token-conflict');
   }
   return out;
 }
