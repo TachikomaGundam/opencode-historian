@@ -190,7 +190,7 @@ describe('buildMaintainReport (light)', () => {
     expect(Object.keys(tail)).toEqual([
       'schema', 'generatedAt', 'rowCount', 'mapGeneratedAt', 'mapStaleSeconds', 'deep',
       'pages', 'duplicates', 'staleness', 'diffusion', 'flatRootPages', 'tags', 'redirects',
-      'sections', 'freshness',
+      'sections', 'freshness', 'dueForReview',
     ]);
     expect(tail.rowCount).toBe(15);
     expect(tail.generatedAt).toBe('2026-09-04T12:00:00.000Z');
@@ -250,6 +250,212 @@ describe('buildMaintainReport (deep)', () => {
 
   it('deep without readBody is a programmer error, not a silent light run', async () => {
     await expect(buildMaintainReport({ rows: rows() }, { now: NOW, deep: true })).rejects.toThrow(/readBody/);
+  });
+});
+
+// --- dueForReview (task-03: cadence × stamp join, advisory-only) ----------------
+
+/** NOW 2026-09-04T12:00Z vs a UTC-midnight stamp date ⇒ floor truncates the
+ *  half-day, so 08-20 reads age 15, 09-01 age 3. The boundary pair uses
+ *  NOW_MID (00:00Z) where ages are whole days: 08-28 ⇒ exactly 7 (due at
+ *  age === cadence), 08-29 ⇒ 6 (not due). */
+const NOW_MID = new Date('2026-09-04T00:00:00.000Z');
+
+const G5_ZH_STALE = `# API 部署现状卡
+
+**状态/Status**: Active · **日期/Date**: 2026-08-15
+
+## 部署物清单
+
+| 组件 | 版本 | 端口/路径 | 端点 | 依赖 | 上次核实于 |
+| --- | --- | --- | --- | --- | --- |
+| api | 1.0 | 8000 | http://localhost:8000/health | postgres | 2026-08-15 |
+| worker | 2.0 | 8001 | http://localhost:8001/health | redis | 2026-08-20 |
+| legacy | 0.9 | 8002 | — | none | 2026-07-01 (未复跑) |
+
+## 验证方法
+
+| 组件 | 复核命令 | 预期结果 |
+| --- | --- | --- |
+| api | \`curl -s http://localhost:8000/health\` | HTTP 200 |
+| worker | \`systemctl is-active worker\` | active |
+| legacy |  | — |
+| dupe | \`curl -s http://localhost:8000/health\` | HTTP 200 |
+`;
+
+const G5_EN_STALE = `# API Current State Card
+
+**状态/Status**: Active · **日期/Date**: 2026-08-15
+
+## Deployed Components
+
+| Component | Version | Port/Path | Endpoint | Depends on | Last verified |
+| --- | --- | --- | --- | --- | --- |
+| api | 1.0 | 8000 | http://localhost:8000/health | postgres | 2026-08-15 |
+
+## Verification
+
+| Component | Re-check command | Expected result |
+| --- | --- | --- |
+| api | \`curl -s http://localhost:8000/health\` | HTTP 200 |
+`;
+
+// Live infra/cockpit (id 9) metadata-table pattern — local replica fixture only.
+const G6_CONFESSINAL = `# Cockpit Runbook Replica
+
+**状态/Status**: Active · **日期/Date**: 2026-09-01
+
+## Goal
+
+重启后核对 cockpit.socket 与 LDAP 链路。
+
+## Metadata
+
+| Field | Value | Source |
+|---|---|---|
+| Status | Active | this page |
+| Last verified | 2026-09-01 (skeleton-backfill baseline; content not re-run) | revision log |
+| Review cadence | TODO | TODO |
+`;
+
+const G4_OLD = `# KV Cache 原理笔记
+
+**状态/Status**: Active · **日期/Date**: 2026-05-01
+
+解释 KV Cache 在多轮推理中的原理与显存占用。
+
+> **Last verified**: 2026-05-01 · reran bench.py on the live box, exit 0
+`;
+
+const G5_SUPERSEDED = `# Mixed Runbook
+
+**状态/Status**: Active · **日期/Date**: 2026-09-02
+
+## 目标
+
+如何安全重启网关。
+
+上次核实于 2026-09-02（复跑全部行，exit 0）。
+~~上次核实于 2026-08-15（未复跑，baseline）~~
+`;
+
+function g5Dated(rowDate: string): string {
+  return `# API 部署现状卡
+
+**状态/Status**: Active · **日期/Date**: ${rowDate}
+
+## 部署物清单
+
+| 组件 | 版本 | 端口/路径 | 端点 | 依赖 | 上次核实于 |
+| --- | --- | --- | --- | --- | --- |
+| api | 1.0 | 8000 | http://localhost:8000/health | postgres | ${rowDate} |
+`;
+}
+
+function g5WithCadence(cadenceValue: string): string {
+  return `${g5Dated('2026-08-15')}
+## 元数据表
+
+| 元数据 | 值 |
+| --- | --- |
+| 复核周期 | ${cadenceValue} |
+`;
+}
+
+async function dfrReport(path: string, title: string, body: string, now = NOW): Promise<unknown[]> {
+  const report = await buildMaintainReport(
+    { rows: [mk(1, 'en', path, title, '2026-08-10')] },
+    { now, deep: true, readBody: async () => body },
+  );
+  return report.dueForReview as unknown[];
+}
+
+describe('buildMaintainReport — dueForReview (deep)', () => {
+  it('expired G5 card: newest honest row date drives stampAge, cadence default 7d, zh verify commands attached', async () => {
+    expect(await dfrReport('ops/g5-stale', 'API 部署现状卡', G5_ZH_STALE)).toEqual([
+      {
+        path: 'ops/g5-stale',
+        locale: 'en',
+        stampAge: 15,
+        cadence: 7,
+        verifyCommands: ['curl -s http://localhost:8000/health', 'systemctl is-active worker'],
+      },
+    ]);
+  });
+
+  it('en G5 column names (Last verified / Re-check command) parse identically', async () => {
+    expect(await dfrReport('ops/g5-en', 'API Current State Card', G5_EN_STALE)).toEqual([
+      {
+        path: 'ops/g5-en',
+        locale: 'en',
+        stampAge: 20,
+        cadence: 7,
+        verifyCommands: ['curl -s http://localhost:8000/health'],
+      },
+    ]);
+  });
+
+  it('fresh G5 card (age 3 < 7d cadence) does NOT appear', async () => {
+    expect(await dfrReport('ops/g5-fresh', 'API 部署现状卡', g5Dated('2026-09-01'))).toEqual([]);
+  });
+
+  it('boundary at age === cadence is due; one day younger is not', async () => {
+    expect(await dfrReport('ops/g5-due7', 'API 部署现状卡', g5Dated('2026-08-28'), NOW_MID)).toEqual([
+      expect.objectContaining({ path: 'ops/g5-due7', stampAge: 7, cadence: 7 }),
+    ]);
+    expect(await dfrReport('ops/g5-ok6', 'API 部署现状卡', g5Dated('2026-08-29'), NOW_MID)).toEqual([]);
+  });
+
+  it('confessional-only stamp is due regardless of age (cadence clock never reset by a confession)', async () => {
+    expect(await dfrReport('ops/g6-cockpit', 'Cockpit Runbook Replica', G6_CONFESSINAL)).toEqual([
+      { path: 'ops/g6-cockpit', locale: 'en', stampAge: 3, cadence: 90, verifyCommands: [] },
+    ]);
+  });
+
+  it('G4 stamped page uses the 90d genre default', async () => {
+    expect(await dfrReport('docs/g4-old', 'KV Cache 原理笔记', G4_OLD)).toEqual([
+      { path: 'docs/g4-old', locale: 'en', stampAge: 126, cadence: 90, verifyCommands: [] },
+    ]);
+  });
+
+  it('supersede-keeping-struck-old: the fresh honest stamp wins the clock — not due', async () => {
+    expect(await dfrReport('ops/g5-mixed', 'Mixed Runbook', G5_SUPERSEDED)).toEqual([]);
+  });
+
+  // Guards the date-less-header rule: a `| 复核周期 | 2026-09-03 |` value row under
+  // a label-style 上次核实 row must NOT leak in as an honest ledger date.
+  it('a metadata review-by date is not an honest stamp date — confessional force survives it', async () => {
+    const body = `# Cockpit Cadence Runbook\n\n**状态/Status**: Active · **日期/Date**: 2026-09-01\n\n## Metadata\n\n| 元数据 | 值 |\n| --- | --- |\n| 上次核实 | 2026-09-01 (content not re-run) |\n| 复核周期 | 2026-09-03 |\n`;
+    expect(await dfrReport('ops/g6-cad', 'Cockpit Cadence Runbook', body)).toEqual([
+      { path: 'ops/g6-cad', locale: 'en', stampAge: 3, cadence: 90, verifyCommands: [] },
+    ]);
+  });
+
+  it('metadata 复核周期 row overrides the genre default; unparseable values fall back', async () => {
+    const cases: readonly (readonly [string, number])[] = [
+      ['30天', 30], ['每 30 天', 30], ['every 30 days', 30], ['2 weeks', 14], ['1 week', 7],
+      ['7d', 7], ['7 days', 7], ['14', 14],
+      // malformed / non-duration values must NOT fabricate a cadence:
+      ['经常', 7], ['TODO', 7], ['2026-12-31', 7],
+    ];
+    for (const [value, expected] of cases) {
+      const rows = await dfrReport('ops/g5-cad', 'API 部署现状卡', g5WithCadence(value));
+      const got = rows.length === 1 ? (rows[0] as { cadence: number }).cadence : 7;
+      // age is 20d: due iff expected cadence <= 20 — the presence check doubles as the parse check
+      expect(rows.length, `复核周期 ${value}`).toBe(expected <= 20 ? 1 : 0);
+      if (rows.length === 1) expect(got, `复核周期 ${value}`).toBe(expected);
+    }
+  });
+
+  it('G5 card without a command column reports empty verifyCommands', async () => {
+    expect(await dfrReport('ops/g5-nocmd', 'API 部署现状卡', g5Dated('2026-08-15'))).toEqual([
+      { path: 'ops/g5-nocmd', locale: 'en', stampAge: 20, cadence: 7, verifyCommands: [] },
+    ]);
+  });
+
+  it('light mode cannot see stamps: dueForReview is null like freshness', async () => {
+    const report = await buildMaintainReport({ rows: lightRows() }, { now: NOW });
+    expect(report.dueForReview).toBeNull();
   });
 });
 
@@ -337,6 +543,13 @@ describe('historian_map action:"maintain"', () => {
     expect(out.action).toBe('maintain');
     expect(out.deep).toBe(false);
     expect(out.schema).toBe('historian.maintain.v3');
+    // F4 envelope guard: every v3 key stays intact (arrayContaining — concurrent
+    // lanes may add, like statusTokenConflicts); dueForReview is additive INSIDE
+    // report, never a new top-level envelope key.
+    expect(Object.keys(out)).toEqual(
+      expect.arrayContaining(['ok', 'action', 'schema', 'deep', 'generatedAt', 'rowCount', 'report', 'surface', 'markdown', 'urls']),
+    );
+    expect(out).not.toHaveProperty('dueForReview');
     const report = out.report as Record<string, Record<string, unknown>>;
     expect(report.rowCount).toBe(3);
     expect(report.tags).toEqual({
@@ -402,6 +615,18 @@ describe('historian_map action:"maintain"', () => {
     // stamp, and their 2020-01-01 review-by is expired on any realistic clock.
     expect(freshness.missingLastVerified).toEqual([]);
     expect(freshness.expiredReviewBy.length).toBe(2);
+    // llm/alpha twins stamped 2026-01-01 (no parseable duration in 复核周期's
+    // date value → genre default 7d): both due, exact row shape.
+    const due = report.dueForReview as Record<string, unknown>[];
+    expect(due.map((x) => `${x.locale}/${x.path}`).sort()).toEqual(['en/llm/alpha', 'zh/llm/alpha']);
+    expect(due.map((x) => Object.keys(x))).toEqual([
+      ['path', 'locale', 'stampAge', 'cadence', 'verifyCommands'],
+      ['path', 'locale', 'stampAge', 'cadence', 'verifyCommands'],
+    ]);
+    expect(due.map((x) => [x.cadence, x.verifyCommands])).toEqual([
+      [7, []],
+      [7, []],
+    ]);
     const reads = captured.filter((c) => c.query.includes('singleByPath('));
     expect(reads.length).toBe(3); // one bounded read per map row
     expect(fetchCount()).toBe(6); // 2 list + 1 nav + 3 singleByPath

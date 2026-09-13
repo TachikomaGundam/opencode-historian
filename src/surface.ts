@@ -15,7 +15,7 @@
 import { isInternalPath } from './tools/shared.js';
 import { lintBody, type BodyLint } from './lint.js';
 import { classifyGenre } from './templates/genres.js';
-import type { MaintainRow } from './maintain.js';
+import { CONFESSIONAL_STAMP_RE, STAMP_LINE_RE, type MaintainRow } from './maintain.js';
 import type { Locale } from './wiki/pages.read.js';
 import type { NavSnapshot } from './wiki/nav.js';
 
@@ -222,6 +222,14 @@ function resolveTargetPath(baseUrl: string, rawHref: string): { path: string; lo
   return { path: t, locale: 'en' };
 }
 
+/** True when EVERY stamp-bearing line confesses non-execution — see the
+ *  ledgerClaims rule in buildDeep. Lines are the unit of judgement because a
+ *  struck old stamp beside a fresh honest one must keep the exemption. */
+function isConfessionalStamp(body: string): boolean {
+  const stampLines = body.split('\n').filter((l) => STAMP_LINE_RE.test(l));
+  return stampLines.length > 0 && stampLines.every((l) => CONFESSIONAL_STAMP_RE.test(l));
+}
+
 async function scanBodies(
   input: SurfaceInput,
 ): Promise<ScanRow[]> {
@@ -357,7 +365,13 @@ function buildDeep(input: SurfaceInput, scans: ScanRow[]): SurfaceDeep | null {
 
   const ledgerClaims: SurfaceDeep['ledgerClaims'] = [];
   for (const s of ok) {
-    if (s.lint.isRedirectStub || !isFrontPath(s.row.path) || s.lint.hasStamp) continue;
+    // Stamp honesty (swarm-A P2): a stamp that only ever confesses the review
+    // never ran ("…(content not re-run)"/未复跑/未复核/baseline) is not evidence —
+    // claiming review without execution must not suppress the claim ledger.
+    // Any single non-confessional stamp line (incl. supersede-keeping-struck-old)
+    // exempts exactly as before.
+    const exempt = s.lint.hasStamp && !isConfessionalStamp(s.body);
+    if (s.lint.isRedirectStub || !isFrontPath(s.row.path) || exempt) continue;
     const genre = classifyGenre({ title: s.row.title, body: s.body }).genre;
     if (!(genre === 'G4' || genre === 'G5' || genre === 'G6')) continue;
     if (s.lint.claimTotal < 3) continue;
