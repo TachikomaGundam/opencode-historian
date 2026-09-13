@@ -81,6 +81,19 @@ export interface FreshnessScan {
   readonly expiredReviewBy: readonly ExpiredReview[];
 }
 
+/** One cadence-due page (advisory queue — maintain NEVER auto-writes the stamp). */
+export interface DueForReviewRow {
+  readonly path: string;
+  readonly locale: Locale;
+  /** Whole days from the newest honest stamp date to now (floored; confessional-only
+   *  stamps stamp their own date but never reset the clock — see dueForReviewOf). */
+  readonly stampAge: number;
+  /** Days: metadata 复核周期/Review cadence row when parseable, else genre default. */
+  readonly cadence: number;
+  /** Re-check commands parsed from the ledger's command column (empty when none). */
+  readonly verifyCommands: readonly string[];
+}
+
 export interface MaintainReport {
   readonly schema: typeof MAINTAIN_SCHEMA;
   readonly generatedAt: string;
@@ -102,6 +115,8 @@ export interface MaintainReport {
   readonly redirects: { available: boolean; count: number; stubs: readonly RedirectStub[] };
   readonly sections: readonly { section: string; paths: number; rows: number }[];
   readonly freshness: FreshnessScan | null;
+  /** Deep-only advisory queue (null in light, like freshness). */
+  readonly dueForReview: readonly DueForReviewRow[] | null;
 }
 
 // --- Constants --------------------------------------------------------------
@@ -117,9 +132,34 @@ const DEFAULT_TOP_N = 10;
 // pre-emptively so the deep sweep lights up when the genre lane lands.
 const FRESHNESS_GENRES: readonly string[] = ['G5', 'G6'];
 const STAMP_RE = /上次核实|last verified/i;
+/** Stamp label incl. the 上次验证 variant (the set lint.ts STAMP_RE tests) — one
+ *  line-level source of truth for the honesty rule shared by surface + freshness. */
+export const STAMP_LINE_RE = /上次核实|上次验证|last verified/i;
+/** A stamp that confesses the review never executed (swarm-A P2 "stamp honesty"):
+ *  it must not exempt the claim ledger (surface) nor reset the cadence clock
+ *  (dueForReview). Matched per stamp line, never page-wide — "baseline" is a
+ *  common GPU-benchmark noun outside a stamp. */
+export const CONFESSIONAL_STAMP_RE = /(not re-run|未复跑|未复核|baseline)/i;
 const REVIEW_LABEL_RE = /^(复核周期|复核期限|复核日期|review[-_ ]?by|review[-_ ]?due)$/i;
 const ISO_DATE_RE = /\d{4}-\d{2}-\d{2}/;
 const REDIRECT_RE = /^>\s*Redirect:/i;
+/** Table column headers that carry the per-row last-verified date (G5 ledger card). */
+const STAMP_COL_RE = /^(?:上次核实于?|上次验证于?|last verified)$/i;
+/** Metadata row naming the review cadence — its value is a DURATION, unlike the
+ *  ISO-date 复核期限/review-by row REVIEW_LABEL_RE owns. */
+const CADENCE_LABEL_RE = /^(?:复核周期|复核节奏|review[-_ ]?cadence|cadence)$/i;
+/** Ledger command-column headers: zh 复核命令/验证命令/命令/用法\/命令,
+ *  en Re-check command / Verify command(s) / Command(s) / Usage \/ Command. */
+const COMMAND_COL_RE = /^(?:命令|用法\s*\/\s*命令|复核命令|验证命令|commands?|usage\s*\/\s*commands?|re[-_ ]?check[-_ ]?commands?|verify[-_ ]?commands?)$/i;
+const DASH_CELL_RE = /^:?-{2,}:?$/;
+const NULLISH_CELL_RE = /^(?:—|–|-|n\/?a|待补充|todo|\?)$/i;
+/** Cadence floors when a stamped page carries no parseable metadata row:
+ *  G5 machine-state ledgers 7d (weekly re-run — the round-1 plan supersedes the
+ *  older 30d skeleton hint), G4 concepts and G6 how-tos 90d (the G6 skeleton's
+ *  own 复核周期 example "如每 90 天"); the remaining genres (G1/G2/G3) have no
+ *  cadence guidance anywhere, so the conservative quarterly 90d default applies. */
+const GENRE_CADENCE_DAYS: Readonly<Record<string, number>> = { G5: 7, G4: 90, G6: 90 };
+const DEFAULT_CADENCE_DAYS = 90;
 
 // --- Title similarity (trigram core copied from migrate-score.ts:289, where it
 // --- is private with a 0.95 roundtrip bar; maintain needs its own threshold) ---
@@ -289,6 +329,125 @@ function reviewByOf(body: string): string | null {
   return null;
 }
 
+// --- dueForReview (cadence × stamp join; advisory only) --------------------------
+
+function tableCells(line: string): string[] | null {
+  const t = line.trim();
+  return t.startsWith('|') ? t.split('|').map((c) => c.trim()) : null;
+}
+
+const isSeparatorRow = (cells: readonly string[]): boolean =>
+  cells.some((c) => c !== '' && DASH_CELL_RE.test(c));
+
+interface StampEntry {
+  readonly ms: number;
+  readonly confessional: boolean;
+}
+
+/** Every (date, confesses-non-execution) attestation in a body, two real shapes:
+ *  a stamp LABEL line carrying its ISO date (metadata rows, quote stamps, struck
+ *  history — the cockpit / 09-08-sweep forms) and each date under a
+ *  上次核实于/Last verified table column (the G5 card's per-row ledger dates). */
+function stampEntriesOf(body: string): StampEntry[] {
+  const out: StampEntry[] = [];
+  let dateCol = -1;
+  for (const line of body.split('\n')) {
+    const lineDate = STAMP_LINE_RE.test(line) ? line.match(ISO_DATE_RE) : null;
+    if (lineDate !== null) out.push({ ms: Date.parse(lineDate[0]), confessional: CONFESSIONAL_STAMP_RE.test(line) });
+    const cells = tableCells(line);
+    if (cells === null) {
+      dateCol = -1;
+      continue;
+    }
+    if (isSeparatorRow(cells)) continue;
+    // A `| 上次核实 | 2026-01-01 |` label row carries its own date (line rule above
+    // owns it) — only a date-less header row arms the column extraction, else the
+    // next value row (any label!) would be mis-read as a ledger date.
+    const h = ISO_DATE_RE.test(line) ? -1 : cells.findIndex((c) => STAMP_COL_RE.test(c));
+    if (h >= 0) {
+      dateCol = h;
+      continue;
+    }
+    const cell = dateCol >= 0 ? cells[dateCol] : undefined;
+    if (cell !== undefined) {
+      const m = cell.match(ISO_DATE_RE);
+      if (m !== null) out.push({ ms: Date.parse(m[0]), confessional: CONFESSIONAL_STAMP_RE.test(cell) });
+    }
+  }
+  return out.filter((e) => !Number.isNaN(e.ms));
+}
+
+/** '30天' / '每 30 天' / 'every 30 days' / '7d' / '2 weeks' / bare '14' → days.
+ *  Dates, TODOs and prose return null — no cadence is ever fabricated. */
+function parseDays(text: string): number | null {
+  const t = text.trim();
+  const w = t.match(/(\d{1,3})\s*(?:weeks?|wks?|w\b|周)/i);
+  if (w !== null) return Number(w[1]) * 7;
+  const d = t.match(/(\d{1,4})\s*(?:days?|d\b|天|日)/i);
+  if (d !== null) return Number(d[1]);
+  return /^\d{1,3}$/.test(t) ? Number(t) : null;
+}
+
+function cadenceDaysOf(body: string): number | null {
+  for (const line of body.split('\n')) {
+    const cells = tableCells(line);
+    if (cells === null || cells.length < 3 || !CADENCE_LABEL_RE.test(cells[1] ?? '')) continue;
+    for (const cell of cells.slice(2)) {
+      const days = parseDays(cell);
+      if (days !== null) return days;
+    }
+  }
+  return null;
+}
+
+/** Re-check commands from ledger verification tables (see COMMAND_COL_RE):
+ *  backticks stripped, empty/nullish cells skipped, order kept, duplicates dropped. */
+function verifyCommandsOf(body: string): string[] {
+  const out: string[] = [];
+  let cmdCol = -1;
+  for (const line of body.split('\n')) {
+    const cells = tableCells(line);
+    if (cells === null) {
+      cmdCol = -1;
+      continue;
+    }
+    if (isSeparatorRow(cells)) continue;
+    const h = cells.findIndex((c) => COMMAND_COL_RE.test(c));
+    if (h >= 0) {
+      cmdCol = h;
+      continue;
+    }
+    const cell = cmdCol >= 0 ? cells[cmdCol] : undefined;
+    if (cell === undefined) continue;
+    const cmd = cell.replace(/^`([\s\S]*)`$/, '$1').trim();
+    if (cmd !== '' && !NULLISH_CELL_RE.test(cmd) && !out.includes(cmd)) out.push(cmd);
+  }
+  return out;
+}
+
+interface DueForReview {
+  readonly stampAge: number;
+  readonly cadence: number;
+  readonly verifyCommands: readonly string[];
+}
+
+/** The join (swarm-B P-dueForReview, stamp honesty as its immune system): due
+ *  when the newest HONEST stamp is at or past the cadence (a weekly card is due
+ *  again on day 7), or when every stamp confesses non-execution — a confession
+ *  records intent, not verification, so it never exempts the page. A struck old
+ *  confessional stamp beside a fresh honest one (supersede-keeping-struck-old)
+ *  runs on the honest clock. */
+function dueForReviewOf(body: string, genre: string, now: Date): DueForReview | null {
+  const entries = stampEntriesOf(body);
+  if (entries.length === 0) return null;
+  const honest = entries.filter((e) => !e.confessional);
+  const clock = honest.length > 0 ? honest : entries;
+  const stampAge = Math.floor((now.getTime() - Math.max(...clock.map((e) => e.ms))) / DAY_MS);
+  const cadence = cadenceDaysOf(body) ?? GENRE_CADENCE_DAYS[genre] ?? DEFAULT_CADENCE_DAYS;
+  if (honest.length > 0 && stampAge < cadence) return null;
+  return { stampAge, cadence, verifyCommands: verifyCommandsOf(body) };
+}
+
 // --- buildMaintainReport --------------------------------------------------------
 
 export async function buildMaintainReport(input: MaintainInput, opts: MaintainOptions = {}): Promise<MaintainReport> {
@@ -308,11 +467,13 @@ export async function buildMaintainReport(input: MaintainInput, opts: MaintainOp
 
   let redirects: MaintainReport['redirects'] = { available: false, count: 0, stubs: [] };
   let freshness: FreshnessScan | null = null;
+  let dueForReview: DueForReviewRow[] | null = null;
   if (deep && opts.readBody !== undefined) {
     const readBody = opts.readBody;
     const stubs: RedirectStub[] = [];
     const missing: MissingStamp[] = [];
     const expired: ExpiredReview[] = [];
+    const due: DueForReviewRow[] = [];
     let scanned = 0;
     let unreadable = 0;
     for (const r of kept) {
@@ -328,6 +489,8 @@ export async function buildMaintainReport(input: MaintainInput, opts: MaintainOp
         continue; // stubs are pointers — exempt from the freshness-stamp rule
       }
       const genre = classifyGenre({ title: r.title, body }).genre;
+      const dfr = dueForReviewOf(body, genre, now);
+      if (dfr !== null) due.push({ path: r.path, locale: r.locale, ...dfr });
       if (!FRESHNESS_GENRES.includes(genre)) continue;
       if (!STAMP_RE.test(body)) missing.push({ path: r.path, locale: r.locale, genre });
       const reviewBy = reviewByOf(body);
@@ -340,6 +503,7 @@ export async function buildMaintainReport(input: MaintainInput, opts: MaintainOp
     }
     redirects = { available: true, count: stubs.length, stubs };
     freshness = { scanned, unreadable, missingLastVerified: missing, expiredReviewBy: expired };
+    dueForReview = due.sort((a, b) => b.stampAge - a.stampAge || cmpStr(a.path, b.path) || cmpStr(a.locale, b.locale));
   }
 
   return {
@@ -363,6 +527,7 @@ export async function buildMaintainReport(input: MaintainInput, opts: MaintainOp
     redirects,
     sections: sectionDist(kept),
     freshness,
+    dueForReview,
   };
 }
 
@@ -438,6 +603,18 @@ export function renderMaintainMarkdown(r: MaintainReport): string {
     );
     for (const m of r.freshness.missingLastVerified) L.push(`  - stamp missing: \`${m.path}\` (${m.locale}, ${m.genre})`);
     for (const e of r.freshness.expiredReviewBy) L.push(`  - review overdue: \`${e.path}\` (${e.locale}) since ${e.reviewBy} (${fmt(e.daysExpired)}d)`);
+  }
+
+  if (r.dueForReview !== null) {
+    L.push('', `## 到期复核 Due for review（deep，advisory）`, '');
+    L.push(`- ${fmt(r.dueForReview.length)} 条 —仅提示，机器不代写；复核由人或复核协议执行`);
+    for (const d of r.dueForReview) {
+      const why = d.stampAge >= d.cadence
+        ? `戳龄 ${fmt(d.stampAge)}d ≥ 周期 ${fmt(d.cadence)}d`
+        : `confessional stamp（自称未复跑），周期 ${fmt(d.cadence)}d 未到亦列`;
+      const cmds = d.verifyCommands.length > 0 ? ` · ${d.verifyCommands.map((c) => '`' + c + '`').join(' ')}` : '';
+      L.push(`  - \`${d.locale}/${d.path}\` — ${why}${cmds}`);
+    }
   }
 
   L.push('', '## Machine-readable JSON', '', '```json', JSON.stringify(r, null, 2), '```', '');

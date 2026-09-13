@@ -30,6 +30,27 @@ const SKELETON = `# Wrong Title H1\n\n**状态/Status**: Active\n\n${LONG}\n\nTO
 const CJK_TWIN_EN = `# CJK Faithful Twin EN\n\n${LONG}\n\n${LONG}\n\n## Section Alpha\nEnglish body sentence alpha carries the full explanation of the layer composition and the request path details end to end.\n## Section Beta\nEnglish body sentence beta with boundary conditions failure handling and the verification commands described inline per row.\n## Section Gamma\nEnglish body gamma notes the trade offs and the exceptions observed during the live scan incident window earlier this week.\n## Section Delta\nEnglish body delta wraps up cross references to the ledger the runbook and the postmortem appendix table rows below.\n## Related Pages\n- [Index](/wiki-index)`;
 const CJK_TWIN_ZH = `# 双生忠实中文版\n\n本页用于验证跨脚本的长度加权判据，中文版忠实翻译英文结构且小节数量完全一致。\n\n## 甲节\n分层组成与请求链路的完整说明，逐段对齐英文原文。\n## 乙节\n边界条件、失败处置与每行对应的验证命令说明。\n## 丙节\n本周扫描事故窗口内观察到的取舍与例外记录。\n## 丁节\n指向台账、手册与复盘附录表格的交叉引用。\n## 相关页面\n- [索引](/zh/wiki-index)`;
 
+// --- stamp-honesty fixtures (task-03, swarm-A P2) ------------------------------
+// Replica of the live infra/cockpit (id 9) metadata table — byte-pattern, not the
+// live page: the stamp line confesses the content was never re-run, yet STAMP_RE
+// matches it and the claim ledger is (today) exempted. The claims block is a
+// G6-classified runbook body with ≥3 distinct machine facts.
+const CONFESSIONS: readonly (readonly [string, string])[] = [
+  ['not re-run + baseline', '| Last verified | 2026-09-01 (skeleton-backfill baseline; content not re-run) | revision log |'],
+  ['baseline', '| Last verified | 2026-09-01 (baseline snapshot) | revision log |'],
+  ['未复跑', '| 上次核实 | 2026-09-01（未复跑） | 修订日志 |'],
+  ['未复核', '| 上次核实 | 2026-09-01（未复核） | 修订日志 |'],
+];
+function confessBody(stampRow: string): string {
+  return `# Cockpit Confessor Runbook\n\n**状态/Status**: Active · **日期/Date**: 2026-09-01\n\n${LONG}\n\n## Health Check\n:9090 端口检查：curl -sk https://localhost:9090 && systemctl is-active cockpit.socket && journalctl -u nslcd --no-pager -n 20 && cat /etc/pam.d/cockpit /etc/cockpit/cockpit.conf\n\n## Metadata\n\n| Field | Value | Source |\n|---|---|---|\n${stampRow}\n| Review cadence | TODO | TODO |\n\n## Related Pages\n- [Index](/wiki-index)`;
+}
+// Honest re-run stamp (executed command + exit code, no confession): the
+// exemption must keep working exactly as today.
+const RERUN_STAMP_EN = `# Cockpit Rerun Runbook\n\n**状态/Status**: Active · **日期/Date**: 2026-09-02\n\n${LONG}\n\n## Health Check\n:9090 端口检查：curl -sk https://localhost:9090 && systemctl is-active cockpit.socket && journalctl -u nslcd --no-pager -n 20 && cat /etc/pam.d/cockpit /etc/cockpit/cockpit.conf\n\n> **上次核实**: 2026-09-02 · reran every row live: systemctl is-active = active, curl exit 0\n\n## Related Pages\n- [Index](/wiki-index)`;
+// Supersede-keeping-struck-old: an old struck confessional stamp below a new
+// honest one — the honest line keeps the exemption (mixed → exempt).
+const MIXED_STAMP_EN = `# Cockpit Mixed Runbook\n\n**状态/Status**: Active · **日期/Date**: 2026-09-02\n\n${LONG}\n\n## Health Check\n:9090 端口检查：curl -sk https://localhost:9090 && systemctl is-active cockpit.socket && journalctl -u nslcd --no-pager -n 20 && cat /etc/pam.d/cockpit /etc/cockpit/cockpit.conf\n\n上次核实于 2026-09-02（复跑 systemctl 与 curl，全部 exit 0）。\n~~上次核实于 2026-08-15（未复跑，baseline）~~\n\n## Related Pages\n- [Index](/wiki-index)`;
+
 const bodies = new Map<string, string>([
   ['en\u0000wiki-index', INDEX_EN], ['zh\u0000wiki-index', INDEX_ZH],
   ['en\u0000infra/services', SERVICES_EN], ['en\u0000infra/network', NETWORK_EN], ['zh\u0000infra/network', NETWORK_EN.replace(/\/wiki-index/g, '/zh/wiki-index')],
@@ -44,6 +65,9 @@ const bodies = new Map<string, string>([
   ['en\u0000infra/orphan', ORPHAN], ['zh\u0000infra/orphan', ORPHAN.replace(/\/wiki-index/g, '/zh/wiki-index')],
   ['en\u0000infra/skeleton', SKELETON],
   ['en\u0000home', HOME_EN],
+  ...CONFESSIONS.map(([, stampRow], i): [string, string] => [`en\u0000ops/confess-${i}`, confessBody(stampRow)]),
+  ['en\u0000ops/rerun-stamp', RERUN_STAMP_EN],
+  ['en\u0000ops/mixed-stamp', MIXED_STAMP_EN],
   ['en\u0000_sandbox/probe', '# probe\n\nsandbox body 内容。'], ['zh\u0000_sandbox/probe', '# probe\n\nsandbox body 内容。'],
 ]);
 
@@ -67,6 +91,9 @@ const rows: MaintainRow[] = [
   mkRow('infra/skeleton', 'en', 'Infra Skeleton'),
   mkRow('_meta/page-map', 'en', 'Page Map', []),
   mkRow('_sandbox/probe', 'en', 'probe', []), mkRow('_sandbox/probe', 'zh', 'probe', []),
+  ...CONFESSIONS.map((_, i) => mkRow(`ops/confess-${i}`, 'en', 'Cockpit Confessor Runbook')),
+  mkRow('ops/rerun-stamp', 'en', 'Cockpit Rerun Runbook'),
+  mkRow('ops/mixed-stamp', 'en', 'Cockpit Mixed Runbook'),
 ];
 
 const live: LiveRow[] = [
@@ -185,6 +212,27 @@ describe('buildSurfaceReport — deep tier', () => {
     expect(claim).toBeDefined();
     expect(claim.ports).toBeGreaterThanOrEqual(3);
     expect(d.ledgerClaims.some((c) => c.path === 'ops/twin' && c.locale === 'zh')).toBe(false);
+  });
+
+  // Task-03 stamp honesty (swarm-A P2). Pre-fix baseline (characterization run
+  // on unchanged surface.ts, evidence .omo/evidence/task-03-stamp-honesty.md):
+  // all four confessional fixtures were EXEMPT (toBe(false)); flipped below.
+  it('confessional stamps (not re-run/baseline/未复跑/未复核) do NOT exempt ledgerClaims', async () => {
+    const d = (await run()).deepReport!;
+    CONFESSIONS.forEach(([label, _row], i) => {
+      const claim = d.ledgerClaims.find((c) => c.path === `ops/confess-${i}`);
+      expect(claim, label).toMatchObject({ locale: 'en', genre: 'G6', commands: 3 });
+    });
+  });
+
+  it('an honest re-run stamp (command + exit, no confession) still exempts', async () => {
+    const d = (await run()).deepReport!;
+    expect(d.ledgerClaims.some((c) => c.path === 'ops/rerun-stamp')).toBe(false);
+  });
+
+  it('supersede-keeping-struck-old: a fresh honest stamp beside the struck confessional one exempts', async () => {
+    const d = (await run()).deepReport!;
+    expect(d.ledgerClaims.some((c) => c.path === 'ops/mixed-stamp')).toBe(false);
   });
 
   it('renderSurfaceMarkdown emits zh-first headers + JSON tail', async () => {
