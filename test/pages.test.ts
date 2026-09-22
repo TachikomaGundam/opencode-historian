@@ -21,6 +21,7 @@ import {
   createPage,
   updatePage,
   appendSection,
+  insertSectionRespectingTrailer,
   movePage,
   deletePage,
   searchPages,
@@ -458,6 +459,28 @@ describe('appendSection', () => {
     expect(result.pageId).toBe(42);
   });
 
+  it('splices the section before a trailing Related Pages footer (B1)', async () => {
+    // Given: a page whose body ends with a trailer heading block
+    const fresh = rawPage({ id: 42, content: '# Alpha\nbody\n\n## Related Pages\n- [x](y)\n' });
+    const { fetchImpl, captured } = makeResponder({
+      'singleByPath(': () => ({ data: { pages: { singleByPath: fresh } } }),
+      'single(': () => ({ data: { pages: { single: rawPage({ id: 42, content: fresh.content }) } } }),
+      'update(': (vars) => {
+        Object.assign(fresh, { content: vars.content });
+        return { data: { pages: { update: { ...RESP_OK, page: { id: vars.id, path: vars.path, locale: vars.locale } } } } };
+      },
+    });
+    const { client } = makeClient(fetchImpl);
+
+    // When: appending a section
+    const result = await appendSection({ client, options: OPTS }, PATH, 'en', '## Later\nnote');
+
+    // Then: section lands above the trailer, trailer stays last, document
+    // keeps its trailing newline
+    expect(varsOf(captured, 'update(')[0].content).toBe('# Alpha\nbody\n\n## Later\nnote\n\n## Related Pages\n- [x](y)\n');
+    expect(result.page.content).toBe('# Alpha\nbody\n\n## Later\nnote\n\n## Related Pages\n- [x](y)\n');
+  });
+
   it('throws PageNotFoundError when the source page is missing', async () => {
     // Given: read reports the source page missing
     const noPageFetch = (async () => jsonResponse({ errors: [{ message: 'This page does not exist.' }] })) as typeof fetch;
@@ -471,6 +494,41 @@ describe('appendSection', () => {
 
     // Then: PageNotFoundError
     expect(err).toBeInstanceOf(PageNotFoundError);
+  });
+});
+
+// --- insertSectionRespectingTrailer (B1 pure helper) --------------------------
+
+describe('insertSectionRespectingTrailer', () => {
+  const everyTrailer = ['Related Pages', 'Related pages', 'Related', 'See Also', 'See also', 'Notes', '备注', '相关页面', '相关'];
+
+  it('inserts before the first S9 trailer heading at any depth', () => {
+    for (const name of everyTrailer) {
+      for (const hashes of ['#', '##', '######']) {
+        expect(insertSectionRespectingTrailer(`body\n\n${hashes} ${name}\n- link`, '## New')).toBe(
+          `body\n\n## New\n\n${hashes} ${name}\n- link`,
+        );
+      }
+    }
+  });
+
+  it('falls back to tail-append when no S9 heading exists', () => {
+    expect(insertSectionRespectingTrailer('Old content', '## Later')).toBe('Old content\n\n## Later');
+  });
+
+  it('ignores headings outside the closed set (exact text only)', () => {
+    for (const near of ['References', 'See Also:', 'related pages', 'Deep Notes']) {
+      expect(insertSectionRespectingTrailer(`body\n\n## ${near}\nx`, '## New')).toBe(`body\n\n## ${near}\nx\n\n## New`);
+    }
+  });
+
+  it('normalizes separators and keeps the section byte-identical', () => {
+    // no blank before trailer / two blanks before trailer / trailer first line
+    expect(insertSectionRespectingTrailer('body\n## Notes', '## New')).toBe('body\n\n## New\n\n## Notes');
+    expect(insertSectionRespectingTrailer('body\n\n\n## Notes', '## New')).toBe('body\n\n## New\n\n## Notes');
+    expect(insertSectionRespectingTrailer('## Related\n- a', '## New')).toBe('## New\n\n## Related\n- a');
+    // trailing newline of the document survives; multi-line section untouched
+    expect(insertSectionRespectingTrailer('a\n\n## Notes\nb\n', '## New\nx\ny')).toBe('a\n\n## New\nx\ny\n\n## Notes\nb\n');
   });
 });
 
