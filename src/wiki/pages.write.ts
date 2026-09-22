@@ -260,10 +260,33 @@ export async function updatePage(deps: PageDeps, id: number, patch: UpdatePatch)
 
 // --- appendSection -----------------------------------------------------------
 
+/** B1 (doctrine S9): trailer headings that must stay at the document tail.
+ *  Closed set — exact heading text only (`^#{1,6}\s+<name>\s*$`), so
+ *  "## References" or "## See Also:" never match. Matching is purely
+ *  line-shaped; a fence-internal "## Notes" is out of scope of the spec. */
+const TRAILER_HEADING_RE = /^#{1,6}\s+(?:Related Pages|Related pages|Related|See Also|See also|Notes|备注|相关页面|相关)\s*$/;
+
+/** Splice `section` in front of the first trailer heading, keeping the
+ *  trailer block last; tail-append (pre-B1 behavior) when there is none.
+ *  Separators are normalized to exactly one blank line around the inserted
+ *  section; the section body and the document's trailing newline are kept
+ *  byte-identical. */
+export function insertSectionRespectingTrailer(content: string, section: string): string {
+  const lines = content.split('\n');
+  const trailerIdx = lines.findIndex((line) => TRAILER_HEADING_RE.test(line));
+  if (trailerIdx === -1) return `${content}\n\n${section}`;
+  const before = lines.slice(0, trailerIdx);
+  const after = lines.slice(trailerIdx);
+  while (before.length > 0 && before[before.length - 1]!.trim() === '') before.pop();
+  return before.length === 0
+    ? `${section}\n\n${after.join('\n')}`
+    : `${before.join('\n')}\n\n${section}\n\n${after.join('\n')}`;
+}
+
 export async function appendSection(deps: PageDeps, path: string, locale: Locale, section: string): Promise<UpdateResult> {
   const page = await readPage(deps.client, path, locale);
   if (page === null) throw new PageNotFoundError(`page '${path}' (${locale}) does not exist`);
-  return updatePage(deps, page.id, { content: `${page.content}\n\n${section}` });
+  return updatePage(deps, page.id, { content: insertSectionRespectingTrailer(page.content, section) });
 }
 
 // --- movePage / deletePage ----------------------------------------------------
