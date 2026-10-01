@@ -22,12 +22,12 @@ const SPEC = {
     sectionFile: '/tmp/evo-zh.md',
     del: [/^> \*\*上次核实\*\*.*opencode-wiki-historian 0\.5\.0/],
     rep: [
-      ['| 技能定义 | `/home/lab/.config/opencode/skills/historian.md` | 由 OpenCode 加载；定义筛选、放置、内容质量标准、变更操作手册及检索模式 |',
-       '| 插件包 | `opencode-wiki-historian@0.5.1`（npm；源码 `/home/lab/workspace/opencode-historian`） | 史官插件本体：historian_* 工具集 + SKILL.md 行为契约；由 `~/.config/opencode/opencode.jsonc` 的 plugin 项加载（旧版平面技能文件已停用） |'],
+      ['| 技能定义 | `~/.config/opencode/skills/historian.md` | 由 OpenCode 加载；定义筛选、放置、内容质量标准、变更操作手册及检索模式 |',
+       '| 插件包 | `opencode-wiki-historian@0.5.1`（npm；源码 `~/workspace/opencode-historian`） | 史官插件本体：historian_* 工具集 + SKILL.md 行为契约；由 `~/.config/opencode/opencode.jsonc` 的 plugin 项加载（旧版平面技能文件已停用） |'],
       ['| API 密钥 | `~/.wikijs-api-key` | RS256 JWT，仅限 root 使用，有效期至 2027-06-30 |',
        '| API 密钥 | 插件：`~/.config/opencode/historian-wiki-api.key`；旧 wiki-ops.py：`~/.wikijs-api-key` | 同一 RS256 JWT，仅限 root 使用，有效期至 2027-06-30 |'],
-      ['- **技能文件：** `/home/lab/.config/opencode/skills/historian.md`',
-       '- **插件仓库：** `/home/lab/workspace/opencode-historian`（发布为 npm `opencode-wiki-historian`，本机钉 0.5.1）\n- **插件密钥：** `~/.config/opencode/historian-wiki-api.key`'],
+      ['- **技能文件：** `~/.config/opencode/skills/historian.md`',
+       '- **插件仓库：** `~/workspace/opencode-historian`（发布为 npm `opencode-wiki-historian`，本机钉 0.5.1）\n- **插件密钥：** `~/.config/opencode/historian-wiki-api.key`'],
     ],
   },
   en: {
@@ -36,12 +36,12 @@ const SPEC = {
     sectionFile: '/tmp/evo-en.md',
     del: [/^> \*\*上次核实\*\*.*opencode-wiki-historian 0\.5\.0/],
     rep: [
-      ['| Skill definition | `/home/lab/.config/opencode/skills/historian.md` | Loaded by OpenCode; defines triage, placement, content-quality bar, mutation playbook, and retrieval patterns |',
-       '| Plugin package | `opencode-wiki-historian@0.5.1` (npm; source `/home/lab/workspace/opencode-historian`) | The historian itself: historian_* toolset + SKILL.md behavior contract; loaded via the plugin entry in `~/.config/opencode/opencode.jsonc` (legacy flat skill file retired) |'],
+      ['| Skill definition | `~/.config/opencode/skills/historian.md` | Loaded by OpenCode; defines triage, placement, content-quality bar, mutation playbook, and retrieval patterns |',
+       '| Plugin package | `opencode-wiki-historian@0.5.1` (npm; source `~/workspace/opencode-historian`) | The historian itself: historian_* toolset + SKILL.md behavior contract; loaded via the plugin entry in `~/.config/opencode/opencode.jsonc` (legacy flat skill file retired) |'],
       ['| API key | `~/.wikijs-api-key` | RS256 JWT, root-only, expires 2027-06-30 |',
        '| API key | plugin: `~/.config/opencode/historian-wiki-api.key`; legacy wiki-ops.py: `~/.wikijs-api-key` | same RS256 JWT, root-only, expires 2027-06-30 |'],
-      ['- **Skill file:** `/home/lab/.config/opencode/skills/historian.md`',
-       '- **Plugin repo:** `/home/lab/workspace/opencode-historian` (published as npm `opencode-wiki-historian`, pinned 0.5.1 here)\n- **Plugin key:** `~/.config/opencode/historian-wiki-api.key`'],
+      ['- **Skill file:** `~/.config/opencode/skills/historian.md`',
+       '- **Plugin repo:** `~/workspace/opencode-historian` (published as npm `opencode-wiki-historian`, pinned 0.5.1 here)\n- **Plugin key:** `~/.config/opencode/historian-wiki-api.key`'],
     ],
   },
 };
