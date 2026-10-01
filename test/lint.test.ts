@@ -234,7 +234,7 @@ describe('SYN-13 placeholder cells (CON N1a audit 2026-10-01)', () => {
       '- [Index](/infra)',
     ].join('\n');
     const l = lintBody(body, BASE);
-    expect(l.todoMarkers).toBeGreaterThanOrEqual(2);
+    expect(l.todoMarkers).toBe(2);
     expect(publishGateViolations(l)).toContain('active-with-unfinished-skeleton');
   });
 });
