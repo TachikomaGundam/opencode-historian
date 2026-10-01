@@ -9,7 +9,7 @@ import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { TranslateError } from '../translate.js';
 import { buildChronology, filterRowsByPath } from '../chronology.js';
 import { getMap, refreshMapCache, CACHE_PATH, type MapDeps, type MapSnapshot } from '../map.js';
-import { buildMaintainReport, renderMaintainMarkdown, type MaintainRow, type ReadBodyFn } from '../maintain.js';
+import { buildMaintainReport, MAINTAIN_SCHEMA, renderMaintainMarkdown, type MaintainRow, type ReadBodyFn } from '../maintain.js';
 import { buildSurfaceReport, renderSurfaceMarkdown } from '../surface.js';
 import { lintBody, statusTokenFindings } from '../lint.js';
 import { normalizeLocale, PathValidationError } from '../wiki/locale.js';
@@ -172,7 +172,7 @@ async function runMaintain(deps: ToolDeps, mapDeps: MapDeps, snapshot: MapSnapsh
         '\n';
   return {
     action: 'maintain',
-    schema: 'historian.maintain.v3',
+    schema: MAINTAIN_SCHEMA,
     deep: report.deep,
     generatedAt: report.generatedAt,
     rowCount: report.rowCount,
