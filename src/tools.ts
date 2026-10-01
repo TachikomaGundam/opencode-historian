@@ -21,6 +21,7 @@ import { makeUpdateTool, makeAppendTool } from './tools/write.js';
 import { makeReadTool, makeSearchTool } from './tools/read.js';
 import { makeTranslateSnippetTool, makeMapTool } from './tools/local.js';
 import { makeDeleteTool, makeMoveTool, makeMigrateTool } from './tools/mutate.js';
+import { makeAnchorTool } from './tools/anchor.js';
 
 export interface BuildDeps {
   readonly client?: GqlClient;
@@ -56,5 +57,6 @@ export function buildTools(opts: HistorianOptions, deps: BuildDeps = {}): Histor
     historian_migrate: makeMigrateTool(toolDeps),
     historian_delete: makeDeleteTool(toolDeps),
     historian_move: makeMoveTool(toolDeps),
+    historian_anchor: makeAnchorTool(toolDeps),
   };
 }
