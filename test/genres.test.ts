@@ -350,10 +350,10 @@ describe('genreSkeleton anatomy per genre × lang', () => {
 describe('genreSkeleton G1', () => {
   it('zh: timeline table, 5 Whys, 6-column action table, cite-not-dump appendix', () => {
     const zh = genreSkeleton('G1', 'zh');
-    expect(zh).toContain('| 时间 | 事件 | 来源 |');
+    expect(zh).toContain('| 时间 | 阶段 | 事件 | 来源 |');
     expect(zh).toContain('5 Whys');
     // Digest action-item table: 措施 | 类型 | 负责人 | 期限 | 验证 | 状态
-    expect(zh).toContain('| 措施 | 类型 | 负责人 | 期限 | 验证 | 状态 |');
+    expect(zh).toContain('| 措施 | 优先级 | 类型 | 负责人 | 期限 | 验证 | 跟踪 | 状态 |');
     // V6 appendix doctrine: decisive excerpts + evidence-page links, not raw dumps.
     expect(zh).toContain('决定性摘录（每段 ≤10 行）');
     expect(zh).toContain('`_evidence/...`');
@@ -362,9 +362,9 @@ describe('genreSkeleton G1', () => {
   });
   it('en: parallel timeline table, 5 Whys, action table header, cite-not-dump appendix', () => {
     const en = genreSkeleton('G1', 'en');
-    expect(en).toContain('| Time | Event | Source |');
+    expect(en).toContain('| Time | Phase | Event | Source |');
     expect(en).toContain('5 Whys');
-    expect(en).toContain('| Action | Type | Owner | Due | Verification | Status |');
+    expect(en).toContain('| Action | Priority | Type | Owner | Due | Verification | Tracking | Status |');
     expect(en).toContain('Decisive excerpts (≤10 lines each)');
     expect(en).toContain('`_evidence/...`');
     expect(en).toContain('tier:"evidence"');

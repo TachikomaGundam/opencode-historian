@@ -80,8 +80,8 @@ const RULES = [
   'R4 句长约束: zh sentences ≤20 chars; en sentences ≤25 words.',
   'R5 表格判据: ≥3-field structured data → table; pairs → description list.',
   'R6 来源列: comparison/timeline tables carry a source column.',
-  'R7 时间线三列: event timelines are exactly 时间|事件|来源.',
-  'R8 行动项五要素: action items use the five columns 类型|负责人|期限|验证|状态.',
+  'R7 时间线四列: event timelines are exactly 时间|阶段|事件|来源.',
+  'R8 行动项八列: action items use the eight columns 措施|优先级|类型|负责人|期限|验证|跟踪|状态.',
 ] as const;
 
 export function reformatSystemFor(lang: GenreLang): string {
