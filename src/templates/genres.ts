@@ -264,7 +264,7 @@ export function selfReviewChecklist(genre: Genre): readonly ChecklistItem[] {
   const items: readonly ChecklistItem[] = [
     {
       id: 1,
-      label: '导言占比 10–15%：导言 ≈ 正文的 10–15%，每个重要小节在导言至少占一句（lead ≈10–15% of body; every major section ≥1 sentence in lead）',
+      label: '导言占比 10–15% 且 3–5 句：导言 ≈ 正文的 10–15%，每个重要小节在导言至少占一句（lead ≈10–15% of body, 3–5 sentences; every major section ≥1 sentence in lead）',
       kind: 'content',
       appliesTo: 'all',
     },
