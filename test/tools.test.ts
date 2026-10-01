@@ -171,12 +171,13 @@ const TOOL_KEYS = [
   'historian_migrate',
   'historian_delete',
   'historian_move',
+  'historian_anchor',
 ] as const;
 
 // --- Surface + schema -------------------------------------------------------
 
 describe('tool surface (buildTools)', () => {
-  it('exports exactly the 10 historian_* tool keys', () => {
+  it('exports exactly the 11 historian_* tool keys', () => {
     // Given: a default build
     const { tools } = makeTools();
     // When: inspecting the returned record
