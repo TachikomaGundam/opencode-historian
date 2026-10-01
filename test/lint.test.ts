@@ -216,3 +216,25 @@ describe('lintBody — link extraction', () => {
     expect(l.links.filter((k) => k.locale === 'en' && k.path === 'llm-eval/foo')).toHaveLength(1); // dedup
   });
 });
+
+describe('SYN-13 placeholder cells (CON N1a audit 2026-10-01)', () => {
+  it('bare TBD/未定 table cells count as debt; narrative mentions stay clean', () => {
+    const body = [
+      '**状态/Status**: Active · **日期/Date**: 2026-09-09',
+      '## Summary',
+      'The lead sentence carries the finding.',
+      '## Action Items',
+      '| Action | Due | Status |',
+      '| --- | --- | --- |',
+      '| File upstream issue | TBD | todo |',
+      '| Observe logs | 未定 | todo |',
+      '| Ship fix | 2026-09-09 | done |',
+      'Narrative text noting the deadline was originally TBD stays untouched.',
+      '## Related Pages',
+      '- [Index](/infra)',
+    ].join('\n');
+    const l = lintBody(body, BASE);
+    expect(l.todoMarkers).toBeGreaterThanOrEqual(2);
+    expect(publishGateViolations(l)).toContain('active-with-unfinished-skeleton');
+  });
+});
