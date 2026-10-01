@@ -185,8 +185,10 @@ export function statusTokenFindings(lint: BodyLint): readonly StatusTokenFinding
 const TODO_COMMENT_RE = /(TODO|TBD|PLACEHOLDER|占位)/i;
 const LITERAL_TODO_RE = /\bTODO:/g;
 /** SYN-13 enforcement: a table cell that is nothing but a placeholder token is
- *  debt (bare `TBD`/`未定` cells passed the old comment-only scan and shipped Active). */
-const PLACEHOLDER_CELL_RE = /^(?:TBD|TBA|未定|待定|待补充|待定日期|TODO)[：:]?$/i;
+ *  debt (bare `TBD`/`未定` cells passed the old comment-only scan and shipped Active).
+ *  `todo` is deliberately NOT in this set — it is the skeleton's legitimate status
+ *  vocabulary (待办/todo), not placeholder debt. */
+const PLACEHOLDER_CELL_RE = /^(?:TBD|TBA|未定|待定|待补充|待定日期)[：:]?$/i;
 
 function countPlaceholderCells(masked: string): number {
   let n = 0;
