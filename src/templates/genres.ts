@@ -288,13 +288,13 @@ export function selfReviewChecklist(genre: Genre): readonly ChecklistItem[] {
     },
     {
       id: 5,
-      label: '时间线每行有来源列，仅日志可证事实（timeline rows carry sources; log-verifiable facts only）',
+      label: '时间线每行有阶段与来源列（触发/影响/发现/缓解/恢复），仅日志可证事实（timeline rows carry phase + source columns; log-verifiable facts only）',
       kind: 'genre-specific',
       appliesTo: ['G1'],
     },
     {
       id: 6,
-      label: '行动项五要素 = 类型|负责人|期限|验证|状态 五列，措施是行内容（action items: five essentials as columns）',
+      label: '行动项八列 = 措施|优先级|类型|负责人|期限|验证|跟踪|状态；元数据表带复核期限（action items: eight columns with priority + tracking; metadata carries review-by）',
       kind: 'genre-specific',
       appliesTo: ['G1'],
     },
