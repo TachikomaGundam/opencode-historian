@@ -1,4 +1,4 @@
-<!-- source: /home/user/.local/share/opencode/tool-output/tool_0593dece80013pIQ0AqqAHpAgl sha256:2d8f96086ad5a5a701be6b92cc747f452b466754162069831dc2f4a33c7241d1 -->
+<!-- source: ~/.local/share/opencode/tool-output/tool_0593dece80013pIQ0AqqAHpAgl sha256:2d8f96086ad5a5a701be6b92cc747f452b466754162069831dc2f4a33c7241d1 -->
 
 # Wiki.js 2.x Documentation Report
 
