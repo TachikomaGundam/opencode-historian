@@ -94,7 +94,7 @@ export const G1_ZH: string = `# 页面标题（占位：写完后替换为实际
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | <!-- 做什么 --> | <!-- P0/P1/P2 --> | <!-- prevent/mitigate/process --> | <!-- 负责人 --> | YYYY-MM-DD | <!-- 如何证明已完成 --> | <!-- issue/页面路径，无则 — --> | <!-- 待办/进行中/已完成 --> |
 
-<!-- 每个根因主题至少一个 prevent 行动项；验证列必须可检查，否则行动项不算完成；逾期的开项由 maintain 深扫点名。 -->
+<!-- 每个根因主题至少一个 prevent 行动项；验证列必须可检查，否则行动项不算完成；期限列必须 ISO 日期，未定先定日期再入表（TBD 项对老化清扫永久隐形）；逾期的开项由 maintain 深扫点名。 -->
 
 ## 教训
 
@@ -191,7 +191,7 @@ export const G1_EN: string = `# Page Title (placeholder: replace with the real t
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | <!-- what to do --> | <!-- P0/P1/P2 --> | <!-- prevent/mitigate/process --> | <!-- owner --> | YYYY-MM-DD | <!-- how to prove it is done --> | <!-- issue/page link, or — --> | <!-- todo/in progress/done --> |
 
-<!-- At least one prevent item per root-cause theme; an action item without a checkable verification is not done; open items past due are named by the maintain deep sweep. -->
+<!-- At least one prevent item per root-cause theme; an action item without a checkable verification is not done; the Due column must carry an ISO date — set a date before entering the table (TBD rows are permanently invisible to the ageing sweep); open items past due are named by the maintain deep sweep. -->
 
 ## Lessons
 
