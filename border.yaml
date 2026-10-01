@@ -1,0 +1,39 @@
+version: 1
+# historian plugin release gate config — seat-authored 2026-10-02 under the debridement ruling.
+# Identity allowlist mirrors the operator's machine-wide precedent (harness/Abathur/border.yaml
+# rules.authors): the same GitHub noreply person in both shipped formats + the pre-existing
+# Wiki.js service-account commits already public in this repo's history.
+targets:
+  git:
+    remotes:
+      - name: origin
+        url: git@github.com:TachikomaGundam/opencode-historian.git
+rules:
+  authors:
+    emails: [TachikomaGundam@users.noreply.github.com, 296048333+TachikomaGundam@users.noreply.github.com, wiki@sumteclab.com]
+    names: [TachikomaGundam, Wiki.js]
+  hosts: []
+  ips: []
+  pathPatterns: []
+
+# Value-pinned waivers (Abathur precedent: one exact digest per rule+file; new values still fail).
+# All entries verified line-by-line as regex/escape code bytes (Redirect:\s patterns, JSON/TS
+# escape fixtures) — misfires of the Windows-path heuristics, not secrets.
+allow:
+  - { rule: 'path-pattern:[A-Za-z]:\\', match: 'c14f17a739d27686277cdad76665bee4444faf4c2037a6701874fed8dd46f70d', file: 'scripts/cprime-fix.mjs' }
+  - { rule: 'path-pattern:[A-Za-z]:\\', match: 'c14f17a739d27686277cdad76665bee4444faf4c2037a6701874fed8dd46f70d', file: 'src/lint.ts' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '0892295cdb2590e68436c6581e9c6d2b047aa71b6b4cc46d5c4a4893f23412a4', file: 'test/status-token.test.ts' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '18dfe83d9411b5e4f85d896c5eb97cee5209e2a836f438ba43c32c50b9b407de', file: 'src/templates/genres.ts' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '2b94c17ca9541b8d3d7908151d2d1e97f2b5253504815a009c6f6abf92c40454', file: 'test/map.test.ts' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '3069ebe1b5848708cf889d7349f5d62541e379c26ab45bb73952c127783ee886', file: 'test/pages.test.ts' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '4424d4ac6d3f1422da6e2f437771a23928ea33487c042d345e1f220d912f11e7', file: 'src/map.ts' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '66f0930c9904d006b650f6597dae53538ccad17d6778d7ce979c13a2ce425d87', file: 'src/jsonc.ts' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '66f0930c9904d006b650f6597dae53538ccad17d6778d7ce979c13a2ce425d87', file: 'src/wiki/locale.ts' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '66f0930c9904d006b650f6597dae53538ccad17d6778d7ce979c13a2ce425d87', file: 'test/map.test.ts' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '73f59d49dae6948d223a136a30b8674edf637ccd857f76dc38f2c6e195b571dc', file: 'scripts/fix-index.mjs' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '73f59d49dae6948d223a136a30b8674edf637ccd857f76dc38f2c6e195b571dc', file: 'scripts/merge-pairs.mjs' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: 'aaddbd920ee294cd93ec2ba22f509e117495bdda4d6fa3a0df885e32447dc1c6', file: 'scripts/fix-index.mjs' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: 'b10813d379482f32fe5657da371f077c534419eeecaf9eaa28f305544a6e7b27', file: 'scripts/fix-stamps.mjs' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: 'c4141d7d3791dd75efdf836979a66efba39df91cba09858a72d89e95157a58ca', file: 'src/migrate-score.ts' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: 'e7549451a6b4ed501a3c31dc28e31bbf7289a535725d9d7b17ce01f456a11b21', file: 'src/chronology.ts' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: 'ec18995e54afb50e59f07c6507606cde6107cef6e190cb19e1de84624416933f', file: 'src/templates/genres.ts' }

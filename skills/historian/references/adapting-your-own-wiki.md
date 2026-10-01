@@ -38,7 +38,7 @@ Six-step self-onboarding for pointing the historian plugin at your own Wiki.js i
 
 ## 5. 隐私红线与发布门 / Privacy red-lines & the pre-publish gate
 
-- 任何进入包/文档的内容不得包含：真实主机名、真实用户路径（`/home/...`）、token、真实私有部署的页面标题与章节表。
+- 任何进入包/文档的内容不得包含：真实主机名、真实用户路径（home 目录绝对路径，如 `~/…` 展开后的形态）、token、真实私有部署的页面标题与章节表。
 - 硬门：`node tools/privacy-audit.mjs` 扫描 `npm pack` 全部文件（含 `dist/` 与 `skills/`）。改过任何随包文本后必须跑到 exit 0 再发布。
 
 ## 6. 机构记忆层开关与证据层 / reading-loop & capture switches, evidence tier
