@@ -94,6 +94,22 @@ export interface DueForReviewRow {
   readonly verifyCommands: readonly string[];
 }
 
+/** One open action item past its due date (G1 action tables rot silently —
+ *  corpus law: "an action item that ages out without completion is a red
+ *  flag"). Advisory queue like dueForReview; twins dedupe by path. */
+export interface OverdueAction {
+  readonly path: string;
+  readonly locale: Locale;
+  /** First table cell (the 措施/action text), flattened to one line, ≤80 chars. */
+  readonly action: string;
+  /** The ISO date found in the 期限/due column, verbatim. */
+  readonly due: string;
+  /** Whole days from due date to now (floored). */
+  readonly daysOverdue: number;
+  /** Status cell text, verbatim (matched open). */
+  readonly status: string;
+}
+
 export interface MaintainReport {
   readonly schema: typeof MAINTAIN_SCHEMA;
   readonly generatedAt: string;
@@ -117,11 +133,13 @@ export interface MaintainReport {
   readonly freshness: FreshnessScan | null;
   /** Deep-only advisory queue (null in light, like freshness). */
   readonly dueForReview: readonly DueForReviewRow[] | null;
+  /** Deep-only advisory queue of open action items past due (null in light). */
+  readonly overdueActions: readonly OverdueAction[] | null;
 }
 
 // --- Constants --------------------------------------------------------------
 
-export const MAINTAIN_SCHEMA = 'historian.maintain.v2';
+export const MAINTAIN_SCHEMA = 'historian.maintain.v3';
 /** Trigram-Jaccard bar for calling two (different-path) titles near-duplicates. */
 export const DUP_TITLE_THRESHOLD = 0.75;
 const DAY_MS = 86_400_000;
@@ -153,12 +171,21 @@ const CADENCE_LABEL_RE = /^(?:复核周期|复核节奏|review[-_ ]?cadence|cade
 const COMMAND_COL_RE = /^(?:命令|用法\s*\/\s*命令|复核命令|验证命令|commands?|usage\s*\/\s*commands?|re[-_ ]?check[-_ ]?commands?|verify[-_ ]?commands?)$/i;
 const DASH_CELL_RE = /^:?-{2,}:?$/;
 const NULLISH_CELL_RE = /^(?:—|–|-|n\/?a|待补充|todo|\?)$/i;
+/** Action-item table column labels (header-anchored; the table is identified
+ *  by carrying all three of these columns — see overdueActionsOf). */
+const ACTION_COL_RE = /^(?:\*\*)?(?:措施|action)(?:\*\*)?$/i;
+const DUE_COL_RE = /^(?:\*\*)?(?:期限|due|deadline)(?:\*\*)?$/i;
+const STATUS_COL_RE = /^(?:\*\*)?(?:状态|status)(?:\*\*)?$/i;
+/** Closed first (fail-quiet on neutral cells like 未完成), then open. */
+const CLOSED_STATUS_RE = /已完成|^完成$|已取消|不做|done|closed|resolved|cancelled|wont.?fix/i;
+const OPEN_STATUS_RE = /待办|进行中|todo|pending|in.?progress|open/i;
 /** Cadence floors when a stamped page carries no parseable metadata row:
  *  G5 machine-state ledgers 7d (weekly re-run — the round-1 plan supersedes the
  *  older 30d skeleton hint), G4 concepts and G6 how-tos 90d (the G6 skeleton's
- *  own 复核周期 example "如每 90 天"); the remaining genres (G1/G2/G3) have no
- *  cadence guidance anywhere, so the conservative quarterly 90d default applies. */
-const GENRE_CADENCE_DAYS: Readonly<Record<string, number>> = { G5: 7, G4: 90, G6: 90 };
+ *  own 复核周期 example "如每 90 天"); G1 postmortems 30d — their action items
+ *  carry due dates and rot inside a quarter; G2/G3 have no cadence guidance, so
+ *  the conservative quarterly 90d default applies. */
+const GENRE_CADENCE_DAYS: Readonly<Record<string, number>> = { G1: 30, G5: 7, G4: 90, G6: 90 };
 const DEFAULT_CADENCE_DAYS = 90;
 
 // --- Title similarity (trigram core copied from migrate-score.ts:289, where it
@@ -448,6 +475,51 @@ function dueForReviewOf(body: string, genre: string, now: Date): DueForReview | 
   return { stampAge, cadence, verifyCommands: verifyCommandsOf(body) };
 }
 
+/** Flattens a markdown cell to one ≤80-char line for report display. */
+function flattenCell(cell: string): string {
+  const flat = cell.replace(/[*_`]|<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  return flat.length > 80 ? `${flat.slice(0, 77)}…` : flat;
+}
+
+/** Finds open action items past due in any G1-shaped action table (header must
+ *  carry 措施/期限/状态 columns). Undated (TBD) rows are skipped here — they are
+ *  a different defect owned by the authoring gate, not the ageing sweep. */
+export function overdueActionsOf(body: string, now: Date): Omit<OverdueAction, 'path' | 'locale'>[] {
+  const hits: Omit<OverdueAction, 'path' | 'locale'>[] = [];
+  const lines = body.split('\n');
+  let colAction = -1, colDue = -1, colStatus = -1, inTable = false;
+  for (const line of lines) {
+    const cells = tableCells(line);
+    if (cells === null) {
+      inTable = false;
+      colAction = colDue = colStatus = -1;
+      continue;
+    }
+    if (cells.every((c) => DASH_CELL_RE.test(c.trim()))) continue;
+    const a = cells.findIndex((c) => ACTION_COL_RE.test(c.trim()));
+    const d = cells.findIndex((c) => DUE_COL_RE.test(c.trim()));
+    const s = cells.findIndex((c) => STATUS_COL_RE.test(c.trim()));
+    if (a !== -1 && d !== -1 && s !== -1) {
+      colAction = a; colDue = d; colStatus = s; inTable = true;
+      continue;
+    }
+    if (!inTable || colAction < 0 || cells.length <= Math.max(colDue, colStatus)) continue;
+    const status = cells[colStatus].trim();
+    if (CLOSED_STATUS_RE.test(status) || !OPEN_STATUS_RE.test(status)) continue;
+    const dueMatch = cells[colDue].match(ISO_DATE_RE);
+    if (dueMatch === null) continue;
+    const t = Date.parse(dueMatch[0]);
+    if (Number.isNaN(t) || t >= now.getTime()) continue;
+    hits.push({
+      action: flattenCell(cells[colAction]),
+      due: dueMatch[0],
+      daysOverdue: Math.floor((now.getTime() - t) / DAY_MS),
+      status,
+    });
+  }
+  return hits;
+}
+
 // --- buildMaintainReport --------------------------------------------------------
 
 export async function buildMaintainReport(input: MaintainInput, opts: MaintainOptions = {}): Promise<MaintainReport> {
@@ -468,12 +540,14 @@ export async function buildMaintainReport(input: MaintainInput, opts: MaintainOp
   let redirects: MaintainReport['redirects'] = { available: false, count: 0, stubs: [] };
   let freshness: FreshnessScan | null = null;
   let dueForReview: DueForReviewRow[] | null = null;
+  let overdueActions: OverdueAction[] | null = null;
   if (deep && opts.readBody !== undefined) {
     const readBody = opts.readBody;
     const stubs: RedirectStub[] = [];
     const missing: MissingStamp[] = [];
     const expired: ExpiredReview[] = [];
     const due: DueForReviewRow[] = [];
+    const overdue: OverdueAction[] = [];
     let scanned = 0;
     let unreadable = 0;
     for (const r of kept) {
@@ -491,6 +565,7 @@ export async function buildMaintainReport(input: MaintainInput, opts: MaintainOp
       const genre = classifyGenre({ title: r.title, body }).genre;
       const dfr = dueForReviewOf(body, genre, now);
       if (dfr !== null) due.push({ path: r.path, locale: r.locale, ...dfr });
+      for (const oa of overdueActionsOf(body, now)) overdue.push({ path: r.path, locale: r.locale, ...oa });
       if (!FRESHNESS_GENRES.includes(genre)) continue;
       if (!STAMP_RE.test(body)) missing.push({ path: r.path, locale: r.locale, genre });
       const reviewBy = reviewByOf(body);
@@ -504,6 +579,12 @@ export async function buildMaintainReport(input: MaintainInput, opts: MaintainOp
     redirects = { available: true, count: stubs.length, stubs };
     freshness = { scanned, unreadable, missingLastVerified: missing, expiredReviewBy: expired };
     dueForReview = due.sort((a, b) => b.stampAge - a.stampAge || cmpStr(a.path, b.path) || cmpStr(a.locale, b.locale));
+    const repByPath = new Map<string, string>();
+    const overdueSorted = overdue.sort((a, b) => cmpStr(a.path, b.path) || cmpStr(a.locale, b.locale));
+    for (const o of overdueSorted) if (!repByPath.has(o.path)) repByPath.set(o.path, o.locale);
+    overdueActions = overdueSorted
+      .filter((o) => o.locale === repByPath.get(o.path))
+      .sort((a, b) => b.daysOverdue - a.daysOverdue || cmpStr(a.path, b.path));
   }
 
   return {
@@ -528,6 +609,7 @@ export async function buildMaintainReport(input: MaintainInput, opts: MaintainOp
     sections: sectionDist(kept),
     freshness,
     dueForReview,
+    overdueActions,
   };
 }
 
@@ -614,6 +696,14 @@ export function renderMaintainMarkdown(r: MaintainReport): string {
         : `confessional stamp（自称未复跑），周期 ${fmt(d.cadence)}d 未到亦列`;
       const cmds = d.verifyCommands.length > 0 ? ` · ${d.verifyCommands.map((c) => '`' + c + '`').join(' ')}` : '';
       L.push(`  - \`${d.locale}/${d.path}\` — ${why}${cmds}`);
+    }
+  }
+
+  if (r.overdueActions !== null) {
+    L.push('', '## 逾期行动项 Overdue action items（deep，advisory）', '');
+    L.push(`- ${fmt(r.overdueActions.length)} 条开着的行动项已过期限（孪生页按路径去重，en 优先）—仅提示，处置由人或复核协议执行`);
+    for (const o of r.overdueActions) {
+      L.push(`  - \`${o.locale}/${o.path}\` — "${o.action}" 期限 ${o.due}（逾期 ${fmt(o.daysOverdue)}d，状态：${o.status}）`);
     }
   }
 
