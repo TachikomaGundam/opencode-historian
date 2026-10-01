@@ -184,6 +184,18 @@ export function statusTokenFindings(lint: BodyLint): readonly StatusTokenFinding
 
 const TODO_COMMENT_RE = /(TODO|TBD|PLACEHOLDER|占位)/i;
 const LITERAL_TODO_RE = /\bTODO:/g;
+/** SYN-13 enforcement: a table cell that is nothing but a placeholder token is
+ *  debt (bare `TBD`/`未定` cells passed the old comment-only scan and shipped Active). */
+const PLACEHOLDER_CELL_RE = /^(?:TBD|TBA|未定|待定|待补充|待定日期|TODO)[：:]?$/i;
+
+function countPlaceholderCells(masked: string): number {
+  let n = 0;
+  for (const line of masked.split('\n')) {
+    if (!line.trimStart().startsWith('|')) continue;
+    for (const cell of line.split('|')) if (PLACEHOLDER_CELL_RE.test(cell.trim())) n++;
+  }
+  return n;
+}
 
 function countTodoMarkers(masked: string): number {
   let n = 0;
@@ -193,6 +205,7 @@ function countTodoMarkers(masked: string): number {
   // literal TODO: outside comments (comments already masked to '' for this pass)
   const noComments = masked.replace(COMMENT_RE, '');
   n += (noComments.match(LITERAL_TODO_RE) ?? []).length;
+  n += countPlaceholderCells(masked);
   return n;
 }
 
