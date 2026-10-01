@@ -37,3 +37,26 @@ allow:
   - { rule: 'path-pattern:\\\\[^\\]+\\', match: 'c4141d7d3791dd75efdf836979a66efba39df91cba09858a72d89e95157a58ca', file: 'src/migrate-score.ts' }
   - { rule: 'path-pattern:\\\\[^\\]+\\', match: 'e7549451a6b4ed501a3c31dc28e31bbf7289a535725d9d7b17ce01f456a11b21', file: 'src/chronology.ts' }
   - { rule: 'path-pattern:\\\\[^\\]+\\', match: 'ec18995e54afb50e59f07c6507606cde6107cef6e190cb19e1de84624416933f', file: 'src/templates/genres.ts' }
+
+# Self-referential waivers: the rule-IDs of the path heuristics themselves contain
+# byte-sequences (letter+colon+backslash, double-backslash runs) that the heuristics flag
+# when border.yaml is scanned as content. Config text, publicly the gate's own vocabulary,
+# not secrets. Engine-side config-exemption is the proper fix — filed as policy question.
+  - { rule: 'path-pattern:[A-Za-z]:\\', match: 'be5fa85046a8d8d93b90ee568b409b269888f8b0ba64727f3c07fcdeba15ecb8', file: 'border.yaml' }
+  - { rule: 'path-pattern:[A-Za-z]:\\', match: 'c14f17a739d27686277cdad76665bee4444faf4c2037a6701874fed8dd46f70d', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '0996146e7cb4682e9da92f3abd130a72594897f30a6f85de173bbfc86b9f880b', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '0af938cdf09c92d7f75fd1ac505789eeb8eeeaea0bd64156b61d0bbb7538c56f', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '2593c836afdc083f12bfd390b6334e70c398c8629bbcdd44aa61a8fae65417fc', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '2b16941f0c0e3b902ee19c1fa0fa85376881c5af463044afe578b42c2fbec254', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '5289abfc7f135249689559b17484e58e1e000654e84b81d2a6062281b016445e', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '78cd62cd01bb4309dd2d5bb305eac1f0bcc4dff304b203088de16068b78fe54f', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '835b5fbe22c2a78b470a96c0e66cb2047926f6418a43b85ef22539ae210e3007', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '84d8f68f6bcd3bbada30a4fe5f52227c0952c5f55ef22963df39359723c26480', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '966c9be5d5e57033b7b2b44cd229e98f84e25a508116efd18ce36d6aa78b0248', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: '9c78148ecf49d8daf5c5b760e3b7dfd7b4832223e66d8592aaace0a2e849954b', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: 'a0417f8ad3c4032aa5ea83a333abfbfeeb0478006a7644617219503d750fb56c', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: 'a0c621a9c3996b54e12e72fc6022f1ab5723198740c325795655fabd84e7e839', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: 'a8c8358392c8f8bf2d6fd94b1032aff0708dcdce3ea7f82d3b5b498a3ca26201', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: 'e931c5fb6452605c0e3a1f724576423f8dcaf4e4a33862efed985eed6fdfb62a', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: 'f536fb087dced4e64caae8c609244db11727bf9736355c058d1506acb1c76519', file: 'border.yaml' }
+  - { rule: 'path-pattern:\\\\[^\\]+\\', match: 'f7863571ff2fad47ff55234130fdd2a5c1e67850d4c6a2c4f87eab85f2a7708c', file: 'border.yaml' }
