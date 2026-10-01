@@ -1,4 +1,4 @@
-<!-- source: /home/user/workspace/harness/historian/.omo/research/wikijs-2x-capabilities-digest.md sha256:0559d7893665669d539858545ae5d4fedcb9289e9763eedfc1392776714064ad -->
+<!-- source: ~/workspace/harness/historian/.omo/research/wikijs-2x-capabilities-digest.md sha256:0559d7893665669d539858545ae5d4fedcb9289e9763eedfc1392776714064ad -->
 
 # Wiki.js 2.x Feature & Customization Digest (persisted 2026-09-01)
 

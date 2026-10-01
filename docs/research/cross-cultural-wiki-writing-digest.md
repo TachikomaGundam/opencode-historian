@@ -1,4 +1,4 @@
-<!-- source: /home/user/workspace/harness/historian/.omo/research/cross-cultural-wiki-writing-digest.md sha256:3a59b5e937cf7f986e646cbf765700329130d3eee1bd48cdaa57b4141a33b0ff -->
+<!-- source: ~/workspace/harness/historian/.omo/research/cross-cultural-wiki-writing-digest.md sha256:3a59b5e937cf7f986e646cbf765700329130d3eee1bd48cdaa57b4141a33b0ff -->
 
 # Cross-Cultural Wiki Writing — Planning Digest (persisted 2026-09-01)
 
