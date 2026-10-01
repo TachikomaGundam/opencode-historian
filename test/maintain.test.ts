@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import type { ToolDefinition } from '@opencode-ai/plugin';
 import { OPTS, makeKeyHome, jsonResponse } from './client-fixtures.js';
 import { buildTools } from '../src/tools.js';
-import { buildMaintainReport, renderMaintainMarkdown, DUP_TITLE_THRESHOLD, type MaintainRow } from '../src/maintain.js';
+import { buildMaintainReport, renderMaintainMarkdown, overdueActionsOf, DUP_TITLE_THRESHOLD, type MaintainRow } from '../src/maintain.js';
 import type { MapRow } from '../src/map.js';
 import type { Locale } from '../src/wiki/pages.read.js';
 
@@ -78,7 +78,7 @@ describe('buildMaintainReport (light)', () => {
       { now: NOW },
     );
     // stale_state guard: the report says when it was built and over how many rows
-    expect(report.schema).toBe('historian.maintain.v2');
+    expect(report.schema).toBe('historian.maintain.v3');
     expect(report.generatedAt).toBe('2026-09-04T12:00:00.000Z');
     expect(report.rowCount).toBe(15); // input rows, pre-filter
     expect(report.mapGeneratedAt).toBe('2026-09-04T11:00:00.000Z');
@@ -190,7 +190,7 @@ describe('buildMaintainReport (light)', () => {
     expect(Object.keys(tail)).toEqual([
       'schema', 'generatedAt', 'rowCount', 'mapGeneratedAt', 'mapStaleSeconds', 'deep',
       'pages', 'duplicates', 'staleness', 'diffusion', 'flatRootPages', 'tags', 'redirects',
-      'sections', 'freshness', 'dueForReview',
+      'sections', 'freshness', 'dueForReview', 'overdueActions',
     ]);
     expect(tail.rowCount).toBe(15);
     expect(tail.generatedAt).toBe('2026-09-04T12:00:00.000Z');
@@ -636,5 +636,54 @@ describe('historian_map action:"maintain"', () => {
     const home = makeKeyHome();
     const { tools } = makeWired({}, home);
     await expect(run(tools.historian_map, { action: 'bogus' })).rejects.toThrow();
+  });
+});
+
+// --- overdueActions (I-16: G1 action tables must not rot silently) -------------
+
+describe('overdueActionsOf', () => {
+  const TABLE = (rows: string) =>
+    `# 某事件复盘\n\n## 行动项\n\n| 措施 | 类型 | 负责人 | 期限 | 验证 | 状态 |\n| --- | --- | --- | --- | --- | --- |\n${rows}\n\n## 相关页面\n`;
+  it('fires only on open+overdue+dated rows; done/future/TBD/neutral stay quiet', () => {
+    const body = TABLE(
+      '| 回填复核命令 | prevent | 用户 | 2026-08-20 | grep | 待办 |\n' +
+      '| 上游反馈 | process | agent | 2026-09-10 | issue | pending |\n' +
+      '| 重启观察 | verify | 用户 | 2026-08-01 | grep | 已完成 |\n' +
+      '| 补文档 | process | 未定 | 未定 | issue | Pending |\n' +
+      '| 再启用 | process | 用户 | 2026-08-02 | x | 未完成 |',
+    );
+    expect(overdueActionsOf(body, NOW)).toEqual([
+      { action: '回填复核命令', due: '2026-08-20', daysOverdue: 15, status: '待办' },
+    ]);
+  });
+  it('en headers + in-progress status also fire; a table without the 期限 column never matches', () => {
+    const en = '# Post\n\n## Action Items\n\n| Action | Owner | Due | Verification | Status |\n| --- | --- | --- | --- | --- |\n| file upstream **issue** | agent | 2026-08-31 | link | in progress |\n';
+    expect(overdueActionsOf(en, NOW)).toEqual([
+      { action: 'file upstream issue', due: '2026-08-31', daysOverdue: 4, status: 'in progress' },
+    ]);
+    const noDue = '| 措施 | 负责人 | 状态 |\n| --- | --- | --- |\n| 做事 | 我 | 待办 |\n';
+    expect(overdueActionsOf(noDue, NOW)).toEqual([]);
+  });
+});
+
+describe('buildMaintainReport overdue queue (deep)', () => {
+  const PAGE_EN =
+    '# 事故复盘\n\n**状态/Status**: active · **日期/Date**: 2026-08-01\n\n## 行动项\n\n' +
+    '| 措施 | 类型 | 负责人 | 期限 | 验证 | 状态 |\n| --- | --- | --- | --- | --- | --- |\n' +
+    '| 观察日志 | 验证 | 用户 | 2026-08-20 | grep | Pending |\n| 提交 issue | 改进 | agent | 2026-08-25 | link | 进行中 |\n';
+  const rows: MaintainRow[] = [
+    mk(200, 'en', 'ops/incident', '事故复盘', '2026-08-10'),
+    mk(201, 'zh', 'ops/incident', '事故复盘', '2026-08-10'),
+  ];
+  it('lists all open overdue items of one path, dedupes twins to the en row, null in light', async () => {
+    const readBody = async (): Promise<string | null> => PAGE_EN;
+    const report = await buildMaintainReport({ rows }, { now: NOW, deep: true, readBody });
+    expect(report.overdueActions).toEqual([
+      { path: 'ops/incident', locale: 'en', action: '观察日志', due: '2026-08-20', daysOverdue: 15, status: 'Pending' },
+      { path: 'ops/incident', locale: 'en', action: '提交 issue', due: '2026-08-25', daysOverdue: 10, status: '进行中' },
+    ]);
+    expect(renderMaintainMarkdown(report)).toContain('逾期行动项');
+    const light = await buildMaintainReport({ rows }, { now: NOW });
+    expect(light.overdueActions).toBeNull();
   });
 });

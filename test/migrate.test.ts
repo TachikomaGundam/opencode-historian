@@ -157,7 +157,7 @@ describe('reformatPageDraft', () => {
     const system = duel.llmCalls[0]!.system;
     expect(system).toContain('RESTYLE: en->en');
     expect(system).toContain('R1 结论先行');
-    expect(system).toContain('R8 行动项五要素');
+    expect(system).toContain('R8 行动项八列');
     expect(system).toMatch(/PRESERVE/);
     expect(system).toMatch(/verbatim/);
     expect(system).toContain('code fences');
