@@ -45,7 +45,10 @@ export const G1_ZH: string = `# 页面标题（占位：写完后替换为实际
 | --- | --- |
 | 影响范围 | <!-- 哪些服务/用户/区域受影响 --> |
 | 持续时间 | <!-- 起止时间，如 2026-09-01 14:02–15:47 (UTC+8) --> |
+| 关键时间 | <!-- 影响开始 → 被发现 → 被缓解 → 已恢复（UTC）；发现延迟=被发现−影响开始 --> |
+| 发现方式 | <!-- 告警/人工/日志回放：谁、何时、如何发现 --> |
 | 严重度 | <!-- P0/P1/P2（或 S1–S4），并写明判定依据 --> |
+| 复核期限 | YYYY-MM-DD <!-- 行动项回查日期；到期页进入 maintain 深扫队列 --> |
 
 ## 背景
 
@@ -53,11 +56,11 @@ export const G1_ZH: string = `# 页面标题（占位：写完后替换为实际
 
 ## 时间线
 
-<!-- 只记可查证事实：以日志/告警为准，不以口述为准；相邻事件 ≠ 因果关系。每行必须填来源列。 -->
+<!-- 只记可查证事实：以日志/告警为准，不以口述为准；相邻事件 ≠ 因果关系。每行必须填阶段与来源列；阶段取词：触发/影响/发现/缓解/恢复。 -->
 
-| 时间 | 事件 | 来源 |
-| --- | --- | --- |
-| YYYY-MM-DD HH:MM | <!-- 发生了什么 --> | <!-- 告警/日志/commit 链接 --> |
+| 时间 | 阶段 | 事件 | 来源 |
+| --- | --- | --- | --- |
+| YYYY-MM-DD HH:MM | <!-- 阶段 --> | <!-- 发生了什么 --> | <!-- 告警/日志/commit 链接 --> |
 
 ## 量化影响
 
@@ -76,6 +79,8 @@ export const G1_ZH: string = `# 页面标题（占位：写完后替换为实际
 4. Why: <!-- 第 4 层 -->
 5. Why: <!-- 第 5 层：收敛到根本原因 -->
 
+**复发检查**：<!-- 检索既往事件页：同根因/同触发面是否发生过？有则链接前例；首次则明示"未见前例"。 -->
+
 ## 处置
 
 | 类别 | 措施 | 完成时间 |
@@ -85,11 +90,11 @@ export const G1_ZH: string = `# 页面标题（占位：写完后替换为实际
 
 ## 行动项
 
-| 措施 | 类型 | 负责人 | 期限 | 验证 | 状态 |
-| --- | --- | --- | --- | --- | --- |
-| <!-- 做什么 --> | <!-- prevent/mitigate/process --> | <!-- 负责人 --> | YYYY-MM-DD | <!-- 如何证明已完成 --> | <!-- 待办/进行中/已完成 --> |
+| 措施 | 优先级 | 类型 | 负责人 | 期限 | 验证 | 跟踪 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| <!-- 做什么 --> | <!-- P0/P1/P2 --> | <!-- prevent/mitigate/process --> | <!-- 负责人 --> | YYYY-MM-DD | <!-- 如何证明已完成 --> | <!-- issue/页面路径，无则 — --> | <!-- 待办/进行中/已完成 --> |
 
-<!-- 每个根因主题至少一个 prevent 行动项；验证列必须可检查，否则行动项不算完成。 -->
+<!-- 每个根因主题至少一个 prevent 行动项；验证列必须可检查，否则行动项不算完成；逾期的开项由 maintain 深扫点名。 -->
 
 ## 教训
 
@@ -137,7 +142,10 @@ export const G1_EN: string = `# Page Title (placeholder: replace with the real t
 | --- | --- |
 | Blast radius | <!-- services/users/regions affected --> |
 | Duration | <!-- start–end, e.g. 2026-09-01 14:02–15:47 (UTC+8) --> |
+| Key timestamps | <!-- impact start → detected → mitigated → recovered (UTC); detection lag = detected − start --> |
+| Detected by | <!-- alert / human / log replay: who, when, how --> |
 | Severity | <!-- P0/P1/P2 (or S1–S4) with the basis for the rating --> |
+| Review-by | YYYY-MM-DD <!-- action-item sweep date; expired pages enter the maintain deep queue --> |
 
 ## Background
 
@@ -145,11 +153,11 @@ export const G1_EN: string = `# Page Title (placeholder: replace with the real t
 
 ## Timeline
 
-<!-- Verifiable facts only: log/alert-based, not memory-based; adjacent events ≠ causation. Every row needs its source column filled. -->
+<!-- Verifiable facts only: log/alert-based, not memory-based; adjacent events ≠ causation. Every row fills the phase and source columns; phase vocabulary: trigger/impact/detection/mitigation/recovery. -->
 
-| Time | Event | Source |
-| --- | --- | --- |
-| YYYY-MM-DD HH:MM | <!-- what happened --> | <!-- alert/log/commit link --> |
+| Time | Phase | Event | Source |
+| --- | --- | --- | --- |
+| YYYY-MM-DD HH:MM | <!-- phase --> | <!-- what happened --> | <!-- alert/log/commit link --> |
 
 ## Quantified Impact
 
@@ -168,6 +176,8 @@ export const G1_EN: string = `# Page Title (placeholder: replace with the real t
 4. Why: <!-- layer 4 -->
 5. Why: <!-- layer 5: converges on the root cause -->
 
+**Recurrence check**: <!-- search prior incident pages: same root cause or trigger before? Link the precedent; if first seen, say so. -->
+
 ## Remediation
 
 | Kind | Action | Done |
@@ -177,11 +187,11 @@ export const G1_EN: string = `# Page Title (placeholder: replace with the real t
 
 ## Action Items
 
-| Action | Type | Owner | Due | Verification | Status |
-| --- | --- | --- | --- | --- | --- |
-| <!-- what to do --> | <!-- prevent/mitigate/process --> | <!-- owner --> | YYYY-MM-DD | <!-- how to prove it is done --> | <!-- todo/in progress/done --> |
+| Action | Priority | Type | Owner | Due | Verification | Tracking | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| <!-- what to do --> | <!-- P0/P1/P2 --> | <!-- prevent/mitigate/process --> | <!-- owner --> | YYYY-MM-DD | <!-- how to prove it is done --> | <!-- issue/page link, or — --> | <!-- todo/in progress/done --> |
 
-<!-- At least one prevent item per root-cause theme; an action item without a checkable verification is not done. -->
+<!-- At least one prevent item per root-cause theme; an action item without a checkable verification is not done; open items past due are named by the maintain deep sweep. -->
 
 ## Lessons
 
