@@ -27,6 +27,7 @@
 | SYN-21 | **撞车 advisory 必须响应** | `historian_page_create` 返回 `path exists — … prefer historian_page_update to amend it` 或 `疑似重复: … 先读再写` advisory（`src/tools/shared.ts` 的 `collisionAdvisory`）时，必须 `historian_read` 既有页后改用 `historian_page_update` 续写，禁止无视 advisory 直接重复建页。advisory 本身不拦截写入，拦截靠执行者响应——这是 GATE 环的设计（机器提示、人/agent 裁决）。 |
 | SYN-22 | **Redirect 存根正文** | 存根正文只允许 `> Redirect: <canonical URL>` 一行，行首起始（`/^>\s*Redirect:/i` 判定），不携带其他正文。双语孪生各改一份（en→`/en/...`、zh→`/zh/...` canonical）。流程与 maintain 计数口径见 `references/genres.md` Redirect 存根规范。 |
 | SYN-23 | **发布态流转** | capture 新建页必经 `状态: draft` → 十项自检通过 → `Active`。建页时自检 FAIL ≥3 条出 advisory `自检 N/10 未通过: … (不阻断, 发布前请补齐)`；FAIL 项用 `historian_page_update` 补齐后才可标 Active。禁止跳过自检直接把 draft 页改口成 Active。 |
+| SYN-24 | **发表后更正注记** | 页面上线后修改事实（数字、日期、因果、行动项状态）须追加一行带日期的更正：`更正/Correction: YYYY-MM-DD — <改了什么、依据>`；纯排版/语法修改不触发。复盘页的行动项状态变化视为事实修改，一律适用。 |
 
 ## 来源
 
