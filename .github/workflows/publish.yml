@@ -1,0 +1,55 @@
+name: release-on-tag
+# Trusted publishing via npm OIDC — no NPM_TOKEN ever touches this repo.
+# Flow: human pushes tag v<semver>  ->  gates (build+tests+privacy)  ->  npm publish --provenance.
+# One-time npm-site config required FIRST (see RELEASE.md §npm trusted-publisher), otherwise
+# the publish step fails closed with E401 — which is the correct outcome, not a bug to route around.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+  id-token: write # OIDC identity for provenance + trusted publishing
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0   # trusted publishing floor: node>=22.14, npm>=11.5.1
+          registry-url: https://registry.npmjs.org
+
+      - name: npm meets trusted-publishing CLI floor
+        run: |
+          npm install --no-save --global npm@^11.5.1
+          npm --version
+
+      - name: pin gate — tag must equal package.json version (mis-tag fails closed)
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "$PKG" ]; then
+            echo "tag v$TAG != package.json version $PKG — refusing." >&2
+            exit 1
+          fi
+
+      - name: install
+        run: npm ci --no-audit --no-fund
+
+      - name: gates (mirror of prepublishOnly, run explicitly for legible CI logs)
+        run: |
+          npm run build
+          npx vitest run
+          node tools/privacy-audit.mjs
+
+      - name: publish with provenance
+        env:
+          NPM_CONFIG_IGNORE_LIFECYCLE_SCRIPTS: "true" # gates already ran; do not double-execute prepublishOnly
+        # provenance generates automatically for trusted publishes from public repos — no flag needed
+        run: npm publish
