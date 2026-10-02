@@ -91,7 +91,11 @@ export const DEFAULT_BASE_URL = 'http://localhost:3000';
 export const DEFAULT_API_KEY_PATH = '~/.wikijs-api-key';
 /** Env leg of the endpoint chain: raw option → this env var → unset (''). */
 export const ENV_TRANSLATE_ENDPOINT = 'HISTORIAN_TRANSLATE_ENDPOINT';
-export const DEFAULT_TRANSLATE_MODEL = 'qwen3.7-plus';
+/** L-MACHINE-LOCAL (owner ruling 2026-10-01, 复核 2026-10-02): the portable
+ * package must NOT pin the operator's model choice. Resolution is
+ * explicit-option -> env leg -> unset (''), and an unset model fails loudly
+ * at first translate call (see translate.ts), never silently defaults. */
+export const ENV_TRANSLATE_MODEL = 'HISTORIAN_TRANSLATE_MODEL';
 /** Empty = no path-prefix restriction (see HistorianOptions.sections). */
 export const DEFAULT_SECTIONS: readonly string[] = [];
 export const DEFAULT_LOCALES = ['en', 'zh'] as const;
@@ -135,7 +139,7 @@ export function resolveOptions(
     apiKeyPath: raw.apiKeyPath ?? DEFAULT_API_KEY_PATH,
     translate: {
       endpoint: raw.translate?.endpoint ?? env[ENV_TRANSLATE_ENDPOINT] ?? '',
-      model: raw.translate?.model ?? DEFAULT_TRANSLATE_MODEL,
+      model: raw.translate?.model ?? env[ENV_TRANSLATE_MODEL] ?? '',
       apiKey: translateApiKey,
       providerKey,
     },

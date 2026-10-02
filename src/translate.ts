@@ -178,6 +178,14 @@ export async function callMessages(
         'or export HISTORIAN_TRANSLATE_ENDPOINT.',
     );
   }
+  if (opts.translate.model.trim() === '') {
+    throw new TranslateError(
+      'config',
+      'translate.model not configured — set plugin option translate.model or ' +
+      'env HISTORIAN_TRANSLATE_MODEL to a model YOUR device is authorized for ' +
+      '(L-MACHINE-LOCAL: the package ships no device model defaults).',
+    );
+  }
   const url = normalizeMessagesUrl(opts.translate.endpoint);
   const key = opts.translate.apiKey;
   const fetchImpl = deps?.fetchImpl ?? fetch;

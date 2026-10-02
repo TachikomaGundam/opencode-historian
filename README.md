@@ -1,5 +1,7 @@
 # opencode-historian
 
+> 中文 ↓ | [English →](README.en.md)
+
 > OpenCode 插件：双语 wiki.js 知识库管理 / Bilingual wiki curator as an OpenCode plugin.
 
 opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具打包成一个 OpenCode 插件，让 AI agent 能直接管理双语知识库。它为什么存在、文风从哪里来、怎么一句话开始用，见下文「史官宣言」。
@@ -169,7 +171,7 @@ opencode run --command historian --message "historian_map show"
       "apiKeyPath": "~/.wiki-key",
       "translate": {
         "endpoint": "https://<your-anthropic-compatible-gateway>/v1",
-        "model": "qwen3.7-plus",
+        "model": "<your-authorized-model>",
         "apiKey": "<YOUR_KEY>",
         "providerKey": "my-provider"
       },
@@ -189,7 +191,7 @@ opencode run --command historian --message "historian_map show"
 | `baseUrl` | string | `http://localhost:3000` | wiki.js GraphQL 端点 |
 | `apiKeyPath` | string | `~/.wikijs-api-key` | wiki API key 文件路径（tilde 在读取时展开） |
 | `translate.endpoint` | string | 未配置（见下方链） | 翻译 API 端点 |
-| `translate.model` | string | `qwen3.7-plus` | 翻译模型 |
+| `translate.model` | string | 未配置（调用时响亮报错） | 翻译模型；包内不内置设备模型默认（L-MACHINE-LOCAL），可用 env `HISTORIAN_TRANSLATE_MODEL` 兜底腿 |
 | `translate.apiKey` | string | 见下方链 | 翻译 API 密钥 |
 | `translate.providerKey` | string | 未配置 | jsonc 兜底腿读取的 provider 名；须显式设置才会启用该腿 |
 | `sections` | string[] | `[]`（不限制） | 写入路径前缀白名单。v4 起强制生效：非空时 create/update/append/delete/move(目标路径) 在发出请求前做 `sectionGuard` 检查，越界返回 `ConfigError`；`home`、`wiki-index`、`_sandbox`、`_data`、`_meta`、`_evidence` 恒豁免；按首路径段匹配、区分大小写 |

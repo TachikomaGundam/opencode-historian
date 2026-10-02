@@ -186,7 +186,7 @@ describe('resolveOptions defaults', () => {
     expect(opts.baseUrl).toBe('http://localhost:3000');
     expect(opts.apiKeyPath).toBe('~/.wikijs-api-key');
     expect(opts.translate.endpoint).toBe('');
-    expect(opts.translate.model).toBe('qwen3.7-plus');
+    expect(opts.translate.model).toBe(''); // no device pin since 0.5.5 (L-MACHINE-LOCAL)
     expect(opts.translate.providerKey).toBe(''); // opt-in only: no default provider
     expect(opts.sections).toEqual([]);
     expect(opts.locales).toEqual(['en', 'zh']);
@@ -237,7 +237,7 @@ describe('resolveOptions defaults', () => {
       apiKeyPath: '/opt/secrets/wiki.key',
       translate: {
         endpoint: 'http://tts:9000/v1',
-        model: 'qwen-other',
+        model: 'device-other',
         apiKey: 'sk-raw',
         providerKey: 'my-provider',
       },
@@ -248,7 +248,7 @@ describe('resolveOptions defaults', () => {
     expect(opts.baseUrl).toBe('http://elsewhere:4321');
     expect(opts.apiKeyPath).toBe('/opt/secrets/wiki.key');
     expect(opts.translate.endpoint).toBe('http://tts:9000/v1');
-    expect(opts.translate.model).toBe('qwen-other');
+    expect(opts.translate.model).toBe('device-other');
     expect(opts.translate.providerKey).toBe('my-provider');
     expect(opts.sections).toEqual(['team-notes']);
     expect(opts.locales).toEqual(['en']);
