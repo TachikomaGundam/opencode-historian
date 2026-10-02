@@ -32,5 +32,9 @@
     "build": "tsc",
     "test": "vitest run",
     "prepublishOnly": "npm run build && npx vitest run && node tools/privacy-audit.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TachikomaGundam/opencode-historian.git"
   }
 }
