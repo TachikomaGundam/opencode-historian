@@ -31,7 +31,7 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "prepublishOnly": "npm run build && npx vitest run && node tools/privacy-audit.mjs"
+    "prepublishOnly": "npm run build && npx vitest run && node tools/privacy-audit.mjs && node tools/portable-binding-audit.mjs"
   },
   "repository": {
     "type": "git",
