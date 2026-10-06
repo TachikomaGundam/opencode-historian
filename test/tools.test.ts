@@ -340,7 +340,7 @@ describe('historian_page_create', () => {
       throw new Error('tools.test: unknown fetch body shape');
     }) as typeof fetch;
     try {
-      const tools = buildTools(OPTS, {});
+      const tools = buildTools(OPTS, { homeDir: makeKeyHome() });
       // When: creating with twin:true (default) entirely on the no-deps build
       const out = await run(tools.historian_page_create, { path: PATH, title: 'Alpha', content: '# Alpha\nbody', tags: ['t1'] });
       // Then: the twin was ENGINE-translated and created — never the
