@@ -18,16 +18,19 @@ const rules = (): Rule[] =>
 const re = (r: Rule): RegExp => new RegExp(r.pattern, r.flags ?? 'i');
 
 describe.skipIf(!hasLocal)('owner-handle-email red line (contact-shape predicate)', () => {
-  const owner = rules().find((r) => r.name === 'owner-handle-email');
-  it('rule exists', () => expect(owner).toBeDefined());
+  // ALL fs reads live inside it() bodies: describe callbacks run at collection
+  // even when skipped — a read here crashed fresh-clone CI (self-inflicted, 2026-10-06).
+  it('rule exists', () => expect(rules().find((r) => r.name === 'owner-handle-email')).toBeDefined());
 
   it('fires on handle used as contact email', () => {
-    expect(re(owner!).test('TachikomaGundam@users.noreply.github.com')).toBe(true);
-    expect(re(owner!).test('mail tachikomagundam@gmail.com')).toBe(true);
+    const owner = rules().find((r) => r.name === 'owner-handle-email')!;
+    expect(re(owner).test('TachikomaGundam@users.noreply.github.com')).toBe(true);
+    expect(re(owner).test('mail tachikomagundam@gmail.com')).toBe(true);
   });
 
   it('does not fire on the canonical repository URL identity', () => {
-    expect(re(owner!).test('git+https://github.com/TachikomaGundam/opencode-historian.git')).toBe(false);
+    const owner = rules().find((r) => r.name === 'owner-handle-email')!;
+    expect(re(owner).test('git+https://github.com/TachikomaGundam/opencode-historian.git')).toBe(false);
   });
 
   it('shipped repository field stays clean against the WHOLE local list', () => {
