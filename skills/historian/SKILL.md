@@ -1,6 +1,6 @@
 ---
 name: historian
-description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）、G1-G6 页型骨架、V6 进化驱动机构记忆层（三回路：捕获 /historian-capture 触发器 + 策展 maintain 报告 + 闸门 reading loop/十项自检/sections guard）、可发布 OpenCode 插件。Phase 1.5 页型分类确保每页匹配正确的知识形态。操作 10 个 historian_* 工具完成搜索、阅读、创建、更新、追加、翻译、迁移、移动、删除与页面地图/时间线/维护扫描。"
+description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）、G1-G6 页型骨架、V6 进化驱动机构记忆层（三回路：捕获 /historian-capture 触发器 + 策展 maintain 报告 + 闸门 reading loop/十项自检/sections guard）、可发布 OpenCode 插件。Phase 1.5 页型分类确保每页匹配正确的知识形态。操作 11 个 historian_* 工具完成搜索、阅读、创建、更新、追加、翻译、迁移、移动、删除、锚印封存（anchor：人类订单/批准消息的哈希封存与对账）与页面地图/时间线/维护扫描。"
 ---
 
 # 史官 (Historian) — 行为契约 V6 进化驱动
@@ -28,7 +28,7 @@ description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）�
 
 ## 三回路总览 (Three Loops)
 
-V6 的机构记忆层由三条回路组成，共用同一套 10 个 `historian_*` 工具：
+V6 的机构记忆层由三条回路组成，共用同一套 11 个 `historian_*` 工具：
 
 ```
 回路        驱动方式        入口                                    产出
@@ -196,9 +196,9 @@ G5 现状卡的硬约束：状态块是机读单行（`Active` / `Superseded-by:
 |------|------|----------|
 | `historian_page_create` | 创建页面（含孪生） | `path`, `title`, `content`（缺省=返回本地骨架）, `genre`(G1-G6), `locale`(en/zh, 缺省 en), `isPublished`(缺省 true), `tags`(缺省 []), `twin`(缺省 true), `tier`(缺省前台；`"evidence"`=证据层) |
 | `historian_page_update` | 更新页面（全量合并） | `path`, `locale`, `title?`, `content?`, `description?`, `tags?` |
-| `historian_page_append` | 追加到页面（双 locale） | `path`, `section`, `locale`, `sectionZh?` |
+| `historian_page_append` | 追加到页面（双 locale）。**正文一律放 `section`**；`content` 参数对追加无效——传入非空且未被 section 包含的 content 会被当场拒绝而非静默丢弃 | `path`, `section`, `locale`, `sectionZh?` |
 | `historian_translate_snippet` | 翻译片段 | `text`, `from`(en/zh), `to`(en/zh) |
-| `historian_search` | 搜索页面 | `query`, `kind`(title/content), `tags?`(1-5 个), `tagsMode?`(all 缺省/any) |
+| `historian_search` | 搜索页面。**用单个关键词**（多词查询可能 0 命中）；刚写入的内容索引有延迟，写入后验证一律用 `historian_read`，勿用 search | `query`, `kind`(title/content), `tags?`(1-5 个), `tagsMode?`(all 缺省/any) |
 | `historian_read` | 读取页面 | `path`, `locale` |
 | `historian_map` | 页面地图/时间线/维护扫描 | `action`(show/refresh/timeline/maintain)；maintain 可选 `deep`（缺省 false=light 扫）；timeline 可选 `days`（近 N 天）与 `path`（前缀过滤）；输出人读 markdown + 机读 JSON，zh/en 行独立；maintain 同时返回 surface 接口面体检（信封 `historian.maintain.v3`） |
 | `historian_migrate` | 迁移页面到规范 | `path`, `genre?`, `apply`(false/true) |

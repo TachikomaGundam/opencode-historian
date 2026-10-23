@@ -944,6 +944,47 @@ describe('historian_page_append', () => {
     expect(fetchCount()).toBe(5);
   });
 
+  it('refuses loudly when content carries text section does not (infra handoff 2026-10-23)', async () => {
+    const { tools, fetchCount } = makeWired({
+      'singleByPath(': (vars) => ({
+        data: { pages: { singleByPath: vars.locale === 'zh' ? zhPage() : rawPage() } },
+      }),
+    });
+
+    const out = await run(tools.historian_page_append, {
+      path: PATH,
+      section: '## 标题A',
+      content: '## 标题A\n\n正文B',
+    });
+
+    expect(out.ok).toBe(false);
+    expect(out.error).toBe('append-content-arg-ignored');
+    expect(typeof out.actionableHint).toBe('string');
+    expect(fetchCount()).toBe(0);
+  });
+
+  it('accepts a redundant content argument already contained in section', async () => {
+    const { tools, fetchCount } = makeWired({
+      'singleByPath(': (vars) => ({
+        data: { pages: { singleByPath: vars.locale === 'zh' ? zhPage() : rawPage() } },
+      }),
+      'single(': () => ({ data: { pages: { single: rawPage() } } }),
+      'update(': (vars) => ({
+        data: { pages: { update: { ...RESP_OK, page: { id: vars.id, path: vars.path, locale: vars.locale } } } },
+      }),
+    });
+
+    const out = await run(tools.historian_page_append, {
+      path: PATH,
+      section: '## New\n\nbody',
+      content: '## New',
+    });
+
+    expect(out.ok).toBe(true);
+    expect(out.mode).toBe('append');
+    expect(fetchCount()).toBe(5);
+  });
+
   it('appends to both locales when sectionZh is provided and the twin exists', async () => {
     // Given: both locales exist
     const { tools, captured, fetchCount } = makeWired({
