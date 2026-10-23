@@ -8,7 +8,7 @@ opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具�
 
 功能一览:
 
-* 11 个 `historian_*` 工具，覆盖创建、更新、追加、翻译、搜索、阅读、地图/时间线/维护报告、迁移、删除、移动、锚印封存（historian_anchor：把人类订单/批准消息在引擎会话库中定位、哈希并落证据页回执，供事后对账）
+* 11 个 `historian_*` 工具：创建、更新、追加、翻译、搜索、阅读、地图/时间线/维护报告、迁移、删除、移动。另有锚印封存 `historian_anchor`：在引擎会话库中定位人类订单/批准消息，哈希并落证据页回执，供事后对账
 * Skill v5 随插件自动注入（config hook），无需手动安装 skill 文件
 * G1 至 G6 页型契约，每种页型对应专属骨架模板（v4 新增 G6 操作手册/how-to）
 * 双语孪生页面（en/zh）自动翻译，翻译引擎可配置
@@ -23,7 +23,7 @@ opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具�
 
 ### 灵感 / Inspiration
 
-这个插件的写作规则不是发明的，是从五种语言文化的 wiki 工程传统加一种运维文化里蒸馏出来的（调研全文见仓库内 `docs/research/cross-cultural-wiki-writing-digest.md`，每条主张附原文引用）：
+这个插件的写作规则不是发明的。它们蒸馏自五种语言文化的 wiki 工程传统，再加一种运维文化。调研全文见仓库内 `docs/research/cross-cultural-wiki-writing-digest.md`，每条主张附原文引用：
 
 | 文化 | 给史官的贡献 |
 |---|---|
@@ -33,13 +33,13 @@ opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具�
 | 法文 | 中立、非个人化、清晰、精确、易懂、有教学性六种品质；溢美词强制转成事实（用排名、奖项、销量替代"最伟大的"这类断言）；耐久过滤：明天就会过时的内容不值得写 |
 | 俄文 | ХС/ИС 条目门槛（导言普通读者可懂、术语最少、不少于 10 行）；二手权威来源优先于一手（АИ）；每种观点按影响力分配篇幅、禁止虚假平衡（ВЕС）；风格要求精确、简明、无歧义，同时保持内容饱和 |
 
-SRE postmortem 文化单独值得点名：它把"事件"当一等文档对待，先证据后结论的证据链四段式（`src/index.ts` 的 `CAPTURE_COMMAND_TEMPLATE` 模板）正是 `/historian-capture` 命令的正文契约：证据链→方法→修复手段→函数级实现，而"改进项要有负责人和可验证终态"落在了 G1 行动项表格里。
+SRE postmortem 文化单独值得点名：它把"事件"当一等文档对待。先证据后结论的证据链四段式，正是 `/historian-capture` 命令的正文契约：证据链→方法→修复手段→函数级实现。模板见 `src/index.ts` 的 `CAPTURE_COMMAND_TEMPLATE`。"改进项要有负责人和可验证终态"落在了 G1 行动项表格里。
 
 把这些文化做成插件的直接动因，是一个机构记忆问题：这台机器由一个人加一群 AI agent 操作。会话结束，终端滚动条就没了；上下文压缩，细节就丢了。部署过什么、发生过什么事故、踩过什么坑、做过什么决定，三个月后人和 AI 都无从查起。史官要解决的，就是让这台机器的历史变得可检索。
 
 ### 目的 / Purpose
 
-让"这台机器上部署过什么、发生过什么、踩过什么坑、做过什么决定"成为人和 AI 都可索引、可引用、可审计的一等知识：
+让"这台机器上部署过什么、发生过什么、踩过什么坑、做过什么决定"成为一等知识。人和 AI 都能索引它、引用它、审计它：
 
 * 知识落进结构化双语 wiki 页，而不是一次性的会话回复
 * 每个写操作强制回报 en + zh 双 URL（`URL_MANDATE`，`src/tools/shared.ts:39`），引用链可回溯
@@ -57,7 +57,7 @@ SRE postmortem 文化单独值得点名：它把"事件"当一等文档对待，
 | 前置查阅回路 | 向每次请求的 system 提示注入"先查 wiki"指令（单块合并：追加到最后一个 system 块，绝不产生第二条 system 消息；双信号门控：选项与本机哨兵文件同时到位才注入）：v4 advisory 四条——先读 `wiki-index` / `historian_map show` 定位再 `historian_search`（index-first）；update 优先于 create；引用页面时带 URL 与日期；发现矛盾/过期在页内标注（supersede 或复核章）而非静默覆盖，G5 账本逐行核对「上次核实于」 | `readingLoop` 选项（默认 false，开启需配置+哨兵双确认）+ 哨兵文件 `~/.config/opencode/historian-reading-loop.json`，`src/index.ts` 的 `experimental.chat.system.transform` 钩子 |
 | 主动留痕 | `/historian-capture` 命令把当前会话总结成 G1 事件页；开启 `capture.enabled` 后额外在会话空闲时弹一次提醒，仅提醒，绝不自动写页 | `src/index.ts` 的 `config` / `event` 钩子 |
 
-G5 现状卡回答"现在跑着什么"，timeline 回答"最近两周变了什么"。比如问"`service-a` 现在监听哪个端口"，应当命中现状账本里的一行（形如 `example.com:8000`，带上次核实日期与验证命令），而不是某次会话的聊天记录。这两样合起来，wiki 才从文档堆变成可查询的运维账本。
+G5 现状卡回答"现在跑着什么"，timeline 回答"最近两周变了什么"。比如问"`service-a` 现在监听哪个端口"，答案应当是现状账本里的一行，带上次核实日期与验证命令（形如 `example.com:8000`）。它不该来自某次会话的聊天记录。这两样合起来，wiki 才从文档堆变成可查询的运维账本。
 
 知识库要同时满足四种诉求——档案、手册、百科、知识库（速查）。六柱页型加索引层按层分工：
 
@@ -109,7 +109,7 @@ G5 现状卡回答"现在跑着什么"，timeline 回答"最近两周变了什�
 
 * `sections` 默认空列表 = 不设路径前缀限制，实际写权限由 wiki.js token 的 page rules 决定；包内不携带任何真实主机、真实章节分类学或页面数据
 * 翻译腿零内置地址：解析链只有 `translate.endpoint` 选项 → 环境变量 `HISTORIAN_TRANSLATE_ENDPOINT` → 未配置，未配置时孪生降级 pending，不发任何网络请求
-* `tools/privacy-audit.mjs` 对 `npm pack` 清单里的每个随包文件跑隐私红线 regex（真实主机 / 本机路径 / 本机章节名 / 密钥形态 / 个人身份），任何命中即非零退出、拦住发布；已接入 `prepublishOnly`（build → test → audit）
+* `tools/privacy-audit.mjs` 对 `npm pack` 清单里的每个随包文件跑隐私红线 regex。红线覆盖真实主机、本机路径、本机章节名、密钥形态、个人身份。任何命中即非零退出，拦住发布。它已接入 `prepublishOnly`（build → test → audit）
 * 随包文本里的示例全部占位符化：`http://<your-wiki>:3000`、`team-notes/`、`example.com`
 
 ## 仓库 / Repository
@@ -201,7 +201,7 @@ opencode run --command historian --message "historian_map show"
 
 `translate.endpoint` 解析链（优先级从高到低）：`translate.endpoint` 选项 → 环境变量 `HISTORIAN_TRANSLATE_ENDPOINT` → 未配置。包内**不**内置任何网关地址；未配置时翻译调用直接以 `translate.endpoint not configured` 失败（见降级行为）。
 
-`sections` 默认为空列表 = 不限制路径前缀（任意合法路径可写，实际权限由 wiki.js token 的 page rules 决定）。按机器通过选项传入白名单，例如 `["team-notes", "infra", "ops"]`。传入非空列表即强制生效（v4）：五个写入工具先过 `sectionGuard`（`src/tools/shared.ts`），不在白名单内的路径直接以 `ConfigError` 拒绝、不发任何写请求；报错信息会点名越界的首段并提示把它加进 `sections`。两个细节：匹配按首路径段、区分大小写，`doc` 授权 `doc` 与 `doc/x` 但不授权 `docs/x`；配置项首尾斜杠可省。`home`、`wiki-index`、`_sandbox`、`_data`、`_meta`、`_evidence` 是插件自记账与索引胶水所需，恒豁免。
+`sections` 默认为空列表 = 不限制路径前缀，任意合法路径可写；实际写权限由 wiki.js token 的 page rules 决定。按机器通过选项传入白名单，例如 `["team-notes", "infra", "ops"]`。传入非空列表即强制生效（v4）。五个写入工具先过 `sectionGuard`（`src/tools/shared.ts`）。不在白名单内的路径直接以 `ConfigError` 拒绝，不发任何写请求；报错信息会点名越界的首段并提示把它加进 `sections`。两个细节：匹配按首路径段、区分大小写，`doc` 授权 `doc` 与 `doc/x` 但不授权 `docs/x`；配置项首尾斜杠可省。`home`、`wiki-index`、`_sandbox`、`_data`、`_meta`、`_evidence` 是插件自记账与索引胶水所需，恒豁免。
 
 ### API Key 获取优先级
 
@@ -277,7 +277,7 @@ zh: http://<host>/zh/ops/example
 
 **地图视图**：`historian_map show` 输出包含 Locale 和 Twin 列，展示每个路径的双语对应关系。本地镜像文件保存在 `~/.config/opencode/historian-map.json`（`getMap` 读取，带过期秒数）；`_meta/page-map` 是 wiki 端的缓存页，由 `historian_map` refresh 写入。
 
-**时间轴视图**：`historian_map action:'timeline'` 把镜像行按 ISO 周分组（可选 `days` 窗口与 `path` 前缀过滤），输出人读周表 + 机读 `weeks` JSON，回答"最近哪些页面变过"。
+**时间轴视图**：`historian_map action:'timeline'` 把镜像行按 ISO 周分组，可选 `days` 窗口与 `path` 前缀过滤。输出人读周表 + 机读 `weeks` JSON，回答"最近哪些页面变过"。
 
 **维护视图**：`historian_map action:'maintain'` 输出策展报告——双语缺口、近似重复标题、过期页面、孤儿/扩散候选、标签词表、章节分布。默认 light 档只扫地图行加每个 locale 一次 `pages.list`；`deep:true` 逐页读正文，补新鲜度标记与 Redirect 存根识别。
 
@@ -298,7 +298,7 @@ zh: http://<host>/zh/ops/example
 
 ### 10 项自检门
 
-每页写入后过一遍自检清单（源码 `src/templates/genres.ts` `selfReviewChecklist()`，参考文件 `skills/historian/references/rules.md` + `genres.md`）。dry-run 阶段评 1–8，apply 后评 9–10。genre-specific 条目对不匹配的页型记 N/A=PASS；G5 页的第 4–6 项换成账本变体（`G5_CHECKLIST_VARIANTS`），G6 页换成手册变体（`G6_CHECKLIST_VARIANTS`）：第 4 项要求标题是目标句式 "How to X" / "如何/怎么做X"，第 5 项要求每条操作步骤三段（动作 + 预期结果 + 失败处置），第 6 项要求元数据表含「上次核实」与「复核周期」行：
+每页写入后过一遍自检清单（源码 `src/templates/genres.ts` `selfReviewChecklist()`，参考文件 `skills/historian/references/rules.md` + `genres.md`）。dry-run 阶段评 1–8，apply 后评 9–10。genre-specific 条目对不匹配的页型记 N/A=PASS；G5 页的第 4–6 项换成账本变体（`G5_CHECKLIST_VARIANTS`），G6 页换成手册变体（`G6_CHECKLIST_VARIANTS`）。手册变体三款：第 4 项要求标题是目标句式 "How to X" / "如何/怎么做X"；第 5 项要求每条操作步骤三段（动作 + 预期结果 + 失败处置）；第 6 项要求元数据表含「上次核实」与「复核周期」行：
 
 1. **导言占比 10–15%**：导言 ≈ 正文的 10–15%，每个重要小节在导言至少占一句
 2. **句长上限**：中文句 ≤20 字、英文句 ≤25 词
@@ -332,7 +332,7 @@ wiki 内容按读者分三层，工具按层执行不同语义（`historian_page
 historian_page_create({ path: "_evidence/<topic>--<yyyymmdd>", tier: "evidence", content: "<原始件全文>" })
 ```
 
-- **软提醒语义（soft advisory）**：写前台页时若内容含超过 30 行的围栏代码块，工具结果附一条 `advisory`，提示把原始件搬到 `_evidence/` 页、正文改放决定性摘录（每段 ≤10 行）+ 证据页链接 + 外部链接（commit/PR/告警）。提醒归提醒，写入永不阻断；证据层页自身不跑这项检查。
+- **软提醒语义（soft advisory）**：写前台页时若内容含超过 30 行的围栏代码块，工具结果附一条 `advisory`。它提示把原始件搬到 `_evidence/` 页，正文改放决定性摘录（每段 ≤10 行）+ 证据页链接 + 外部链接（commit/PR/告警）。提醒归提醒，写入永不阻断；证据层页自身不跑这项检查。
 - **镜像与快照页分工**：本地镜像 `~/.config/opencode/historian-map.json` 是活查询的唯一来源（`historian_map show` 直接读它）；`_meta/page-map` wiki 页是审计账本，`historian_map refresh` 每次提交一个新修订，wiki 的页面历史即全库变更时间线。
 
 ## wiki.js 用法与定制化 / Usage Guide
@@ -420,7 +420,7 @@ wiki.js GraphQL API 有 9 个常见陷阱。插件在内部处理了每一个（
 
 ### 评测框架
 
-评测框架是维护方的私有 harness 仓库（与插件仓库同工作区，不对外公开），提供 7 个行为验收场景，覆盖创建、追加、重叠整合、整理、价值门控、G1 格式、zh URL 报告。v3 插件最近一轮内部评测：7/7 PASS、51/58 适用分、G=1、零重试——此行为维护记录声明，外部读者无法在本仓库复算，请以此为界。（`results/2026-09-02-v3-plugin.md`）。
+评测框架是维护方的私有 harness 仓库，与插件仓库同工作区，不对外公开。它提供 7 个行为验收场景：创建、追加、重叠整合、整理、价值门控、G1 格式、zh URL 报告。v3 插件最近一轮内部评测：7/7 PASS、51/58 适用分、G=1、零重试。此行为维护记录声明，外部读者无法在本仓库复算，请以此为界。（`results/2026-09-02-v3-plugin.md`）。
 
 ## 开发 / Development
 
