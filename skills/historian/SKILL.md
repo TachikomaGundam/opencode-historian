@@ -1,6 +1,6 @@
 ---
 name: historian
-description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）与 G1-G6 页型骨架，是可发布 OpenCode 插件。V6 进化驱动机构记忆层三回路：捕获（/historian-capture 触发器）、策展（maintain 报告）、闸门（reading loop/十项自检/sections guard）。Phase 1.5 页型分类确保每页匹配正确的知识形态。操作 11 个 historian_* 工具：搜索、阅读、创建、更新、追加、翻译、迁移、移动、删除。另有锚印封存（anchor：人类订单/批准消息的哈希封存与对账）与页面地图/时间线/维护扫描。"
+description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）与 G1-G6 页型骨架，是可发布 OpenCode 插件。V6 进化驱动机构记忆层三回路：捕获、策展、闸门。捕获走 /historian-capture 触发器；策展出 maintain 报告；闸门含 reading loop、十项自检、sections guard。Phase 1.5 页型分类确保每页匹配正确的知识形态。操作 11 个 historian_* 工具：搜索、阅读、创建、更新、追加、翻译、迁移、移动、删除。另有锚印封存（anchor：人类订单/批准消息的哈希封存与对账）与页面地图/时间线/维护扫描。"
 ---
 
 # 史官 (Historian) — 行为契约 V6 进化驱动
