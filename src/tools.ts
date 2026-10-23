@@ -1,7 +1,7 @@
 /**
  * historian_* tool surface (todo 11) — barrel + composition.
  *
- * buildTools wires the 10 custom tools from the engine modules; this file
+ * buildTools wires the 11 custom tools from the engine modules; this file
  * holds no engine logic, only wiring. Per-call construction (no module-level
  * cache — each buildTools call resolves a fresh client/translator), and the
  * client is resolved LAZILY: a missing/invalid wiki key surfaces as a

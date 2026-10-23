@@ -42,11 +42,12 @@ jobs:
       - name: install
         run: npm ci --no-audit --no-fund
 
-      - name: gates (mirror of prepublishOnly, run explicitly for legible CI logs)
+      - name: gates (full mirror of prepublishOnly, run explicitly for legible CI logs)
         run: |
           npm run build
           npx vitest run
           node tools/privacy-audit.mjs
+          node tools/portable-binding-audit.mjs
 
       - name: publish with provenance
         env:

@@ -8,7 +8,7 @@ opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具�
 
 功能一览:
 
-* 10 个 `historian_*` 工具，覆盖创建、更新、追加、翻译、搜索、阅读、地图/时间轴/维护报告、迁移、删除、移动
+* 11 个 `historian_*` 工具，覆盖创建、更新、追加、翻译、搜索、阅读、地图/时间线/维护报告、迁移、删除、移动、锚印封存（historian_anchor：把人类订单/批准消息在引擎会话库中定位、哈希并落证据页回执，供事后对账）
 * Skill v5 随插件自动注入（config hook），无需手动安装 skill 文件
 * G1 至 G6 页型契约，每种页型对应专属骨架模板（v4 新增 G6 操作手册/how-to）
 * 双语孪生页面（en/zh）自动翻译，翻译引擎可配置
@@ -133,7 +133,7 @@ Source repository is managed by the maintainer; the public distribution channel 
 
 > 注：npm 包名为 opencode-wiki-historian（opencode-historian 已被注册表上一无关同名包占用）；仓库与插件 id 仍为 opencode-historian。
 
-发布准备状态：包已按 0.1.0 打包就绪（`npm pack` 验证通过），npm 发布需账号 2FA 一次性完成（`npm publish --access public --otp=<code>`）。在发布完成前，方式二 `file://` 为当前可用安装路径。
+发布状态：包已上架 npm（当前 0.6.1，走 GitHub Actions Trusted Publishing / OIDC，不再需要账号 2FA OTP）。方式一 `npm install` 与方式二 `file://` 两条安装路径均可用；方式二仍是开发态调试首选（改完即生效，无需发版）。
 
 ### 方式二：本地路径（开发用）
 
@@ -145,7 +145,7 @@ Source repository is managed by the maintainer; the public distribution channel 
 }
 ```
 
-此方式已通过 `opencode run` 验证，10 个 historian 工具全部注册成功（`.qa/12.txt`）。
+此方式已通过 `opencode run` 验证，11 个 historian 工具全部注册成功（验证记录为本机 `.qa/` 内部产物，不随包分发）。
 
 ### 安装后验证
 
@@ -155,7 +155,7 @@ Source repository is managed by the maintainer; the public distribution channel 
 opencode run --command historian --message "historian_map show"
 ```
 
-如果工具列表中出现 `historian_page_create` 等 10 个工具，安装成功。
+如果工具列表中出现 `historian_page_create` 等 11 个工具，安装成功。
 
 > **升级提示**：如果你之前使用过 historian v2 的扁平 skill 文件（如 `~/.config/opencode/skills/historian.md`），需要先重命名为 `historian.md.v2-disabled` 或移到别处。插件通过 config hook 自动注入 v5 skill，两个同名 skill 不能共存。
 
@@ -227,7 +227,7 @@ key 缺失时 `ConfigError` 记录一次日志，插件工具全部禁用，open
 | 现象 | 定性 | 说明 |
 |---|---|---|
 | 裸配置未传 `translate` 选项（三段 key 链 `translate.apiKey` → `DASHSCOPE_API_KEY` → `translate.providerKey` 全缺）时插件工具全部禁用 | by design | 翻译腿是写操作的前提，缺 key 时宁可整体禁用也不静默半成品；配置按上方选项全表补齐即恢复。缺配置时的部分降级（工具照常注册、仅翻译调用失败）在议 |
-| 自进化驱动（readingLoop + capture）默认关闭，作者本机也尚未点亮 | 状态如实 | 两个开关缺省均为 `false`（`src/config.ts:100` `DEFAULT_READING_LOOP`、`src/config.ts:102` `DEFAULT_CAPTURE_ENABLED`），readingLoop 还需配置+哨兵双确认。v0.4.0 发布仍待人工 2FA 步骤（`npm publish` 需 OTP），本机启用要等发布落地后进行；回路代码与测试已就绪，但在真正点亮之前本文档不假装它在跑 |
+| 自进化驱动（readingLoop + capture）默认关闭，作者本机也尚未点亮 | 状态如实 | 两个开关缺省均为 `false`（`src/config.ts:100` `DEFAULT_READING_LOOP`、`src/config.ts:102` `DEFAULT_CAPTURE_ENABLED`），readingLoop 还需配置+哨兵双确认。v0.4.0 时代的人工 2FA 发布流程已被 Trusted Publishing（OIDC）取代，npm 已上架至 0.6.1；回路本机启用仍待点亮；回路代码与测试已就绪，但在真正点亮之前本文档不假装它在跑 |
 
 ## wiki.js 前置检查 / Prerequisites
 
@@ -416,17 +416,17 @@ wiki.js GraphQL API 有 9 个常见陷阱。插件在内部处理了每一个（
 2. **再 apply**：`apply=true`，引擎在首次写入前自动生成 pre-image 备份
 3. **回滚**：读备份 JSON，用 `historian_page_update` 推回原始内容
 
-备份文件位于 `results/pilot-backup-*.json`。迁移进度存储在 `~/.config/opencode/historian-migrate.json`，支持断点续跑。
+备份文件写在运行侧的 `results/pilot-backup-*.json`（该目录为迁移执行记录，不随包分发，外部读者仓库里看不到属预期）。迁移进度存储在 `~/.config/opencode/historian-migrate.json`，支持断点续跑。
 
 ### 评测框架
 
-harness repo（与本插件仓库同工作区）提供 7 个行为验收场景，覆盖创建、追加、重叠整合、整理、价值门控、G1 格式、zh URL 报告。v3 插件评测结果：7/7 PASS，51/58 适用分，G=1，零重试（`results/2026-09-02-v3-plugin.md`）。
+评测框架是维护方的私有 harness 仓库（与插件仓库同工作区，不对外公开），提供 7 个行为验收场景，覆盖创建、追加、重叠整合、整理、价值门控、G1 格式、zh URL 报告。v3 插件最近一轮内部评测：7/7 PASS、51/58 适用分、G=1、零重试——此行为维护记录声明，外部读者无法在本仓库复算，请以此为界。（`results/2026-09-02-v3-plugin.md`）。
 
 ## 开发 / Development
 
 ```bash
 npm run build       # tsc 编译到 dist/
-npm test            # vitest run（493 tests, 20 files）
+npm test            # vitest run（593 tests, 26 files；其中 4 条依赖本机 tools/redlines.local.json，缺该文件时自动跳过，fresh clone 为 589 跑 + 4 跳过）
 npm pack --dry-run  # 检查打包文件列表
 ```
 

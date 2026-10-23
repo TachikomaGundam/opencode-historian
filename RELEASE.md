@@ -1,7 +1,7 @@
 # Release process (v0.5.4+) — npm Trusted Publishing (OIDC), no tokens
 
 ## One-time npm-site config (package owner, browser — this is the human key)
-1. npmjs.com → Sign in → My Packages → **opencode-historian** → Settings → **Trusted Publisher** → choose **GitHub Actions**.
+1. npmjs.com → Sign in → My Packages → **opencode-wiki-historian** → Settings → **Trusted Publisher** → choose **GitHub Actions**.
 2. Fields (case-sensitive, exact):
    - Organization or user: `TachikomaGundam`
    - Repository: `opencode-historian`

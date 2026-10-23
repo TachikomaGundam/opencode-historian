@@ -7,7 +7,7 @@
  * The server() hook resolves plugin options and returns:
  *   - config: mutates cfg.skills.paths to ship the bundled skills/ directory
  *     and registers the /historian-capture command (todo 9)
- *   - tool: 10 historian_* tools wired by buildTools(opts)
+ *   - tool: 11 historian_* tools wired by buildTools(opts)
  *   - experimental.chat.system.transform: merges the historian-first reading
  *     loop advisory into the LAST system block (single-block-safe append — a
  *     second entry is never added). v3 double gate: 默认 false，true 需配置+哨兵双确认.
