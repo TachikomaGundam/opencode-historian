@@ -15,6 +15,7 @@ import {
   isInternalPath,
   MACHINE_TIER_NOTE,
   monolingualRefusalJson,
+  contentArgRefusalJson,
   okJson,
   publishGateRefusalJson,
   sectionRefusalJson,
@@ -131,6 +132,7 @@ const APPEND_ARGS = {
   locale: s.enum(['en', 'zh']).default('en'),
   sectionZh: s.string().optional().describe('Explicit zh section; when absent the zh side falls back to translation/wiring'),
   tier: s.enum(TIERS).optional().describe('Explicit tier; absent → inferred from the path (first segment _meta/ or _evidence/ ⇒ evidence, else front)'),
+  content: s.string().optional().describe('UNUSED on append — all text must go in section; a non-empty content not contained in section makes the call refuse'),
 } as const;
 
 const AppendArgsSchema = s.object(APPEND_ARGS);
@@ -145,6 +147,10 @@ export function makeAppendTool(deps: ToolDeps): ToolDefinition {
     args: APPEND_ARGS,
     execute: async (raw) => {
       const args = AppendArgsSchema.parse(raw);
+      // Loud guard: `content` is not an append channel — never drop text silently.
+      if (args.content !== undefined && args.content.trim() !== '' && !args.section.includes(args.content.trim())) {
+        return contentArgRefusalJson();
+      }
       // Exactly ONE resolution rule: explicit tier arg wins; otherwise infer
       // from the path prefix (internal namespace ⇒ evidence).
       const tier: Tier = args.tier ?? inferredTier(args.path);

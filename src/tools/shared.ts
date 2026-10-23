@@ -181,6 +181,18 @@ export function monolingualRefusalJson(toolName: string, argumentName: string): 
   });
 }
 
+/** historian_page_append got a non-empty `content` that `section` does not carry →
+ *  refuse loudly instead of silently dropping it (infra handoff 2026-10-23). */
+export function contentArgRefusalJson(): ToolResult {
+  return dump({
+    ok: false,
+    error: 'append-content-arg-ignored',
+    errorKind: 'AppendContentArgError',
+    message: 'historian_page_append ignores the "content" argument; only "section" is appended. A non-empty content that section does not already contain would be silently lost, so this call is refused.',
+    actionableHint: 'Re-call with section set to the full text to append (title + body). A content already contained in section is accepted and ignored.',
+  });
+}
+
 // --- Front-tier raw-dump soft gate (v3 todo 6) --------------------------------
 
 /** Contract band (SKILL.md SYN-16): a human page stays a 5-10 line excerpt;
