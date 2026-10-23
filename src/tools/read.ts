@@ -6,8 +6,16 @@
 
 import { tool, type ToolDefinition } from '@opencode-ai/plugin';
 import { normalizeLocale } from '../wiki/locale.js';
-import { listPages, readPage, searchPages, type PageListItem, type PageSearchResponse } from '../wiki/pages.js';
+import {
+  listPages,
+  readPage,
+  searchPages,
+  type PageListItem,
+  type PageSearchResponse,
+  type PageSearchResult,
+} from '../wiki/pages.js';
 import type { GqlClient } from '../wiki/client.js';
+import { readMirrorSnapshot } from '../map.js';
 import { errEnvelope, okJson, reportUrls, URL_MANDATE, type ToolDeps } from './shared.js';
 
 const s = tool.schema;
@@ -143,11 +151,97 @@ async function unionByAnyTag(
 
 // --- historian_search --------------------------------------------------------
 
+const SPLIT_ROW_CAP = 25;
+const MIRROR_ROW_CAP = 10;
+
+/**
+ * Zero-hit fallback chain (live-measured: multi-word queries return 0 from
+ * wiki.js even when every sub-word hits; freshly written pages lag the index):
+ *   1. whitespace token fan-out, merged by (path, locale), ranked by distinct
+ *      token hits — a multi-word query must not answer 0 while sub-words hit;
+ *   2. pure-local page-map mirror scan on title/path substrings — closes the
+ *      index-lag window for addressable titles without any network fan-out;
+ *   3. honest hint — the remaining content-level lag is named, never hidden
+ *      behind a bare zero.
+ * The direct-hit path is byte-identical to the legacy behavior: one request,
+ * no extra envelope fields. Leg failures are dropped and named (same
+ * resilience contract as unionByAnyTag); only an all-legs-failed split throws.
+ */
+async function searchFallback(
+  client: GqlClient,
+  homeDir: string,
+  query: string,
+  direct: PageSearchResponse,
+): Promise<{ readonly resp: PageSearchResponse; readonly fallback: Record<string, unknown> }> {
+  if (direct.results.length > 0) return { resp: direct, fallback: {} };
+
+  const tokens = [...new Set(query.trim().split(/\s+/).filter((t) => t.length > 0))];
+  if (tokens.length >= 2) {
+    const legs = await Promise.allSettled(tokens.map((t) => searchPages(client, t)));
+    const failed: string[] = [];
+    const byKey = new Map<string, { row: PageSearchResult; hits: number }>();
+    legs.forEach((leg, i) => {
+      if (leg.status === 'rejected') {
+        failed.push(tokens[i]);
+        return;
+      }
+      for (const r of leg.value.results) {
+        const k = matchKey(r.path, r.locale);
+        const seen = byKey.get(k);
+        if (seen === undefined) byKey.set(k, { row: r, hits: 1 });
+        else seen.hits += 1;
+      }
+    });
+    if (failed.length === tokens.length) throw legs[0].status === 'rejected' ? legs[0].reason : new Error('token-split failed');
+    if (byKey.size > 0) {
+      const rows = [...byKey.values()]
+        .sort((a, b) => b.hits - a.hits || (a.row.path < b.row.path ? -1 : a.row.path > b.row.path ? 1 : 0) || (a.row.locale < b.row.locale ? -1 : 1))
+        .slice(0, SPLIT_ROW_CAP)
+        .map((v) => v.row);
+      return {
+        resp: { results: rows, suggestions: direct.suggestions, totalHits: rows.length },
+        fallback: { strategy: 'token-split', tokens, ...(failed.length > 0 ? { splitFailed: failed } : {}) },
+      };
+    }
+  }
+
+  const snap = readMirrorSnapshot(homeDir);
+  if (snap !== null && tokens.length > 0) {
+    const lowered = tokens.map((t) => t.toLowerCase());
+    const hits = snap.rows
+      .filter((r) => lowered.some((t) => r.title.toLowerCase().includes(t) || r.path.toLowerCase().includes(t)))
+      .slice(0, MIRROR_ROW_CAP);
+    if (hits.length > 0) {
+      const rows: PageSearchResult[] = hits.map((r) => ({
+        id: String(r.id),
+        title: r.title,
+        description: '',
+        path: r.path,
+        locale: r.locale,
+      }));
+      return {
+        resp: { results: rows, suggestions: direct.suggestions, totalHits: rows.length },
+        fallback: { strategy: 'map-mirror', tokens, mapGeneratedAt: snap.generatedAt, mapStaleSeconds: snap.staleSeconds },
+      };
+    }
+  }
+
+  return {
+    resp: direct,
+    fallback: {
+      hint: 'no text-index or mirror hit; content written in the last minutes may lag the search index — verify via historian_read / historian_map',
+    },
+  };
+}
+
 export function makeSearchTool(deps: ToolDeps): ToolDefinition {
   return tool({
     description:
       `Full-text search over the wiki. kind is informational intent only — the live wiki.js ` +
       `search indexes title AND content (the engine signature is search(query, path, locale), no field scope). ` +
+      `A zero-hit answer is auto-widened: multi-word queries fan out per word and merge (` +
+      `strategy "token-split"), then a local page-map mirror scans titles/paths (strategy "map-mirror"); ` +
+      `a bare zero without those carries a hint. ` +
       `Optional tags filter: tagsMode "all" (DEFAULT) requires EVERY tag on the page (server-side ` +
       `AND); "any" matches AT LEAST ONE tag. Result rows carry each page's tags. ` +
       `Results carry their en/zh URLs. ${URL_MANDATE}.`,
@@ -156,7 +250,8 @@ export function makeSearchTool(deps: ToolDeps): ToolDefinition {
       const args = SearchArgsSchema.parse(raw);
       try {
         const client = deps.getClient();
-        const resp = await searchPages(client, args.query);
+        const direct = await searchPages(client, args.query);
+        const { resp, fallback } = await searchFallback(client, deps.homeDir, args.query, direct);
         const results = resp.results.map((r) => {
           try {
             const locale = normalizeLocale(r.locale);
@@ -180,6 +275,7 @@ export function makeSearchTool(deps: ToolDeps): ToolDefinition {
             totalHits: resp.totalHits,
             suggestions: resp.suggestions,
             results,
+            ...fallback,
           });
         }
 
@@ -220,6 +316,7 @@ export function makeSearchTool(deps: ToolDeps): ToolDefinition {
           totalHits: matched.length,
           suggestions: resp.suggestions,
           results: matched,
+          ...fallback,
         });
       } catch (err) {
         return errEnvelope(err);

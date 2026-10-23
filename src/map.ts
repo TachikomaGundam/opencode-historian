@@ -251,6 +251,14 @@ export async function refreshMapCache(deps: MapDeps, opts?: RefreshOptions): Pro
 
 /** Read the local mirror with staleness in whole seconds; absent or damaged
  *  mirror → a live build (read-only — no cache page write, no mirror write). */
+function snapshotOf(mirror: MirrorFile): MapSnapshot {
+  const parsed = Date.parse(mirror.generatedAt);
+  const staleSeconds = Number.isNaN(parsed)
+    ? null
+    : Math.max(0, Math.floor((Date.now() - parsed) / 1000));
+  return { rows: mirror.rows, stats: mirror.stats, generatedAt: mirror.generatedAt, staleSeconds };
+}
+
 export async function getMap(deps: MapDeps, homeDir?: string): Promise<MapSnapshot> {
   const home = homeDir ?? homedir();
   const mirror = readMirror(home);
@@ -258,10 +266,13 @@ export async function getMap(deps: MapDeps, homeDir?: string): Promise<MapSnapsh
     const { rows, stats } = await buildPageMap(deps);
     return { rows, stats, generatedAt: null, staleSeconds: null };
   }
-  const parsed = Date.parse(mirror.generatedAt);
-  const staleSeconds = Number.isNaN(parsed)
-    ? null
-    : Math.max(0, Math.floor((Date.now() - parsed) / 1000));
-  return { rows: mirror.rows, stats: mirror.stats, generatedAt: mirror.generatedAt, staleSeconds };
+  return snapshotOf(mirror);
+}
+
+/** Pure-local mirror read for consumer fallback paths (historian_search zero-hit
+ *  chain): never touches the network, never builds. Null = absent or damaged. */
+export function readMirrorSnapshot(home: string): MapSnapshot | null {
+  const mirror = readMirror(home);
+  return mirror === null ? null : snapshotOf(mirror);
 }
 

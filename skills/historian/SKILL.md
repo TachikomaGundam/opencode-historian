@@ -198,7 +198,7 @@ G5 现状卡的硬约束：状态块是机读单行（`Active` / `Superseded-by:
 | `historian_page_update` | 更新页面（全量合并） | `path`, `locale`, `title?`, `content?`, `description?`, `tags?` |
 | `historian_page_append` | 追加到页面（双 locale）。**正文一律放 `section`**；`content` 参数对追加无效——传入非空且未被 section 包含的 content 会被当场拒绝而非静默丢弃 | `path`, `section`, `locale`, `sectionZh?` |
 | `historian_translate_snippet` | 翻译片段 | `text`, `from`(en/zh), `to`(en/zh) |
-| `historian_search` | 搜索页面。**用单个关键词**（多词查询可能 0 命中）；刚写入的内容索引有延迟，写入后验证一律用 `historian_read`，勿用 search | `query`, `kind`(title/content), `tags?`(1-5 个), `tagsMode?`(all 缺省/any) |
+| `historian_search` | 搜索页面。多词查询 0 命中时自动按词拆分合并（信封 `strategy:"token-split"`），再落本地页镜像按标题/路径兜底（`"map-mirror"`，行带滞后秒数）；纯 0 命中带 `hint` 指路。注意：刚写入的正文进全文索引有延迟，写入后验证一律用 `historian_read`，勿用 search | `query`, `kind`(title/content), `tags?`(1-5 个), `tagsMode?`(all 缺省/any) |
 | `historian_read` | 读取页面 | `path`, `locale` |
 | `historian_map` | 页面地图/时间线/维护扫描 | `action`(show/refresh/timeline/maintain)；maintain 可选 `deep`（缺省 false=light 扫）；timeline 可选 `days`（近 N 天）与 `path`（前缀过滤）；输出人读 markdown + 机读 JSON，zh/en 行独立；maintain 同时返回 surface 接口面体检（信封 `historian.maintain.v3`） |
 | `historian_migrate` | 迁移页面到规范 | `path`, `genre?`, `apply`(false/true) |
