@@ -1,6 +1,6 @@
 ---
 name: historian
-description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）、G1-G6 页型骨架、V6 进化驱动机构记忆层（三回路：捕获 /historian-capture 触发器 + 策展 maintain 报告 + 闸门 reading loop/十项自检/sections guard）、可发布 OpenCode 插件。Phase 1.5 页型分类确保每页匹配正确的知识形态。操作 11 个 historian_* 工具完成搜索、阅读、创建、更新、追加、翻译、迁移、移动、删除、锚印封存（anchor：人类订单/批准消息的哈希封存与对账）与页面地图/时间线/维护扫描。"
+description: "Wiki.js 史官插件技能：双语孪生页面管理（en/zh）与 G1-G6 页型骨架，是可发布 OpenCode 插件。V6 进化驱动机构记忆层三回路：捕获（/historian-capture 触发器）、策展（maintain 报告）、闸门（reading loop/十项自检/sections guard）。Phase 1.5 页型分类确保每页匹配正确的知识形态。操作 11 个 historian_* 工具：搜索、阅读、创建、更新、追加、翻译、迁移、移动、删除。另有锚印封存（anchor：人类订单/批准消息的哈希封存与对账）与页面地图/时间线/维护扫描。"
 ---
 
 # 史官 (Historian) — 行为契约 V6 进化驱动
@@ -69,7 +69,7 @@ V6 的机构记忆层由三条回路组成，共用同一套 11 个 `historian_*
 
 ### 章节分类学
 
-顶级章节**按机器配置**，插件不内置任何特定部署的章节表：可写前缀白名单由插件选项 `sections` 传入（默认为空 = 不限制前缀；实际权限由 wiki.js token 的 page rules 决定）。当前实例的章节布局以 `historian_map show` 输出或用户说明为准，不要臆断。豁免段（`home`、`wiki-index`、`_sandbox`、`_data`、`_meta`、`_evidence`）恒可写，见闸门回路 sections guard。
+顶级章节**按机器配置**，插件不内置任何特定部署的章节表。可写前缀白名单由插件选项 `sections` 传入，默认为空 = 不限制前缀。实际权限由 wiki.js token 的 page rules 决定。当前实例的章节布局以 `historian_map show` 输出或用户说明为准，不要臆断。豁免段（`home`、`wiki-index`、`_sandbox`、`_data`、`_meta`、`_evidence`）恒可写，见闸门回路 sections guard。
 
 假想实例的占位示例（仅示意，非真实章节表）：
 
@@ -205,7 +205,7 @@ G5 现状卡的硬约束：状态块是机读单行（`Active` / `Superseded-by:
 | `historian_delete` | 删除页面 | `path`, `locale`, `confirm`(必须 "yes") |
 | `historian_move` | 移动页面 | `path`, `locale`, `newPath`, `newLocale?`, `confirm`(必须 "yes") |
 
-删除/移动前，先确认内容已在别处留存（preimage 快照、`_evidence/` 证据页或备份）：`confirm: "yes"` 只是防误触闸门，口头确认不等于已留存。
+删除/移动前，先确认内容已在别处留存（preimage 快照、`_evidence/` 证据页或备份）。`confirm: "yes"` 只是防误触闸门，口头确认不等于已留存。
 
 ### 翻译失败处理
 
@@ -280,7 +280,7 @@ historian_map action:'refresh'
 
 ## 进化驱动 (V6)：三回路细则
 
-插件从"被动工具集"经"机构记忆层"两轮演进，到 V6 升级为"进化驱动"：机器侧三条回路各自完整运转，均不影响上述人工分诊/写作闸门。
+插件从"被动工具集"经"机构记忆层"两轮演进，到 V6 升级为"进化驱动"。机器侧三条回路各自完整运转，均不影响上述人工分诊/写作闸门。
 
 ### 捕获回路 (capture)：/historian-capture
 
@@ -307,7 +307,7 @@ historian_map action:'refresh'
 
 超 10 行的原始件一律拆到 `_evidence/` 证据页（`historian_page_create` 传 `tier:"evidence"`：单语 en、不发布），主页面只放引用/摘要 + 证据页链接。
 
-引用模型的字面特殊标记文本（如 `<|im_start|>` 一类控制 token）时，永不把原始 token 写入档案：用语言描述它（如"思考结束标记 / end-of-thinking marker"），避免原始标记回流污染下游模型会话。
+引用模型的字面特殊标记文本（如 `<|im_start|>` 一类控制 token）时，永不把原始 token 写入档案。用语言描述它，如"思考结束标记 / end-of-thinking marker"，避免原始标记回流污染下游模型会话。
 
 #### SRE 元数据表
 
@@ -327,7 +327,7 @@ historian_map action:'refresh'
 - **light 扫：每次批量写后必跑**——只基于地图行 + 每 locale 一次只读 `pages.list`（便宜，随批走）
 - **deep 扫：每周至多一次**——逐页读正文，跑新鲜度（缺「上次核实于」/ 复核过期）与 `> Redirect:` 存根计数（贵，克制用）
 
-light 扫在 maintain 行之外附带 **surface-light**：`coverage`（live 页面与地图不一致）、`nav`（侧栏真相=实时导航树：mode 非 STATIC 即把页面树镜像回侧栏 / 树内挂 `_` 段链接 / 章节缺落地页→面包屑 404）、`tagsEmpty`；deep 扫附带 **surface-deep**：正文级检测，逐页一次读取、双消费者共享缓存。
+light 扫在 maintain 行之外附带 **surface-light** 三类：`coverage`（live 页面与地图不一致）、`nav`、`tagsEmpty`。`nav` 的真相源是实时导航树：mode 非 STATIC 即把页面树镜像回侧栏；树内挂 `_` 段链接、章节缺落地页会造成面包屑 404。deep 扫附带 **surface-deep**：正文级检测，逐页一次读取、双消费者共享缓存。
 
 报告行 → 处置映射表：
 
@@ -355,11 +355,11 @@ light 扫在 maintain 行之外附带 **surface-light**：`coverage`（live 页�
 
 #### Reading loop（自动注入，默认关闭）
 
-插件经 `experimental.chat.system.transform` 钩子向每次请求的 system 提示注入一段"wiki 优先"advisory：动手前先查索引（`historian_read wiki-index` 或 `historian_map action:"show"`）再 `historian_search`、近期变更查 `historian_map action=timeline`、当前部署态看 G5 现状卡并核实行「上次核实于」、优先更新已有页而非新建、引用所依赖的页面 URL。agent 的义务是**执行**它，不是忽略它。
+插件经 `experimental.chat.system.transform` 钩子向每次请求的 system 提示注入一段"wiki 优先"advisory。它要求：动手前先查索引（`historian_read wiki-index` 或 `historian_map action:"show"`），再 `historian_search`。近期变更查 `historian_map action=timeline`。当前部署态看 G5 现状卡，并核实行「上次核实于」。优先更新已有页而非新建，并引用所依赖的页面 URL。agent 的义务是**执行**它，不是忽略它。
 
 - 双信号门控：仅当**同时**满足两条信号才注入——插件二元组第二参数配 `"readingLoop": true`，**且**本机存在哨兵文件 `~/.config/opencode/historian-reading-loop.json`（内容 `{"version":1,"confirmed":true}`）。任一缺失即不注入。开关默认 false，开启需配置+哨兵双确认；启用步骤见 `references/adapting-your-own-wiki.md`。
 - 配置已开而哨兵缺失时，插件加载期打一条 console.error（给出哨兵路径与内容），不会静默失灵。
-- 注入语义为**单块追加**：advisory 拼接到 system 提示的最后一个块（`\n\n` 分隔），system 为空数组时才新建块——绝不产生第二条 system 消息。严格 OpenAI 兼容后端（如 vLLM）会以 `System message must be at the beginning.` 拒绝多 system 请求，单块追加从根上规避此坑。
+- 注入语义为**单块追加**：advisory 拼接到 system 提示的最后一个块，以 `\n\n` 分隔。system 为空数组时才新建块，绝不产生第二条 system 消息。严格 OpenAI 兼容后端（如 vLLM）会以 `System message must be at the beginning.` 拒绝多 system 请求，单块追加从根上规避此坑。
 - 幂等去重：同一请求的任一 system 块已含 `historian_search` 字样则跳过注入。
 
 #### 发布闸门 publish gate（写入硬拒，v0.5.0）
@@ -387,7 +387,7 @@ light 扫在 maintain 行之外附带 **surface-light**：`coverage`（live 页�
 
 ### Opportunistic backfill（顺手补骨架）
 
-- **touch=顺手 migrate**：因任何任务编辑某页时，若该页仍是旧版自由文本，顺手 `historian_migrate`（先 dry-run 评分再 apply）补当前页型骨架——触碰即进化，零额外调度。
+- **touch=顺手 migrate**：因任何任务编辑某页时，若该页仍是旧版自由文本，顺手 `historian_migrate` 补当前页型骨架：先 dry-run 评分，再 apply。触碰即进化，零额外调度。
 - **尾部页不专项清扫**：不为补骨架专门发起全库扫尾；低频页等下一次 touch。deep maintain 的 staleness/freshness 报告是唯一的尾部线索来源，按报告行处置即可。
 
 ---
