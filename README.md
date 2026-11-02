@@ -133,7 +133,7 @@ Source repository is managed by the maintainer; the public distribution channel 
 
 > 注：npm 包名为 opencode-wiki-historian（opencode-historian 已被注册表上一无关同名包占用）；仓库与插件 id 仍为 opencode-historian。
 
-发布状态：包已上架 npm（当前 0.6.2，走 GitHub Actions Trusted Publishing / OIDC，不再需要账号 2FA OTP）。方式一 `npm install` 与方式二 `file://` 两条安装路径均可用；方式二仍是开发态调试首选（改完即生效，无需发版）。
+发布状态：包已上架 npm（当前 0.6.3，走 GitHub Actions Trusted Publishing / OIDC，不再需要账号 2FA OTP）。方式一 `npm install` 与方式二 `file://` 两条安装路径均可用；方式二仍是开发态调试首选（改完即生效，无需发版）。
 
 ### 方式二：本地路径（开发用）
 
@@ -227,7 +227,7 @@ key 缺失时 `ConfigError` 记录一次日志，插件工具全部禁用，open
 | 现象 | 定性 | 说明 |
 |---|---|---|
 | 裸配置未传 `translate` 选项（三段 key 链 `translate.apiKey` → `DASHSCOPE_API_KEY` → `translate.providerKey` 全缺）时插件工具全部禁用 | by design | 翻译腿是写操作的前提，缺 key 时宁可整体禁用也不静默半成品；配置按上方选项全表补齐即恢复。缺配置时的部分降级（工具照常注册、仅翻译调用失败）在议 |
-| 自进化驱动（readingLoop + capture）默认关闭，作者本机也尚未点亮 | 状态如实 | 两个开关缺省均为 `false`（`src/config.ts:100` `DEFAULT_READING_LOOP`、`src/config.ts:102` `DEFAULT_CAPTURE_ENABLED`），readingLoop 还需配置+哨兵双确认。v0.4.0 时代的人工 2FA 发布流程已被 Trusted Publishing（OIDC）取代，npm 已上架至 0.6.2；回路本机启用仍待点亮；回路代码与测试已就绪，但在真正点亮之前本文档不假装它在跑 |
+| 自进化驱动（readingLoop + capture）默认关闭，作者本机也尚未点亮 | 状态如实 | 两个开关缺省均为 `false`（`src/config.ts:100` `DEFAULT_READING_LOOP`、`src/config.ts:102` `DEFAULT_CAPTURE_ENABLED`），readingLoop 还需配置+哨兵双确认。v0.4.0 时代的人工 2FA 发布流程已被 Trusted Publishing（OIDC）取代，npm 已上架至 0.6.3；回路本机启用仍待点亮；回路代码与测试已就绪，但在真正点亮之前本文档不假装它在跑 |
 
 ## wiki.js 前置检查 / Prerequisites
 
