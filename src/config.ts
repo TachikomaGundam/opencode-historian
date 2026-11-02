@@ -116,7 +116,11 @@ export const DEFAULT_CAPTURE_ENABLED = false;
  *   2. env DASHSCOPE_API_KEY
  *   3. jsonc provider[translate.providerKey].options.apiKey — only when
  *      `translate.providerKey` is set explicitly (no default provider name)
- *   4. throw ConfigError('missing translation key')
+ *   4. unset ('') — deferred: the first translate call fails loudly as
+ *      TranslateError('config') with the three-leg prescription (translate.ts).
+ *      Absence NEVER disables the wiki tools at load time — an operator who
+ *      binds no translation model still gets every other tool, with twins
+ *      degrading to pending (the README config-table contract).
  *
  * Translation endpoint priority: raw.translate.endpoint →
  * env HISTORIAN_TRANSLATE_ENDPOINT → unset (''). There is no baked-in
@@ -163,20 +167,11 @@ function resolveTranslationApiKey(
   if (isNonEmpty(envKey)) return envKey;
 
   if (providerKey !== '') {
-    const jsoncKey = readProviderApiKeyFromJsonc(homeDir, providerKey);
-    if (isNonEmpty(jsoncKey)) return jsoncKey;
+    return readProviderApiKeyFromJsonc(homeDir, providerKey) ?? '';
   }
-
-  const jsoncHint =
-    providerKey !== ''
-      ? `add provider["${providerKey}"].options.apiKey`
-      : `set translate.providerKey and add the key to provider["<name>"].options.apiKey`;
-  throw new ConfigError(
-    'missing-translation-key',
-    `Missing translation api key: set plugin option translate.apiKey, ` +
-      `export DASHSCOPE_API_KEY, or ${jsoncHint} ` +
-      `in ${opencodeJsoncPath(homeDir)}.`,
-  );
+  // No leg produced a key: yield '' (deferred). Load-time absence is a supported
+  // state (wiki tools alive, twins pending); the loud failure is at call time.
+  return '';
 }
 
 /**

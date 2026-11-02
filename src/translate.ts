@@ -122,8 +122,12 @@ export function pickResponseText(json: unknown): string {
     isRecord(content[0]) && content[0].type === 'text' && typeof content[0].text === 'string'
       ? content[0].text
       : texts.join('');
-  if (out === '') throw new TranslateError('malformed', 'response text is empty');
-  return out;
+  // Wrapping whitespace is transport residue, never translation content: some
+  // adaptor lanes pad text parts with leading blank lines, and chunk-rejoining
+  // ('.join('\n\n')) would bake that padding into page bodies.
+  const trimmed = out.trim();
+  if (trimmed === '') throw new TranslateError('malformed', 'response text is empty');
+  return trimmed;
 }
 
 // --- System prompt ----------------------------------------------------------
@@ -184,6 +188,16 @@ export async function callMessages(
       'translate.model not configured — set plugin option translate.model or ' +
       'env HISTORIAN_TRANSLATE_MODEL to a model YOUR device is authorized for ' +
       '(L-MACHINE-LOCAL: the package ships no device model defaults).',
+    );
+  }
+  if (opts.translate.apiKey.trim() === '') {
+    const hint = opts.translate.providerKey !== ''
+      ? `or add provider["${opts.translate.providerKey}"].options.apiKey`
+      : 'or set translate.providerKey and add provider["<name>"].options.apiKey';
+    throw new TranslateError(
+      'config',
+      'Missing translation api key — set plugin option translate.apiKey, ' +
+      `export DASHSCOPE_API_KEY, ${hint} in ~/.config/opencode/opencode.jsonc.`,
     );
   }
   const url = normalizeMessagesUrl(opts.translate.endpoint);
