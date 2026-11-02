@@ -17,7 +17,7 @@ export const OPTS: HistorianOptions = {
   apiKeyPath: '~/.wikijs-api-key',
   translate: {
     endpoint: 'http://translate.test',
-    model: 'example-model',
+    model: 'fixture-model-1',
     apiKey: 'sk-translate',
     providerKey: 'my-provider',
   },

@@ -22,7 +22,7 @@ const OPTS: HistorianOptions = {
   apiKeyPath: '~/.wikijs-api-key',
   translate: {
     endpoint: 'https://translate.example.com/apps/anthropic',
-    model: 'example-model',
+    model: 'fixture-model-1',
     apiKey: KEY,
     providerKey: 'my-provider',
   },
@@ -188,7 +188,7 @@ describe('makeTranslator', () => {
     expect(headers['anthropic-version']).toBe('2023-06-01');
     expect(headers['content-type']).toBe('application/json');
     const body = JSON.parse(String(init.body));
-    expect(body.model).toBe('example-model');
+    expect(body.model).toBe('fixture-model-1');
     expect(body.max_tokens).toBe(500);
     expect(body.system).toContain('DIRECTION: en->zh');
     expect(body.messages).toEqual([{ role: 'user', content: 'Hello world' }]);
