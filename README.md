@@ -4,7 +4,7 @@
 
 > OpenCode 插件：双语 wiki.js 知识库管理 / Bilingual wiki curator as an OpenCode plugin.
 
-opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具打包成一个 OpenCode 插件，让 AI agent 能直接管理双语知识库。它为什么存在、文风从哪里来、怎么一句话开始用，见下文「史官宣言」。
+opencode-historian 把 wiki.js 的读写、翻译、页型规范和迁移工具打包成 OpenCode 插件。AI agent 装上它，就能直接管理双语知识库。它为什么存在、文风从哪里来、怎么一句话开始用，见下文「史官宣言」。
 
 功能一览:
 
@@ -15,8 +15,8 @@ opencode-historian 把 wiki.js 的读写、翻译、页型规范、迁移工具�
 * 页面地图缓存、本地镜像、时间轴聚合视图与 `maintain` 维护策展报告（light/deep 两档）
 * `options.sections` 路径前缀白名单强制生效：配置非空时越界写入硬拒（`ConfigError`，请求发出前拒绝）；`home`、`wiki-index`、`_sandbox`、`_data`、`_meta`、`_evidence` 系统路径恒豁免；默认 `[]` = 不限制
 * `historian_search` 标签过滤：`tags` 1-5 个，`tagsMode` 默认 `all`（服务端 AND）、`any` 为客户端逐标签 fan-out 求并集
-* 顶层 `home` 落地页解锁：仅豁免精确顶层 `home`，其余保留字（login/register/graphql/healthz/_assets/favicon）与嵌套 `home` 照旧拒绝
-* 开工前置查阅回路（reading loop，默认关，双信号启用；v4 advisory：先查索引、update 优先、引页引日期、标注过期）+ `/historian-capture` 会话留痕（默认关）
+* 顶层 `home` 落地页解锁：仅豁免精确顶层 `home`。其余保留字（login、register、graphql、healthz、_assets、favicon）照旧拒绝。嵌套 `home` 也照旧拒绝
+* 开工前置查阅回路（reading loop，默认关，双信号启用）。v4 advisory 四条：先查索引、update 优先、引页引日期、标注过期。另有 `/historian-capture` 会话留痕（默认关）
 * 试点与评测均通过：pilot 7 页迁移 PASS，eval 7/7 场景首跑全过
 
 ## 史官宣言 / The Historian's Manifest
@@ -89,7 +89,7 @@ G5 现状卡回答"现在跑着什么"，timeline 回答"最近两周变了什�
    > `service-a` 今天 OOM 重启，根因是缓存没设上限，已加告警，记下来。
 
    → 分诊为事件复盘，声明 G1 → `historian_page_create`（`genre: "G1"`）→ 回报 `http://<your-wiki>:3000/team-notes/<slug>` 与它的 `/zh/` 孪生页。
-4. **检索与整理**：`historian_search` 按主题查，可按标签过滤（`tags` 1-5 个，`tagsMode` 默认 `all` 即服务端 AND，`any` 为客户端逐标签 fan-out 并集）；`historian_map` 的 `show` 看双语地图、`timeline`（可选 `days` / `path`）看最近变动、`maintain`（可选 `deep:true`）出维护策展报告；存量页不合规用 `historian_migrate` 先 dry-run 再 apply。
+4. **检索与整理**：`historian_search` 按主题查，支持标签过滤（`tags` 1-5 个）。`tagsMode` 默认 `all`（服务端 AND），`any` 为客户端并集。地图与时间线用 `historian_map`：`show` 看双语地图，`timeline` 看最近变动。`maintain` 出维护策展报告，可选 `deep:true` 与 `days` / `path` 窗口。存量页不合规用 `historian_migrate` 先 dry-run 再 apply。
 5. **开关**：reading loop 默认 false，开启需配置+哨兵双确认，两步缺一不可：
 
    1. 插件二元组第二参数写 `"readingLoop": true`：`["opencode-wiki-historian", { "readingLoop": true }]`
@@ -107,7 +107,7 @@ G5 现状卡回答"现在跑着什么"，timeline 回答"最近两周变了什�
 
 插件与任何一台机器的 wiki 内容零耦合：
 
-* `sections` 默认空列表 = 不设路径前缀限制，实际写权限由 wiki.js token 的 page rules 决定；包内不携带任何真实主机、真实章节分类学或页面数据
+* `sections` 默认空列表 = 不设路径前缀限制，实际写权限由 wiki.js token 的 page rules 决定。包内不携带任何真实主机、真实章节分类学或页面数据
 * 翻译腿零内置地址：解析链只有 `translate.endpoint` 选项 → 环境变量 `HISTORIAN_TRANSLATE_ENDPOINT` → 未配置，未配置时孪生降级 pending，不发任何网络请求
 * `tools/privacy-audit.mjs` 对 `npm pack` 清单里的每个随包文件跑隐私红线 regex。红线覆盖真实主机、本机路径、本机章节名、密钥形态、个人身份。任何命中即非零退出，拦住发布。它已接入 `prepublishOnly`（build → test → audit）
 * 随包文本里的示例全部占位符化：`http://<your-wiki>:3000`、`team-notes/`、`example.com`
@@ -133,7 +133,7 @@ Source repository is managed by the maintainer; the public distribution channel 
 
 > 注：npm 包名为 opencode-wiki-historian（opencode-historian 已被注册表上一无关同名包占用）；仓库与插件 id 仍为 opencode-historian。
 
-发布状态：包已上架 npm（当前 0.6.3，走 GitHub Actions Trusted Publishing / OIDC，不再需要账号 2FA OTP）。方式一 `npm install` 与方式二 `file://` 两条安装路径均可用；方式二仍是开发态调试首选（改完即生效，无需发版）。
+发布状态：包已上架 npm，当前版本 0.6.3。发布走 GitHub Actions Trusted Publishing（OIDC），不再需要账号 2FA OTP。方式一 `npm install` 与方式二 `file://` 均可用。方式二仍是开发态调试首选（改完即生效，无需发版）。
 
 ### 方式二：本地路径（开发用）
 
@@ -298,18 +298,18 @@ zh: http://<host>/zh/ops/example
 
 ### 10 项自检门
 
-每页写入后过一遍自检清单（源码 `src/templates/genres.ts` `selfReviewChecklist()`，参考文件 `skills/historian/references/rules.md` + `genres.md`）。dry-run 阶段评 1–8，apply 后评 9–10。genre-specific 条目对不匹配的页型记 N/A=PASS；G5 页的第 4–6 项换成账本变体（`G5_CHECKLIST_VARIANTS`），G6 页换成手册变体（`G6_CHECKLIST_VARIANTS`）。手册变体三款：第 4 项要求标题是目标句式 "How to X" / "如何/怎么做X"；第 5 项要求每条操作步骤三段（动作 + 预期结果 + 失败处置）；第 6 项要求元数据表含「上次核实」与「复核周期」行：
+每页写入后过一遍自检清单（dry-run 评 1–8，apply 后评 9–10）。自检清单源码：`src/templates/genres.ts` 的 `selfReviewChecklist()`。参考文件：`skills/historian/references/rules.md` 与 `genres.md`。genre-specific 条目对不匹配的页型记 N/A=PASS。G5 页的第 4–6 项换成账本变体（`G5_CHECKLIST_VARIANTS`）。G6 页换成手册变体（`G6_CHECKLIST_VARIANTS`）。手册变体三款：第 4 项要求标题是目标句式 "How to X" / "如何/怎么做X"。第 5 项要求每条操作步骤三段（动作 + 预期结果 + 失败处置）。第 6 项要求元数据表含「上次核实」与「复核周期」行：
 
 1. **导言占比 10–15%**：导言 ≈ 正文的 10–15%，每个重要小节在导言至少占一句
 2. **句长上限**：中文句 ≤20 字、英文句 ≤25 词
 3. **表格判据**：≥3 字段的结构化枚举入表，成对数据用描述列表
-4. **对比表来源列**（G2）：对比表/枚举表每行有来源列，行序固定、无合并单元格；G5 变体：部署物清单每行带「上次核实于」列
+4. **对比表来源列**（G2）：对比表/枚举表每行有来源列，行序固定、无合并单元格。G5 变体：部署物清单每行带「上次核实于」列
 5. **时间线来源列**（G1）：时间线每行有来源列，仅日志可证事实；G5 变体：验证方法含可执行复核命令
-6. **行动项五要素**（G1）：类型|负责人|期限|验证|状态 五列，措施是行内容；G5 变体：无叙事正文，只有状态块 + 表格
+6. **行动项五要素**（G1）：类型|负责人|期限|验证|状态 五列，措施是行内容。G5 变体：无叙事正文，只有状态块 + 表格
 7. **无杂项筐**：除 参见/附录 之外没有 "其他/杂项" 类 catch-all 小节
 8. **无溢美词**：领先/强大/灵活/高效 等 bare claim 改事实或删除
 9. **双语 URL 已回报**（写后核销）：报告含 /en/ 与 /zh/ 两个可访问 URL
-10. **孪生已建或 zh_status:pending 声明**（写后核销）：twin created OR zh_status pending recorded and declared in report
+10. **孪生已建或 `zh_status:pending` 声明**（写后核销）。twin created，或 pending 已在报告中声明
 
 ### SYN 20 规则
 
@@ -333,7 +333,7 @@ historian_page_create({ path: "_evidence/<topic>--<yyyymmdd>", tier: "evidence",
 ```
 
 - **软提醒语义（soft advisory）**：写前台页时若内容含超过 30 行的围栏代码块，工具结果附一条 `advisory`。它提示把原始件搬到 `_evidence/` 页，正文改放决定性摘录（每段 ≤10 行）+ 证据页链接 + 外部链接（commit/PR/告警）。提醒归提醒，写入永不阻断；证据层页自身不跑这项检查。
-- **镜像与快照页分工**：本地镜像 `~/.config/opencode/historian-map.json` 是活查询的唯一来源（`historian_map show` 直接读它）；`_meta/page-map` wiki 页是审计账本，`historian_map refresh` 每次提交一个新修订，wiki 的页面历史即全库变更时间线。
+- **镜像与快照页分工**：本地镜像（`~/.config/opencode/historian-map.json`）是活查询的唯一来源，`historian_map show` 直接读它。`_meta/page-map` wiki 页是审计账本，`historian_map refresh` 每次提交一个新修订。wiki 的页面历史即全库变更时间线。
 
 ## wiki.js 用法与定制化 / Usage Guide
 
