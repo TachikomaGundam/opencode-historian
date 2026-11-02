@@ -217,12 +217,10 @@ describe('reading-loop system.transform (v3 double-signal gate)', () => {
     expect(output.system).toEqual(['base prompt']);
   });
 
-  it('stays silent when options are broken (server() already returned empty hooks)', async () => {
+  it('unbound translation key is a SUPPORTED state: hooks register (deferred-key contract)', async () => {
     vi.stubEnv('DASHSCOPE_API_KEY', '');
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const hooks = await plugin.server(fakeInput().input, {});
-    expect(hooks['experimental.chat.system.transform']).toBeUndefined();
-    expect(spy).toHaveBeenCalledOnce();
+    expect(typeof hooks.event).toBe('function');
   });
 });
 
