@@ -4,6 +4,7 @@ import {
   TranslateError,
   normalizeMessagesUrl,
   splitMarkdownBlocks,
+  callMessages,
   pickResponseText,
   buildSystemPrompt,
 } from '../src/translate.js';
@@ -107,6 +108,18 @@ describe('splitMarkdownBlocks', () => {
       '```js\n\nfunction x() {}\n\n```',
       'tail',
     ]);
+  });
+});
+
+describe('callMessages config gate + trim (deferred key: load-time alive, call-time loud)', () => {
+  const base = { baseUrl: 'http://x', apiKeyPath: 'p', locales: ['en', 'zh'], sections: [], readingLoop: false, capture: { enabled: false } };
+  it('empty apiKey fails as TranslateError config naming the providerKey', async () => {
+    const opts = { ...base, translate: { endpoint: 'http://gw.test', model: 'm', apiKey: '', providerKey: 'prov-x' } } as never;
+    await expect(callMessages(opts, undefined, { system: 's', user: 'u' })).rejects.toThrow(/Missing translation api key.*prov-x/);
+  });
+  it('configured key clears the gate (network failure proves the gate passed)', async () => {
+    const opts = { ...base, translate: { endpoint: 'http://127.0.5.1:1', model: 'm', apiKey: 'k', providerKey: '' } } as never;
+    await expect(callMessages(opts, undefined, { system: 's', user: 'u' })).rejects.toThrow(/request to/);
   });
 });
 

@@ -102,23 +102,16 @@ describe('resolveOptions translation-key priority matrix', () => {
   it('skips the jsonc leg entirely when providerKey is not configured (no baked default)', () => {
     const homeDir = makeHomeDir();
     writeJsonc(homeDir, REALISTIC_JSONC); // would resolve a key if the leg ran
-    expect(() => resolveOptions({}, NO_ENV, homeDir)).toThrow(ConfigError);
+    expect(resolveOptions({}, NO_ENV, homeDir).translate.apiKey).toBe('');
   });
 
-  it('throws ConfigError when all three legs are absent (fixture homeDir proves real config is not read)', () => {
-    const emptyHomeDir = makeHomeDir(); // no .config/opencode/opencode.jsonc here
-    let caught: unknown;
-    try {
-      resolveOptions({ translate: { providerKey: 'my-provider' } }, NO_ENV, emptyHomeDir);
-    } catch (err) {
-      caught = err;
-    }
-    expect(caught).toBeInstanceOf(ConfigError);
-    expect((caught as ConfigError).name).toBe('ConfigError');
-    expect((caught as ConfigError).message).toContain('translation');
+  it('yields empty key (deferred, tools stay alive) when all legs are absent', () => {
+    const emptyHomeDir = makeHomeDir();
+    expect(resolveOptions({ translate: { providerKey: 'my-provider' } }, NO_ENV, emptyHomeDir).translate.apiKey).toBe('');
+    expect(resolveOptions({}, NO_ENV, emptyHomeDir).translate.apiKey).toBe('');
   });
 
-  it('throws ConfigError when only an unrelated provider (anthropic) carries an apiKey', () => {
+  it('yields empty key when only an unrelated provider (anthropic) carries an apiKey', () => {
     const homeDir = makeHomeDir();
     writeJsonc(
       homeDir,
@@ -130,12 +123,10 @@ describe('resolveOptions translation-key priority matrix', () => {
   }
 }`,
     );
-    expect(() =>
-      resolveOptions({ translate: { providerKey: 'my-provider' } }, NO_ENV, homeDir),
-    ).toThrow(ConfigError);
+    expect(resolveOptions({ translate: { providerKey: 'my-provider' } }, NO_ENV, homeDir).translate.apiKey).toBe('');
   });
 
-  it('throws ConfigError when the configured provider exists but its apiKey is an empty string', () => {
+  it('yields empty key (deferred) when the configured provider exists but its apiKey is an empty string', () => {
     const homeDir = makeHomeDir();
     writeJsonc(
       homeDir,
@@ -145,9 +136,7 @@ describe('resolveOptions translation-key priority matrix', () => {
   }
 }`,
     );
-    expect(() =>
-      resolveOptions({ translate: { providerKey: 'my-provider' } }, NO_ENV, homeDir),
-    ).toThrow(ConfigError);
+    expect(resolveOptions({ translate: { providerKey: 'my-provider' } }, NO_ENV, homeDir).translate.apiKey).toBe('');
   });
 });
 
@@ -168,15 +157,10 @@ describe('resolveOptions translate.providerKey (jsonc trust leg)', () => {
     expect(opts.translate.providerKey).toBe('my-gateway');
   });
 
-  it('names the configured providerKey in the missing-key error', () => {
+  it('an explicitly configured but absent provider defers to empty key (naming at call time)', () => {
     const homeDir = makeHomeDir();
-    writeJsonc(
-      homeDir,
-      `{ "provider": { "my-provider": { "options": { "apiKey": "sk-x" } } } }`,
-    );
-    expect(() =>
-      resolveOptions({ translate: { providerKey: 'absent-provider' } }, NO_ENV, homeDir),
-    ).toThrow(/provider\["absent-provider"\]/);
+    writeJsonc(homeDir, '{ "provider": { "my-provider": { "options": { "apiKey": "sk-x" } } } }');
+    expect(resolveOptions({ translate: { providerKey: 'absent-provider' } }, NO_ENV, homeDir).translate.apiKey).toBe('');
   });
 });
 
