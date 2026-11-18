@@ -1,4 +1,4 @@
-/** [flow-code] anchor core tests — injected fake store (vitest cannot resolve node:sqlite;
+/** Anchor core tests — injected fake store (vitest cannot resolve node:sqlite;
  * production opener is exercised separately at live-fire). */
 import { describe, it, expect } from 'vitest';
 import { canonicalText, sealAnchor, verifyAnchor, sha256, type DbLike } from '../src/anchor.js';

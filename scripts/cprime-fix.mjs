@@ -1,5 +1,5 @@
 /**
- * [flow-ref]′ executor: fixes the LIVE wiki pages THROUGH the 0.5.0 gated tool
+ * Live repair executor: fixes the LIVE wiki pages THROUGH the 0.5.0 gated tool
  * surface (buildTools → historian_page_update/create). The gate is part of
  * the fix proof: if a repaired page would still violate R1/R2, the write is
  * refused and reported instead of silently shipped.

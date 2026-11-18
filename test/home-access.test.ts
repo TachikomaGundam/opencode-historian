@@ -1,8 +1,8 @@
 /**
- * v4 plan D9 tool-layer proof: the exact top-level path 'home' must pass
+ * Tool-layer proof: the exact top-level path 'home' must pass
  * validatePath for every historian operation. wiki.js 2.5.314 hosts a live
  * published page at path=home (id48, en+zh); the old plugin-side reserved-word
- * block made all 10 tools fail before any fetch ([flow-ref]).
+ * block made all 10 tools fail before any fetch.
  *
  * Harness replicates tools.test.ts (fragment-dispatch fake fetch) — that file
  * is owned by a parallel lane and is not edited here.
@@ -73,7 +73,7 @@ async function run(toolDef: ToolDefinition, args: Record<string, unknown>): Prom
   return JSON.parse(text) as Record<string, unknown>;
 }
 
-describe("top-level 'home' through the tool layer (D9)", () => {
+describe("top-level 'home' through the tool layer", () => {
   it('historian_read on home: validatePath passes, page + dual URLs returned', async () => {
     // Given: the fake server holds the live id48 home page
     const { tools, fetchCount } = makeWired({
@@ -126,7 +126,7 @@ describe("top-level 'home' through the tool layer (D9)", () => {
     // When: reading the uppercase variant
     const out = await run(tools.historian_read, { path: 'HOME', locale: 'en' });
 
-    // Then: rejected pre-flight, exactly as before the D9 bypass
+    // Then: rejected pre-flight, exactly as before the home-path allowance
     expect(out.ok).toBe(false);
     expect(out.errorKind).toBe('PathValidationError');
     expect(fetchCount()).toBe(0);

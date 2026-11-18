@@ -91,7 +91,7 @@ export const DEFAULT_BASE_URL = 'http://localhost:3000';
 export const DEFAULT_API_KEY_PATH = '~/.wikijs-api-key';
 /** Env leg of the endpoint chain: raw option → this env var → unset (''). */
 export const ENV_TRANSLATE_ENDPOINT = 'HISTORIAN_TRANSLATE_ENDPOINT';
-/** [policy-code] ([owner-decision] 2026-10-01, 复核 2026-10-02): the portable
+/** Package-portability rule (decided 2026-10-01, re-confirmed 2026-10-02): the portable
  * package must NOT pin the operator's model choice. Resolution is
  * explicit-option -> env leg -> unset (''), and an unset model fails loudly
  * at first translate call (see translate.ts), never silently defaults. */
@@ -100,9 +100,9 @@ export const ENV_TRANSLATE_MODEL = 'HISTORIAN_TRANSLATE_MODEL';
 export const DEFAULT_SECTIONS: readonly string[] = [];
 export const DEFAULT_LOCALES = ['en', 'zh'] as const;
 /** Reading loop is opt-in: activated only when configured true AND the local
- *  sentinel confirms it (plan v3 [flow-ref]; see src/loop-state.ts). */
+ *  sentinel confirms it (see src/loop-state.ts). */
 export const DEFAULT_READING_LOOP = false;
-/** Capture reminders are opt-in (plan v2 [flow-ref]). */
+/** Capture reminders are opt-in. */
 export const DEFAULT_CAPTURE_ENABLED = false;
 
 // --- Resolution -------------------------------------------------------------

@@ -1,6 +1,6 @@
 /**
  * historian_delete + historian_move + historian_migrate: destructive ops are
- * gated on confirm:"yes" BEFORE any fetch; migrate runs the [flow-ref] engine —
+ * gated on confirm:"yes" BEFORE any fetch; migrate runs the migration engine —
  * dry-run (LLM restyle + deterministic checklist, no writes) or apply
  * (pre-image backup first, per-locale upsert, checkpoint, verification).
  */

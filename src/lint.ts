@@ -1,9 +1,9 @@
 /**
  * Body lint: one fence-aware pass over a page body producing the structural
- * facts every hard gate and surface detector reuses (plan v0.5.0 #6).
+ * facts every hard gate and surface detector reuses.
  * Pure functions, zero wiki I/O — the deep scanner injects bodies, the write
  * tools lint drafts before they hit the API. This is the module the
- * architecture-page audit ([flow-ref] Issue #6) forced into existence: nothing
+ * architecture-page audit forced into existence: nothing
  * here was optional before, which is exactly how a page with five empty
  * sections shipped for three days claiming `状态: Active`.
  */

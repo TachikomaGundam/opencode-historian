@@ -1,4 +1,4 @@
-// [flow-ref] / Issues #2+#3: enable namespacing + download zh i18n bundle.
+// i18n localization fix: enable namespacing + download zh i18n bundle.
 // Root cause chain (proven against live server source):
 //   core/localization.js refreshNamespaces() only loads bundles for
 //   WIKI.config.lang.namespaces when namespacing=true -> zh bundle never

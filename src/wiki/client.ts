@@ -8,8 +8,7 @@
  *   2. Body that is not parseable JSON  -> HttpError ('non-json response')
  *   3. Top-level GraphQL `errors[]`     -> GraphQLError
  *   4. Payload `responseResult.succeeded === false` -> WikiError (permission-ish
- *      errorCode/message -> PermissionError, the class the plan's R-b contract
- *      refers to). The responseResult lookup is field-name agnostic: wiki.js
+ *      errorCode/message -> PermissionError). The responseResult lookup is field-name agnostic: wiki.js
  *      wraps every pages.* operation's result key, so we inspect the first key
  *      of `data` (pitfall #3).
  *
@@ -77,7 +76,7 @@ export class WikiError extends Error {
 }
 
 /** Permission failures from either layer — HTTP 401/403 or a permission-ish
- *  payload errorCode/message. Named per plan R-b (wiki token scope shortage). */
+ *  payload errorCode/message — the wiki token scope shortage class. */
 export class PermissionError extends WikiError {
   constructor(errorCode: string, slug: string, message: string) {
     super(errorCode, slug, message);

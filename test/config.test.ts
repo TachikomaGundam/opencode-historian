@@ -170,7 +170,7 @@ describe('resolveOptions defaults', () => {
     expect(opts.baseUrl).toBe('http://localhost:3000');
     expect(opts.apiKeyPath).toBe('~/.wikijs-api-key');
     expect(opts.translate.endpoint).toBe('');
-    expect(opts.translate.model).toBe(''); // no device pin since 0.5.5 ([policy-code])
+    expect(opts.translate.model).toBe(''); // no device pin since 0.5.5 (device-local policy)
     expect(opts.translate.providerKey).toBe(''); // opt-in only: no default provider
     expect(opts.sections).toEqual([]);
     expect(opts.locales).toEqual(['en', 'zh']);

@@ -114,7 +114,7 @@ interface StatusTokenConflictRow {
 /** maintain: light tier is map rows + ONE read-only pages.list pass per locale
  *  (the mirror's MapRow carries no tags; the list join restores the vocab view);
  *  deep additionally reads each body via readPage. Reserved-path pages (e.g.
- *  'home', [flow-ref]) answer null instead of killing the sweep. Read-only. */
+ *  'home') answer null instead of killing the sweep. Read-only. */
 async function runMaintain(deps: ToolDeps, mapDeps: MapDeps, snapshot: MapSnapshot, deep: boolean) {
   const client = deps.getClient();
   const tagIndex = new Map<string, readonly string[]>();

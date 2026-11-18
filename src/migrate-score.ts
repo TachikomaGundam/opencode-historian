@@ -1,11 +1,11 @@
 /**
- * Deterministic self-review checklist scoring (plan [flow-ref]/15): the 10-item
+ * Deterministic self-review checklist scoring: the 10-item
  * gate is scored by CODE on the reformatted draft — the LLM only restyles,
  * it never scores (an auditable gate). Verdict contract:
  *   - items 1-8 (content)   → 'pass' | 'fail' by the checks below
  *   - items 4-6 are 'na'    → when the page genre is not in appliesTo
  *   - items 9-10 (post-write) → 'deferred' until after apply (they are FAIL
- *     by construction pre-write; [flow-ref] writes them into the pilot report)
+ *     by construction pre-write; the pilot report writes them after apply)
  *
  * Every threshold below is tolerant-but-real: it catches egregious
  * violations, never bikesheds a conformant page. Measured values ride in the
@@ -335,7 +335,7 @@ export function scoreChecklist(genre: Genre, draft: string): readonly ChecklistV
   });
 }
 
-// --- Conformance signal ([flow-ref] roundtrip step ③) ---------------------------
+// --- Conformance signal (migrate roundtrip step ③) ---------------------------
 
 /** Whitespace-normalized equality (the strong signal); otherwise trigram
  *  Jaccard similarity ≥ 0.95. Deterministic, diff-based — never prose. */

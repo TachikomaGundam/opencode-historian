@@ -17,7 +17,7 @@
 
 ## Cutting a release
 1. bump `package.json` + lock (CI pin gate refuses tag != package version);
-2. local: border check PASS → receipt `local/release/<ver>.md`;
+2. local: border check PASS → receipt recorded at release time for `<ver>`;
 3. `git tag v<X.Y.Z> <bump-commit>`; push branch, then tag;
 4. Actions publishes via OIDC with provenance automatically; verify `npm view <pkg> version`.
 

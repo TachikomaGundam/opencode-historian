@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# finish-publish.sh — [flow-ref] completion runner (the 10-step checklist in [local-ref].txt, automated).
+# finish-publish.sh — release completion runner (the 10-step publish checklist, automated).
 #
 # Usage:  tools/finish-publish.sh <6-digit-npm-OTP>   (REPO defaults to `git rev-parse --show-toplevel`)
 # Effect: publishes opencode-wiki-historian@0.1.0 to npm, proves the npm-sourced plugin
@@ -92,7 +92,7 @@ if ! find "$HOME/.cache/opencode" -maxdepth 4 -path "*packages*$PKG*" -print -qu
   say "WARN: npm load path not under ~/.cache/opencode/packages — verify manually (plan criterion)"
 fi
 
-# --- 4. npmjs page must now be 200 (the [flow-ref] exempted URL) ---------------
+# --- 4. npmjs page must now be 200 (exempted until publish) ---------------
 CODE=$(curl -s -o /dev/null -w '%{http_code}' "https://www.npmjs.com/package/$PKG")
 [ "$CODE" = 200 ] && say "npmjs: $CODE OK" || { say "FAIL: npmjs returned $CODE"; exit 7; }
 
@@ -100,4 +100,4 @@ CODE=$(curl -s -o /dev/null -w '%{http_code}' "https://www.npmjs.com/package/$PK
 git tag -f "v$(node -p 'require("./package.json").version' 2>/dev/null || echo 0.1.0)" >/dev/null
 if git remote -v | grep -q .; then git push --tags; say "tag: pushed"; else say "tag: created locally (no remote configured)"; fi
 
-say "ALL DONE — [flow-ref] closed. Unmask note: original config already restored."
+say "ALL DONE — release complete. Unmask note: original config already restored."

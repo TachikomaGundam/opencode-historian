@@ -1,5 +1,5 @@
 /**
- * historian_search tag filtering (v4 [flow-ref]).
+ * historian_search tag filtering.
  *
  * Pins the tags/tagsMode contract:
  *   - no tags          → byte-identical legacy behavior (characterization)

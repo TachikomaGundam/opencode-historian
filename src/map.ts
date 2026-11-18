@@ -1,5 +1,5 @@
 /**
- * Locale-aware page map ([flow-ref]): full cross-locale inventory with en/zh twin
+ * Locale-aware page map: full cross-locale inventory with en/zh twin
  * pairing, rendered as the markdown `_meta/page-map` cache page + local mirror.
  *
  * Intended readers: harness cache-read scripts, the admin UI, and

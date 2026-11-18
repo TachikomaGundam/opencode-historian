@@ -100,7 +100,7 @@ describe('gql HTTP layer', () => {
     expectNoKeyLeak(err);
   });
 
-  it('classifies HTTP 403 as PermissionError named per plan R-b contract', async () => {
+  it('classifies HTTP 403 as PermissionError (wiki token scope shortage)', async () => {
     // Given
     const { client } = makeClient(() =>
       Promise.resolve(new Response('<html><body>Forbidden</body></html>', { status: 403 })),

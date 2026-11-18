@@ -1,6 +1,6 @@
 /**
- * lint.ts unit tests — the architecture-page audit ([flow-ref] #6) and the
- * deepseek stub audit (#5) reproduced as fixtures: every regression the live
+ * lint.ts unit tests — the architecture-page audit and the
+ * deepseek stub audit reproduced as fixtures: every regression the live
  * wiki taught us gets a failing-shape test here.
  */
 

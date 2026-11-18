@@ -1,5 +1,5 @@
 /**
- * C1 dist-harness probe for the v3 double-signal reading-loop gate (plan [flow-ref]).
+ * Dist-harness probe for the double-signal reading-loop gate.
  *
  * Exercises the BUILT bundle (dist/index.js) — never src — through the real
  * plugin entry exactly the way OpenCode loads it: default export { id, server },

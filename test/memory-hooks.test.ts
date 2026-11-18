@@ -224,7 +224,7 @@ describe('reading-loop system.transform (v3 double-signal gate)', () => {
   });
 });
 
-describe('capture event + /historian-capture command ([flow-ref])', () => {
+describe('capture event + /historian-capture command', () => {
   it('event hook is registered on the returned Hooks', async () => {
     const hooks = await plugin.server(fakeInput().input, BASE_OPTS);
     expect(typeof hooks.event).toBe('function');
@@ -288,13 +288,13 @@ describe('capture event + /historian-capture command ([flow-ref])', () => {
     await hooks.config(cfg);
     const template = cfg.command?.['historian-capture']?.template ?? '';
 
-    // D3 trigger list: all five capture triggers must be encoded (K1 proved
+    // Trigger list: all five capture triggers must be encoded (an audit proved
     // the v2 template had zero trigger encoding).
     for (const needle of ['事故闭环', '部署完成', 'bug修复合入', '探针结论', '被否决方案', '否决理由']) {
       expect(template).toContain(needle);
     }
 
-    // D2 body contract: 四段式 evidence-chain ordering replaces the v2 form.
+    // Body contract: 四段式 evidence-chain ordering replaces the v2 form.
     for (const needle of ['证据链', '方法', '修复手段', '函数级实现']) {
       expect(template).toContain(needle);
     }
@@ -310,7 +310,7 @@ describe('capture event + /historian-capture command ([flow-ref])', () => {
     expect(template).toContain('tier:"evidence"');
     expect(template).toContain('_evidence/');
 
-    // Pre-write self-check ([flow-ref] gate) + capture→review→publish flow (K3⑥).
+    // Pre-write self-check gate + capture→review→publish flow.
     expect(template).toContain('自检');
     expect(template).toContain('状态:draft');
     expect(template).toContain('Active');

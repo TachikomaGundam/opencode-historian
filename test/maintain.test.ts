@@ -1,5 +1,5 @@
 /**
- * Maintain curation report (plan [flow-ref], D3 CURATE / D12): fixture-first tests
+ * Maintain curation report: fixture-first tests
  * for the pure buildMaintainReport over MapRow-shaped rows — every light metric
  * asserted exactly (counts, cluster membership, ordering, JSON-tail key
  * stability, generation timestamp + row count), the deep sweep via a stubbed
@@ -253,7 +253,7 @@ describe('buildMaintainReport (deep)', () => {
   });
 });
 
-// --- dueForReview (task-03: cadence × stamp join, advisory-only) ----------------
+// --- dueForReview (cadence × stamp join, advisory-only) ----------------
 
 /** NOW 2026-09-04T12:00Z vs a UTC-midnight stamp date ⇒ floor truncates the
  *  half-day, so 08-20 reads age 15, 09-01 age 3. The boundary pair uses

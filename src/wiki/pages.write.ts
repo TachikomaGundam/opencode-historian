@@ -135,7 +135,7 @@ interface MutableState {
 }
 
 /** Full mutable state of one page (single(id)) — exported for the migrate
- *  engine ([flow-ref]), whose pre-image backup must capture publishStartDate/
+ *  engine, whose pre-image backup must capture publishStartDate/
  *  publishEndDate alongside the readPage fields (the pilot restore replays
  *  the backup through updatePage; RMW needs the write-side field contract). */
 export type { MutableState };

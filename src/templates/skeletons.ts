@@ -1,9 +1,9 @@
 /**
  * Bilingual G1–G4 page skeletons (template data).
  *
- * Provenance: `local/research/cross-cultural-wiki-writing-digest.md` (Genre
- * templates + SYN-1..20) and `local/research/wikijs-2x-capabilities-digest.md`
- * (expression syntax), vendored at `docs/research/*`.
+ * Provenance: `docs/research/cross-cultural-wiki-writing-digest.md` (Genre
+ * templates + SYN-1..20) and `docs/research/wikijs-2x-capabilities-digest.md`
+ * (expression syntax) — both digests are vendored in this repo under `docs/research/`.
  *
  * Contract of every skeleton constant:
  *  - Rubric dimension C anatomy: H1 placeholder → status line

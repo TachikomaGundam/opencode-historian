@@ -1,5 +1,5 @@
 /**
- * historian_* tool surface ([flow-ref]): buildTools() contract tests.
+ * historian_* tool surface: buildTools() contract tests.
  *
  * Every case is fully mocked (fragment-dispatch fake fetch, tmp home dirs,
  * mock translator) — zero live network, zero real wiki writes. Two wiring
@@ -182,7 +182,7 @@ describe('tool surface (buildTools)', () => {
     const { tools } = makeTools();
     // When: inspecting the returned record
     const keys = Object.keys(tools).sort();
-    // Then: the surface matches the plan verbatim
+    // Then: the surface matches the documented contract verbatim
     expect(keys).toEqual([...TOOL_KEYS].sort());
   });
 
@@ -468,7 +468,7 @@ describe('historian_page_create', () => {
   });
 });
 
-// --- create collision advisory (v4 [flow-ref]) -----------------------------------
+// --- create collision advisory -----------------------------------
 
 import { collisionAdvisory } from '../src/tools/shared.js';
 import type { PageListItem } from '../src/wiki/pages.read.js';
@@ -729,7 +729,7 @@ describe('historian_page_create collision advisory (envelope)', () => {
 
 // --- historian_page_update ---------------------------------------------------
 
-// --- create pre-write checklist gate (v4 [flow-ref]) ------------------------------
+// --- create pre-write checklist gate ------------------------------
 
 import { checklistAdvisory } from '../src/tools/shared.js';
 import { scoreChecklist } from '../src/migrate-score.js';
@@ -944,7 +944,7 @@ describe('historian_page_append', () => {
     expect(fetchCount()).toBe(5);
   });
 
-  it('refuses loudly when content carries text section does not (infra handoff 2026-10-23)', async () => {
+  it('refuses loudly when content carries text section does not', async () => {
     const { tools, fetchCount } = makeWired({
       'singleByPath(': (vars) => ({
         data: { pages: { singleByPath: vars.locale === 'zh' ? zhPage() : rawPage() } },
@@ -1682,7 +1682,7 @@ describe('historian_migrate', () => {
   });
 });
 
-// --- evidence tier + internal namespace guards (v3 [flow-ref]) -------------------
+// --- evidence tier + internal namespace guards -------------------
 
 const MACHINE_NOTE = 'machine-tier page; anonymous visits 404 by design';
 
@@ -1954,7 +1954,7 @@ describe('evidence tier + internal namespace guards', () => {
   });
 });
 
-// --- front-tier raw-dump soft gate (v3 [flow-ref]) --------------------------------
+// --- front-tier raw-dump soft gate --------------------------------
 
 /** A fenced block with EXACTLY `lines` lines strictly inside the ``` fence. */
 const fenceBlock = (lines: number): string =>
@@ -2098,7 +2098,7 @@ describe('front-tier raw-dump soft gate', () => {
     expect('advisory' in out).toBe(false);
   });
 });
-// --- options.sections enforcement (v4 [flow-ref]) ---------------------------------
+// --- options.sections enforcement ---------------------------------
 
 import { ConfigError, sectionGuard } from '../src/tools/shared.js';
 import type { HistorianOptions } from '../src/config.js';

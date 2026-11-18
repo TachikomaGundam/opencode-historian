@@ -1,4 +1,4 @@
-// LIVE probe for [flow-ref] — read-only double-fetch consistency check against
+// LIVE probe for the page map — read-only double-fetch consistency check against
 // the real wiki at localhost:3000.
 //
 // Two INDEPENDENT sequential buildPageMap passes (each is its own full
@@ -10,8 +10,8 @@
 // The difference vs the ~204-published baseline is RECORDED, never asserted.
 //
 // Deliberately does NOT refresh `_meta/page-map` and does NOT write the local
-// mirror — [flow-ref] (pilot) and [flow-ref] (wiring) own the write path; this probe
-// is pure read. Deferral reasoning is recorded in [local-ref].txt.
+// mirror — the pilot driver and the tool wiring own the write path; this probe
+// is pure read. Deferral reasoning is recorded in the local working notes.
 //
 // Run: npm run build && node test/live/map10.mjs   (imports from dist/)
 
@@ -52,7 +52,7 @@ try {
     line(
       `MAP10 OK rows=${sa.rows} paths=${sa.paths} perLocale=${JSON.stringify(sa.perLocale)} missingTwin=${sa.missingTwinPaths.length}`,
     );
-    // Evidence for [local-ref].txt: header verbatim + first 10 rows
+    // Evidence for the local working notes: header verbatim + first 10 rows
     line('--- first 10 rows ---');
     const md = renderMapMarkdown(passA.rows, new Date().toISOString()).trim().split('\n');
     for (const l of md.slice(0, 12)) line(l);

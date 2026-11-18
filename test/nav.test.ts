@@ -1,5 +1,5 @@
 /**
- * src/wiki/nav.ts tests (plan v0.5.1-①): tolerant shape parsing of the live
+ * src/wiki/nav.ts tests: tolerant shape parsing of the live
  * `navigation { config tree }` payload and the never-throws degradation
  * contract of readPrimaryNav (unreadable nav → null → surface marks
  * available:false instead of claiming a clean sidebar).

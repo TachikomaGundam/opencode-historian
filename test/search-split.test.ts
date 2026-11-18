@@ -1,5 +1,5 @@
 /**
- * historian_search zero-hit fallback chain ([flow-ref]a, 2026-10-23).
+ * historian_search zero-hit fallback chain.
  *
  * Pins the contract:
  *   - direct hits > 0      → EXACTLY one search request, legacy envelope,

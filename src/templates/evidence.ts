@@ -1,5 +1,5 @@
 /**
- * Machine-tier evidence page skeleton (v3 [flow-ref]).
+ * Machine-tier evidence page skeleton.
  *
  * Evidence pages live under the internal namespaces (`_meta/`, `_evidence/`),
  * are hidden and monolingual — the wiki is their only store (no local mirror,

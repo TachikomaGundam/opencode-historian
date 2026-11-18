@@ -1,14 +1,14 @@
 version: 1
-# historian plugin release gate config — seat-authored 2026-10-02 under the debridement ruling.
-# Identity allowlist mirrors the operator's machine-wide precedent (harness/Abathur/border.yaml
-# rules.authors): same GitHub noreply person in both shipped formats + the pre-existing Wiki.js
-# service-account commits already public in this repo's history.
+# historian plugin release gate config — authored 2026-10-02.
+# Identity allowlist mirrors the operator's machine-wide precedent
+# (same GitHub noreply person in both shipped formats + the pre-existing Wiki.js
+# service-account commits already public in this repo's history).
 #
 # The rule IDs below contain backslash byte-runs that the path heuristics detect in this file
 # itself; the gate's config self-exemption (border repo, fix committed 2026-10-02) suppresses
 # exactly that family for exactly this file, echoed as an INFO row. Requires border >= that fix;
-# the npm-cached 0.8.0 predates it — release runs use the source-built CLI (path pinned in the
-# [flow-ref]) until the border department ships.
+# the npm-cached 0.8.0 predates it — release runs use the source-built CLI until a newer
+# border release lands.
 targets:
   git:
     remotes:
@@ -24,8 +24,8 @@ rules:
 
 # 17 value-pinned waivers: regex/escape code bytes misdetected as Windows paths
 # (verified line-by-line 2026-10-02; new values still fail).
-# Waiver refresh 2026-11-02 (sibyl council [flow-ref]ae in-place plan):
-# rule keys rotated by the border department's char-class fix; entries below are the
+# Waiver refresh 2026-11-02 (in-place plan):
+# rule keys rotated by border's char-class fix; entries below are the
 # CURRENT firing set (dry-run derived, RC verified), each pinned (rule,file,valueDigest)
 # with sunset `until` — re-derive, do not re-stack, when border >= 0.8.3 lands.
 # Verify: node <border-0.8.3-build>/dist/index.js check --config border.yaml -> RC=0

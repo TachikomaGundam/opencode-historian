@@ -1,6 +1,6 @@
 /**
- * Contract locks for the shipped skill docs (plan v2 [flow-ref], v3 [flow-ref],
- * v4 [flow-ref]): SKILL.md must carry the V6 进化驱动 marker, no stale marker
+ * Contract locks for the shipped skill docs: SKILL.md must carry the V6 进化驱动
+ * marker, no stale marker
  * (行为契约 v3 / V4-era 机构记忆层 title / bare V5) may survive anywhere
  * under skills/, the v6 three-loop contract (capture triggers + 四段式
  * evidence chain + maintain protocol + reorg freeze) must be documented, and
@@ -122,7 +122,7 @@ describe('SKILL.md curate loop: maintain protocol + refresh cadence', () => {
 });
 
 describe('SKILL.md v6 discipline: freeze protocol + opportunistic backfill', () => {
-  it('documents the 重构冻结协议 ([flow-ref] six [flow-ref])', () => {
+  it('documents the 重构冻结协议 (six freeze lessons)', () => {
     for (const needle of ['重构冻结协议', '只读不写', 'PageNotFound', 'preimage', 'Redirect 存根', '> Redirect:', '机械改动']) {
       expect(SKILL_MD).toContain(needle);
     }

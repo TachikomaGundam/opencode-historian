@@ -3,7 +3,7 @@ dist/
 .qa/*
 !.qa/.gitkeep
 
-# [flow-ref]: leaky dev artifacts stay local only — never tracked, never shipped
+# leaky dev artifacts stay local only — never tracked, never shipped
 results/*
 results/*.json
 local/
@@ -12,3 +12,5 @@ tools/redlines.local.json
 .codegraph
 .git-crashed-backup/
 *.tgz
+
+.border/

@@ -1,5 +1,5 @@
 /**
- * Shared plumbing for the historian_* tool surface ([flow-ref]): the tool
+ * Shared plumbing for the historian_* tool surface: the tool
  * dependency bag, locale-aware URL helpers (reserved-path safe), the uniform
  * JSON envelope helpers and the error → envelope mapping.
  *
@@ -118,7 +118,7 @@ function hintFor(errorKind: string): string {
   }
 }
 
-// --- Tier plumbing (v3 [flow-ref]) ------------------------------------------------
+// --- Tier plumbing ------------------------------------------------------------
 
 /** Machine namespaces: pages whose first path segment lives here are hidden
  *  machine-tier pages (the `_meta/page-map` cache precedent in src/map.ts —
@@ -182,7 +182,7 @@ export function monolingualRefusalJson(toolName: string, argumentName: string): 
 }
 
 /** historian_page_append got a non-empty `content` that `section` does not carry →
- *  refuse loudly instead of silently dropping it (infra handoff 2026-10-23). */
+ *  refuse loudly instead of silently dropping it. */
 export function contentArgRefusalJson(): ToolResult {
   return dump({
     ok: false,
@@ -193,7 +193,7 @@ export function contentArgRefusalJson(): ToolResult {
   });
 }
 
-// --- Front-tier raw-dump soft gate (v3 [flow-ref]) --------------------------------
+// --- Front-tier raw-dump soft gate --------------------------------------------
 
 /** Contract band (SKILL.md SYN-16): a human page stays a 5-10 line excerpt;
  *  longer raw material belongs on an evidence page. Strictly ABOVE this many
@@ -241,7 +241,7 @@ export function frontDumpAdvisory(tier: Tier, content: string): string | null {
   );
 }
 
-// --- Create-path collision advisory (v4 [flow-ref]) --------------------------------
+// --- Create-path collision advisory -------------------------------------------
 
 /** Title equality for duplicate detection: trim, collapse internal whitespace,
  *  casefold — 'LLM Eval' == ' llm\neval '. */
@@ -307,10 +307,10 @@ export function collisionAdvisory(input: CollisionInput): string | null {
   return parts.length === 0 ? null : parts.join('\n');
 }
 
-// --- Create-path pre-write checklist gate (v4 [flow-ref]) --------------------------
+// --- Create-path pre-write checklist gate --------------------------------------
 
 /** Failing items needed to speak up: 1-2 stragglers are noise, 3+ is a draft
- *  worth flagging. Threshold per the plan ([flow-ref]). */
+ *  worth flagging. */
 const CHECKLIST_FAIL_TRIGGER = 3;
 
 /** The zh short name of a checklist item: its label up to the first
@@ -321,7 +321,7 @@ function itemShortName(label: string): string {
 }
 
 /**
- * Pre-write self-check advisory (plan [flow-ref]): score the draft with the SAME
+ * Pre-write self-check advisory: score the draft with the SAME
  * 10-item gate the migrate pipeline uses (scoreChecklist — no duplicated
  * scoring logic), purely locally, zero network. 3+ failing items produce a
  * hint naming them; items 9-10 are 'deferred' pre-write by the scorer's own
@@ -336,7 +336,7 @@ export function checklistAdvisory(genre: Genre, draft: string): string | null {
   const names = failed.map((v) => `#${v.id} ${itemShortName(labels.get(v.id) ?? '?')}`).join('; ');
   return `自检 ${failed.length}/10 未通过: ${names} (不阻断, 发布前请补齐)`;
 }
-// --- options.sections enforcement (v4 [flow-ref]) ---------------------------------
+// --- options.sections enforcement ----------------------------------------------
 
 /** Config-level write refusal, paralleling PathValidationError's shape. The
  *  class NAME is the routing key errEnvelope dispatches on: this shares the
@@ -392,7 +392,7 @@ export function sectionRefusalJson(path: string, allowedSections: readonly strin
   return violation === null ? null : errEnvelope(new ConfigError(violation));
 }
 
-// --- publish gate (V6.1, [flow-ref] #5.1 / #6.1) --------------------------------
+// --- publish gate ---------------------------------------------------------------
 
 export class PublishGateError extends Error {
   constructor(message: string) {

@@ -26,6 +26,9 @@ const BASE_RED_LINES = [
   ['api-key-shape', /\bsk-[A-Za-z0-9]{16,}/],
   ['aws-access-key', /\bAKIA[0-9A-Z]{16}\b/],
   ['private-key-block', /-----BEGIN (RSA |EC |OPENSSH |)PRIVATE KEY-----/],
+  // Internal flow identifiers must never reach the shipped surface (audit 2026-11-16:
+  // ticket/plan/batch ids baked into dist comments shipped in 0.4.0/0.6.3 undetected).
+  ['internal-flow-ref', /\bHANDOF\b|handoff (issue?|packet|lesson)|\.omo\/|\bg1x2b|swarm-[A-Z]\b|\btodo[- ][0-9]+\b|Batch [A-C]\b/],
 ];
 
 const LOCAL_FILE = join(ROOT, 'tools', 'redlines.local.json');

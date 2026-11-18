@@ -30,7 +30,7 @@ const SKELETON = `# Wrong Title H1\n\n**状态/Status**: Active\n\n${LONG}\n\nTO
 const CJK_TWIN_EN = `# CJK Faithful Twin EN\n\n${LONG}\n\n${LONG}\n\n## Section Alpha\nEnglish body sentence alpha carries the full explanation of the layer composition and the request path details end to end.\n## Section Beta\nEnglish body sentence beta with boundary conditions failure handling and the verification commands described inline per row.\n## Section Gamma\nEnglish body gamma notes the trade offs and the exceptions observed during the live scan incident window earlier this week.\n## Section Delta\nEnglish body delta wraps up cross references to the ledger the runbook and the postmortem appendix table rows below.\n## Related Pages\n- [Index](/wiki-index)`;
 const CJK_TWIN_ZH = `# 双生忠实中文版\n\n本页用于验证跨脚本的长度加权判据，中文版忠实翻译英文结构且小节数量完全一致。\n\n## 甲节\n分层组成与请求链路的完整说明，逐段对齐英文原文。\n## 乙节\n边界条件、失败处置与每行对应的验证命令说明。\n## 丙节\n本周扫描事故窗口内观察到的取舍与例外记录。\n## 丁节\n指向台账、手册与复盘附录表格的交叉引用。\n## 相关页面\n- [索引](/zh/wiki-index)`;
 
-// --- stamp-honesty fixtures (task-03, [flow-ref] P2) ------------------------------
+// --- stamp-honesty fixtures -----------------------------------------------------
 // Replica of the live infra/cockpit (id 9) metadata table — byte-pattern, not the
 // live page: the stamp line confesses the content was never re-run, yet STAMP_RE
 // matches it and the claim ledger is (today) exempted. The claims block is a
@@ -214,8 +214,8 @@ describe('buildSurfaceReport — deep tier', () => {
     expect(d.ledgerClaims.some((c) => c.path === 'ops/twin' && c.locale === 'zh')).toBe(false);
   });
 
-  // Task-03 stamp honesty ([flow-ref] P2). Pre-fix baseline (characterization run
-  // on unchanged surface.ts, evidence local/evidence/[flow-ref]stamp-honesty.md):
+  // Stamp honesty. Pre-fix baseline (characterization run
+  // on unchanged surface.ts, evidence in the local audit archive):
   // all four confessional fixtures were EXEMPT (toBe(false)); flipped below.
   it('confessional stamps (not re-run/baseline/未复跑/未复核) do NOT exempt ledgerClaims', async () => {
     const d = (await run()).deepReport!;

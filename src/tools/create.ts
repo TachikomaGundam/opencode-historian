@@ -99,7 +99,7 @@ export function makeCreateTool(deps: ToolDeps): ToolDefinition {
         isEvidence && args.locale === 'zh'
           ? 'evidence pages are monolingual en — the locale argument was forced to "en"'
           : undefined;
-      // Genre is resolved ONCE, above the template/content fork (v4 [flow-ref]):
+      // Genre is resolved ONCE, above the template/content fork:
       // the template branch feeds it the skeleton, the content branch the
       // pre-write checklist gate. Explicit arg wins over classification.
       const genre: Genre = args.genre ?? classifyGenre({ title: args.title, body: args.description ?? '' }).genre;

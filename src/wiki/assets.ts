@@ -4,7 +4,7 @@
  * Body: FormData, field `mediaUpload` (filename = sanitizeAssetName(filename)).
  * Optional `parent` field carries numeric folderId for folder-scoped uploads.
  * Auth: Bearer token. Api key is INJECTED via `deps.apiKey` — resolution
- * lives in the caller (tools layer, [flow-ref], via readWikiApiKey), so this
+ * lives in the caller (tools layer, via readWikiApiKey), so this
  * module stays network- and config-free (pure + injected, trivially testable).
  *
  * Response JSON: `{type:'success', location}` or `{type:'error', msg}`.

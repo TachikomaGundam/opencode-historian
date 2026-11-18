@@ -18,7 +18,7 @@ import { normalizeLocale, validatePath } from './locale.js';
 
 export type Locale = 'en' | 'zh';
 
-/** Port for [flow-ref] (real translation engine); pages.write injects it. */
+/** Translation-engine port (src/translate.ts); pages.write injects it. */
 export type TranslateFn = (text: string, from: Locale, to: Locale) => Promise<string>;
 
 export interface PageRecord {

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Pins the owner-handle-email red-line semantics ([owner-decision] 2026-10-05, option b):
+// Pins the owner-handle-email red-line semantics (local policy adopted 2026-10-05, option b):
 // the handle is forbidden AS CONTACT (handle@… email shapes), NOT as canonical
 // repository identity — OIDC provenance publishes the GitHub owner regardless,
 // so a bare-handle ban could not honestly hold. File is machine-local (gitignored):
@@ -25,7 +25,7 @@ describe.skipIf(!hasLocal)('owner-handle-email red line (contact-shape predicate
   it('fires on handle used as contact email', () => {
     const owner = rules().find((r) => r.name === 'owner-handle-email')!;
     expect(re(owner).test('TachikomaGundam@users.noreply.github.com')).toBe(true);
-    expect(re(owner).test('mail owner@example.com')).toBe(true);
+    expect(re(owner).test('mail tachikomagundam@example.com')).toBe(true);
   });
 
   it('does not fire on the canonical repository URL identity', () => {

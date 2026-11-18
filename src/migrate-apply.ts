@@ -1,5 +1,5 @@
 /**
- * Migration engine — apply side (plan [flow-ref]): the write pipeline. Order is
+ * Migration engine — apply side: the write pipeline. Order is
  * the safety contract: ① pre-image backup FIRST (before any write; both
  * locales, missing twin recorded null), ② per-locale upsert (present →
  * updatePage RMW; missing twin → auto-created via the translation engine,

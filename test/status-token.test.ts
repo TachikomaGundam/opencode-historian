@@ -1,5 +1,5 @@
 /**
- * S1 status-token integrity (plan historian-evolution-round-1 task 2 / swarm P1).
+ * Status-token integrity (live contradiction lock-down).
  *
  * Ground truth this locks down: the live contradiction on wiki ids 9/92 was
  * MACHINE-INDUCED — every G6 skeleton shipped the colon-header token

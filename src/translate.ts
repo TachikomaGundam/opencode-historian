@@ -162,7 +162,7 @@ export interface TranslateDeps {
 
 /** One raw Anthropic-compatible messages call: caller-supplied system + user
  *  prompt, shared URL/auth/timeout/error-taxonomy with the translation engine.
- *  The migrate reformatter ([flow-ref]) reuses this path with its own prompt; a
+ *  The migrate reformatter reuses this path with its own prompt; a
  *  reformat call is never chunked (a restyle must see the whole page). */
 export interface MessagesCall {
   readonly system: string;
@@ -187,7 +187,7 @@ export async function callMessages(
       'config',
       'translate.model not configured — set plugin option translate.model or ' +
       'env HISTORIAN_TRANSLATE_MODEL to a model YOUR device is authorized for ' +
-      '([policy-code]: the package ships no device model defaults).',
+      '(the package ships no device model defaults).',
     );
   }
   if (opts.translate.apiKey.trim() === '') {

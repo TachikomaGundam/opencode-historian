@@ -2,7 +2,7 @@
  * src/surface.ts — human-interface & content-hygiene detectors (V6.1).
  *
  * maintain.ts owns per-page G5/G6 freshness; this module owns the WIKI-WIDE
- * structural health of the human surface ([flow-ref] issues #1-#6): navigation
+ * structural health of the human surface: navigation
  * hygiene, map-vs-live coverage, redirect-stub reachability, broken / stacked /
  * index-less links, orphans, twin divergence, zh-first language, unfinished
  * skeletons and claim ledgers that beg re-verification.
@@ -365,7 +365,7 @@ function buildDeep(input: SurfaceInput, scans: ScanRow[]): SurfaceDeep | null {
 
   const ledgerClaims: SurfaceDeep['ledgerClaims'] = [];
   for (const s of ok) {
-    // Stamp honesty ([flow-ref] P2): a stamp that only ever confesses the review
+    // Stamp honesty: a stamp that only ever confesses the review
     // never ran ("…(content not re-run)"/未复跑/未复核/baseline) is not evidence —
     // claiming review without execution must not suppress the claim ledger.
     // Any single non-confessional stamp line (incl. supersede-keeping-struck-old)

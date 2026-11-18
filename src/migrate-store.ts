@@ -1,5 +1,5 @@
 /**
- * Migrate persistence (plan [flow-ref]): pre-image backup files + the
+ * Migrate persistence: pre-image backup files + the
  * path-level checkpoint. Both are plain JSON under the plan's 工件根
  * (results/ in the plugin repo; ~/.config/opencode in the home dir), with
  * tolerant reads — a corrupt/missing file degrades to an empty state,

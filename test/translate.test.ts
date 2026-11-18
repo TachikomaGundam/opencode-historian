@@ -10,7 +10,7 @@ import {
 } from '../src/translate.js';
 import type { HistorianOptions } from '../src/config.js';
 
-// Unit surface of the [flow-ref] translation engine. Every case runs against
+// Unit surface of the translation engine. Every case runs against
 // injected fetchImpl mocks — no network. The synthetic KEY below is used
 // verbatim in fake response bodies to pin the log-leak guard: a buggy
 // translateChunk that echoes body text into errors without redaction fails.

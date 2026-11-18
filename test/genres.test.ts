@@ -9,7 +9,7 @@ import {
 import { scoreChecklist } from '../src/migrate-score.js';
 import type { Genre, Confidence, ClassifyInput } from '../src/templates/genres.js';
 
-// Unit surface of the [flow-ref] page-genre system: bilingual G1–G5 skeletons (the
+// Unit surface of the page-genre system: bilingual G1–G5 skeletons (the
 // harness rubric-C anatomy + wiki.js expression pieces), deterministic genre
 // classification, and the 10-item self-review gate. Everything is pure string
 // logic — no network, no fs, no time.
@@ -567,7 +567,7 @@ describe('scoreChecklist G5 ledger scorers catch non-conformant pages', () => {
 // --- G6 how-to manual (goal-titled operational manual) ------------------------
 
 describe('genreSkeleton G6', () => {
-  it('zh: goal section, prerequisites table, triple-tagged steps, rollback, D4 freshness metadata', () => {
+  it('zh: goal section, prerequisites table, triple-tagged steps, rollback, freshness metadata', () => {
     const zh = genreSkeleton('G6', 'zh');
     expect(zh).toContain('## 目标');
     expect(zh).toContain('| 条件 | 检查方法 | 预期结果 |');

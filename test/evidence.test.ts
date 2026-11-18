@@ -1,5 +1,5 @@
 /**
- * Machine-tier evidence page template (v3 [flow-ref]): evidenceSkeleton() unit
+ * Machine-tier evidence page template: evidenceSkeleton() unit
  * contract + historian_page_create template-mode wiring for tier "evidence".
  *
  * evidenceSkeleton is a pure function — every assertion uses deterministic
@@ -143,7 +143,7 @@ describe('historian_page_create template mode (blank content)', () => {
     expect(String(out.note)).toContain('Nothing was written to the wiki');
     expect(String(out.note)).toContain('原文');
     expect(String(out.note)).toContain('<human-page-path>');
-    // D4-4: template envelopes carry no machine-tier 404 note
+    // Envelope contract: template envelopes carry no machine-tier 404 note
     expect(String(out.note)).not.toContain('anonymous visits 404');
     expect(fetchCount()).toBe(0);
   });
@@ -184,7 +184,7 @@ describe('historian_page_create template mode (blank content)', () => {
     // When: front-tier blank content (classification fallback)
     const out = await run(tools.historian_page_create, input);
 
-    // Then: exactly the pre-[flow-ref] envelope — genre key present, old note text
+    // Then: exactly the pre-evidence-tier envelope — genre key present, old note text
     expect(out.ok).toBe(true);
     expect(out.mode).toBe('template');
     const expected = classifyGenre({ title: 'Alpha', body: '' });

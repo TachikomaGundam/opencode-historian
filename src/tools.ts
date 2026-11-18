@@ -1,12 +1,12 @@
 /**
- * historian_* tool surface ([flow-ref]) — barrel + composition.
+ * historian_* tool surface — barrel + composition.
  *
  * buildTools wires the 11 custom tools from the engine modules; this file
  * holds no engine logic, only wiring. Per-call construction (no module-level
  * cache — each buildTools call resolves a fresh client/translator), and the
  * client is resolved LAZILY: a missing/invalid wiki key surfaces as a
  * ConfigError envelope on first execution, never as a buildTools crash that
- * would kill plugin registration ([flow-ref]).
+ * would kill plugin registration.
  */
 
 import { homedir } from 'node:os';

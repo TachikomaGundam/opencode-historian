@@ -1,5 +1,5 @@
 /**
- * Migration engine tests (plan [flow-ref]): reformat dry-run + apply pipeline.
+ * Migration engine tests: reformat dry-run + apply pipeline.
  * Everything is mocked: dual-mode fetch (gql fragments + the LLM messages
  * endpoint), tmp home dir, tmp results dir, fixed `now` for deterministic
  * backup filenames. The LLM text and the deterministic checklist calculator

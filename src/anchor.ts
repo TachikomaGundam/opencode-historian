@@ -1,13 +1,13 @@
 /**
- * Anchor sealing core ([flow-code] merged into the historian per [owner-decision]
- * 2026-10-01T16:24): a human order/approval message living in the engine's own
+ * Anchor sealing core (merged into the historian 2026-10-01): a human
+ * order/approval message living in the engine's own
  * session store is located by (session, ordinal) or by unique exact body match,
  * hashed two ways (raw + canonical), and the receipt is written as an
  * _evidence/anchors page. `verify` re-reads the store and re-computes: MATCH /
  * MISMATCH / ABSENT — never a silent repair.
  *
- * The canonical-text rule is a CLOSED list (mirrors [policy-code]'s
- * normalization discipline): trailing <dcp-message-id ...>...</dcp-message-id>
+ * The canonical-text rule is a CLOSED list (fixed normalization discipline):
+ * trailing <dcp-message-id ...>...</dcp-message-id>
  * block and surrounding whitespace. Anything else — including the engine
  * merging several user turns into one message while the agent is busy — is
  * NOT normalized away: a seal is only as atomic as the store row it names, and

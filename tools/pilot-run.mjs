@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 /**
- * Pilot migration driver (plan [flow-ref]). Staged, resumable, auditable:
+ * Pilot migration driver. Staged, resumable, auditable:
  *
  *   node tools/pilot-run.mjs select              # live inventory + candidate scoring (read-only)
- *   node tools/pilot-run.mjs before              # snapshot .qa/before-map.json, open window
+ *   node tools/pilot-run.mjs before              # snapshot the before-map baseline, open window
  *   node tools/pilot-run.mjs page <path> [--force]  # ≤3-round draft loop (read-only)
  *   node tools/pilot-run.mjs apply <path>        # backup-first upsert + post-apply verify
- *   node tools/pilot-run.mjs after               # refreshMapCache + snapshot .qa/after-map.json
- *   node tools/pilot-run.mjs diff                # [local-ref]-diff.txt + assertions (a)(b)(c)
+ *   node tools/pilot-run.mjs after               # refreshMapCache + snapshot the after-map baseline
+ *   node tools/pilot-run.mjs diff                # diff report + assertions (a)(b)(c)
  *   node tools/pilot-run.mjs report              # results/pilot-<section>-<date>.md
  *   node tools/pilot-run.mjs status              # current state summary
  *
  * All engine calls go through the SHIPPED dist build (npm run build first).
- * Every wiki mutation and every LLM call is appended to [local-ref].txt with the
+ * Every wiki mutation and every LLM call is appended to the local audit ledger with the
  * path/locale/op/UpdatedAt ledger contract. Runtime state (drafts, verdicts,
- * applied entries) lives in [local-ref]-state.json so any mode can be re-run.
+ * applied entries) lives in a local state file so any mode can be re-run.
  * The script never prints secrets: all engine error text is pre-redacted.
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -438,7 +438,7 @@ async function verifyUrlsAndTwin(state, path, rec, backupPath) {
   rec.residuals = residuals;
   for (const r of residuals) logLine(`RESIDUAL ${path} ${r}`);
   if (http.en !== '200' || http.zh !== '200') {
-    logLine(`HTTP ${path} REGRESSION: anonymous access not 200 — isPublished regression investigation required ([flow-ref] default)`);
+    logLine(`HTTP ${path} REGRESSION: anonymous access not 200 — isPublished regression investigation required`);
     rec.status = 'http-regression';
   } else {
     rec.status = 'green';
@@ -568,7 +568,7 @@ async function cmdReport() {
   md.push(`# Pilot migration report — ${section} (${DATE_KEY})`, '', `**Status: ${statusLine}**`, '');
   md.push('## 选择依据', '');
   md.push(
-    '- 选择域 = [flow-ref] sections 分类学，排除 `_sandbox/`、`scratch/` 与根路径页（首段不在分类学内的页面）',
+    '- 选择域 = sections 分类学，排除 `_sandbox/`、`scratch/` 与根路径页（首段不在分类学内的页面）',
     '- 页数单位 = 章节内去重 Path 数（en+zh 孪生对计 1 页；未按 map 行数计）',
     '- 候选页必须：所有 (path, locale) 行 published && 非 private && 非 private 命名空间（否则匿名 200 QA 不可满足）',
     '- 选择时刻（live pages.list 实测，逐候选记录 path-count + publish 状态）：',
@@ -633,7 +633,7 @@ async function cmdReport() {
   md.push('## 遗留', '');
   const allResiduals = state.pilot.paths.flatMap((p) => (state.pages[p]?.residuals ?? []).map((r) => `- \`${p}\`: ${r}`));
   md.push(allResiduals.length > 0 ? allResiduals.join('\n') : '- 无');
-  md.push('- [flow-ref] 已知残留：zh 译文 item2（中文句长 ≤20 字）倾向失分；revise 提示「中文句长 ≤20 字，拆短句」用于修订轮；apply 后对 stored zh 内容复评并记录于上表/本文遗留');
+  md.push('- migrate 引擎已知残留：zh 译文 item2（中文句长 ≤20 字）倾向失分；revise 提示「中文句长 ≤20 字，拆短句」用于修订轮；apply 后对 stored zh 内容复评并记录于上表/本文遗留');
   mkdirSync(RESULTS, { recursive: true });
   writeFileSync(reportFile, `${md.join('\n')}\n`);
   logLine(`REPORT written ${reportFile} status=${statusLine}`);

@@ -36,7 +36,7 @@ function extractReceipt(content: string): SealReceipt | undefined {
 export function makeAnchorTool(deps: ToolDeps): ToolDefinition {
   return tool({
     description:
-      'Historian anchor ([flow-code] in the memory seat): action:"seal" locates a human order/approval message in the engine session store ' +
+      'Historian anchor: action:"seal" locates a human order/approval message in the engine session store ' +
       '(by session_id/session_title + index or unique body match), hashes it (raw + canonical, closed normalization list) and writes an ' +
       '_evidence/anchors/<slug> receipt page; action:"verify" re-reads the store against a sealed page and returns MATCH/MISMATCH/ABSENT with drift fields. ' +
       'Read-only against the store; the wiki page is the durable receipt. ' + URL_MANDATE,
@@ -72,7 +72,7 @@ export function makeAnchorTool(deps: ToolDeps): ToolDefinition {
             locale: 'en',
             title: `Anchor seal ${slug}${a.label !== undefined ? ` — ${a.label}` : ''}`,
             content: renderSealPage(r, a.label),
-            tags: ['anchor-seal', '[flow-code]'],
+            tags: ['anchor-seal'],
             isPublished: true,
             twin: false,
           });

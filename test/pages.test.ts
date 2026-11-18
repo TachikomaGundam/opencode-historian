@@ -233,7 +233,7 @@ describe('createPage', () => {
     expect(twinVars.tags).toEqual([]);
     expect(translate).toHaveBeenNthCalledWith(1, 'Alpha', 'en', 'zh');
     expect(translate).toHaveBeenNthCalledWith(2, '# Alpha\nbody', 'en', 'zh');
-    // D2 contract: both URLs embedded in the result
+    // Contract: both URLs embedded in the result
     expectPair(result);
   });
 
@@ -386,7 +386,7 @@ describe('updatePage', () => {
     expect(vars.path).toBe(PATH);
     expect(vars.title).toBe('New Title');
     expect(vars.content).toBe('New content');
-    // D2 contract on the result
+    // Same contract on the result
     expectPair(result);
     expect(result.pageId).toBe(42);
   });

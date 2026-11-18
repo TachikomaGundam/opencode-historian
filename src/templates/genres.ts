@@ -1,6 +1,6 @@
 /**
  * Page-genre system: bilingual G1–G5 templates, deterministic genre
- * classification, and the 10-item self-review gate (plan [flow-ref]).
+ * classification, and the 10-item self-review gate.
  *
  * The five genres (digest "Genre templates", cross-cultural-wiki-writing):
  *   G1 事件/复盘页  — incident postmortem (summary → metadata → background →
@@ -21,7 +21,7 @@
  *
  * Every skeleton embeds the harness rubric dimension-C anatomy (status block,
  * one-line scope, Related Pages tail) and wiki.js expression pieces only —
- * see skeletons.ts for the raw strings. Consumers (tools.ts, [flow-ref]/15 pilot)
+ * see skeletons.ts for the raw strings. Consumers (tools.ts, the migrate pilot)
  * import everything from this barrel.
  */
 
@@ -41,7 +41,7 @@ import {
 } from './skeletons.js';
 
 // Contract re-exports: raw skeleton data stays reachable through the barrel
-// ([flow-ref] renders these double-checked strings into skill references).
+// (the skill loader renders these double-checked strings into skill references).
 export {
   G1_EN,
   G1_ZH,
@@ -77,13 +77,13 @@ export interface ClassifyResult {
   readonly signals: readonly string[];
 }
 
-/** One gate item of the 10-item self-review checklist (plan [flow-ref]). */
+/** One gate item of the 10-item self-review checklist. */
 export interface ChecklistItem {
   /** 1..10 — items are always returned as the full contiguous gate. */
   readonly id: number;
   readonly label: string;
   /** kind='genre-specific' items are scored N/A=PASS when the page's genre is
-   *  not in `appliesTo` (pilot scoring, [flow-ref]/15). */
+   *  not in `appliesTo` (pilot scoring). */
   readonly kind: 'content' | 'post-write' | 'genre-specific';
   readonly appliesTo: readonly Genre[] | 'all';
 }
@@ -157,7 +157,7 @@ function countMatches(haystack: string, keyword: string): number {
  *  - a tie between the two top scores (both > 0) → G4/medium (generalist
  *    genre wins the ambiguous case);
  *  - otherwise the top genre wins; confidence = margin ≥ 3 → high, else medium.
- *  `signals` names the matched cues (used by the pilot engine, [flow-ref]/15). */
+ *  `signals` names the matched cues (used by the pilot engine). */
 export function classifyGenre(input: ClassifyInput): ClassifyResult {
   const title = input.title.toLowerCase();
   const rawBody = input.body;
@@ -196,8 +196,8 @@ export function classifyGenre(input: ClassifyInput): ClassifyResult {
 // --- selfReviewChecklist ----------------------------------------------------
 
 /**
- * The 10-item self-review gate (plan [flow-ref]). The FULL gate is always
- * returned (ids 1..10 contiguous); the pilot engine ([flow-ref]) applies items
+ * The 10-item self-review gate. The FULL gate is always
+ * returned (ids 1..10 contiguous); the pilot engine applies items
  * via the kind/appliesTo contract:
  *  - content items (1–3, 7, 8)     — scored on the rewritten draft (dry-run);
  *  - genre-specific items (4–6)    — N/A=PASS when the page's genre is not in
@@ -235,7 +235,7 @@ const G5_CHECKLIST_VARIANTS: Readonly<Record<number, ChecklistItem>> = {
 };
 
 /** G6 swaps the genre-specific items 4–6 for how-to gates (goal-titled H1,
- *  step triples, D4 freshness metadata); everything else is shared. */
+ *  step triples, freshness metadata); everything else is shared. */
 const G6_CHECKLIST_VARIANTS: Readonly<Record<number, ChecklistItem>> = {
   4: {
     id: 4,

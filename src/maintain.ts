@@ -1,5 +1,5 @@
 /**
- * Maintain curation report (plan [flow-ref], D3 CURATE / D12): deterministic
+ * Maintain curation report: deterministic
  * metric sweeps over already-fetched map rows (tier-1 light) plus optional
  * injected page-body reads (deep). The chronology.ts precedent holds here —
  * no client, no fs, no wiki logic: pure functions over MapRow-shaped input and
@@ -144,16 +144,16 @@ export const MAINTAIN_SCHEMA = 'historian.maintain.v3';
 export const DUP_TITLE_THRESHOLD = 0.75;
 const DAY_MS = 86_400_000;
 const DEFAULT_TOP_N = 10;
-/** Genres whose pages must carry the D4 last-verified stamp (G6 how-to joins
- *  this set when [flow-ref] lands it — string membership, no type coupling). */
-// D4 freshness applies to knowledge-fact pages: G5 today; 'G6' is listed
+/** Genres whose pages must carry the last-verified stamp (G6 how-to joins
+ *  this set when its genre lane lands — string membership, no type coupling). */
+// Freshness applies to knowledge-fact pages: G5 today; 'G6' is listed
 // pre-emptively so the deep sweep lights up when the genre lane lands.
 const FRESHNESS_GENRES: readonly string[] = ['G5', 'G6'];
 const STAMP_RE = /上次核实|last verified/i;
 /** Stamp label incl. the 上次验证 variant (the set lint.ts STAMP_RE tests) — one
  *  line-level source of truth for the honesty rule shared by surface + freshness. */
 export const STAMP_LINE_RE = /上次核实|上次验证|last verified/i;
-/** A stamp that confesses the review never executed ([flow-ref] P2 "stamp honesty"):
+/** A stamp that confesses the review never executed ("stamp honesty"):
  *  it must not exempt the claim ledger (surface) nor reset the cadence clock
  *  (dueForReview). Matched per stamp line, never page-wide — "baseline" is a
  *  common GPU-benchmark noun outside a stamp. */
@@ -344,7 +344,7 @@ function sectionDist(rows: readonly MaintainRow[]): { section: string; paths: nu
     .sort((a, b) => b.paths - a.paths || cmpStr(a.section, b.section));
 }
 
-/** D4 review-by row inside a 元数据 markdown table (wiki.js has no front matter). */
+/** Review-by row inside a 元数据 markdown table (wiki.js has no front matter). */
 function reviewByOf(body: string): string | null {
   for (const line of body.split('\n')) {
     if (!line.trimStart().startsWith('|')) continue;
@@ -458,7 +458,7 @@ interface DueForReview {
   readonly verifyCommands: readonly string[];
 }
 
-/** The join ([flow-ref] P-dueForReview, stamp honesty as its immune system): due
+/** The dueForReview join (stamp honesty as its immune system): due
  *  when the newest HONEST stamp is at or past the cadence (a weekly card is due
  *  again on day 7), or when every stamp confesses non-execution — a confession
  *  records intent, not verification, so it never exempts the page. A struck old

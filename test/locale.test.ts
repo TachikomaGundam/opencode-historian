@@ -34,7 +34,7 @@ describe('validatePath rejects', () => {
   it('space in segment', () => rejects('foo/bar baz', 'space'));
   it('backslash separator', () => rejects('foo\\bar', 'backslash'));
   it('double slash', () => rejects('foo//bar', '//'));
-  // v0.4.0 (v4 plan D9): the EXACT top-level segment 'home' is allowed — the
+  // v0.4.0 (live-path allowance): the EXACT top-level segment 'home' is allowed — the
   // instance hosts a live published page at path=home (wiki.js 2.5.314, id48,
   // en+zh). Every other 'home' shape keeps today's reserved-word rejection.
   it('reserved word: HOME upper (bypass is exact lowercase only)', () => rejects('HOME', 'home'));
@@ -69,7 +69,7 @@ describe('validatePath accepts', () => {
     expect(() => validatePath(input)).not.toThrow();
   };
 
-  // D9 bypass: top-level 'home' (exact, lowercase) is a legal live path.
+  // Live-path allowance: top-level 'home' (exact, lowercase) is a legal live path.
   it('home (exact top-level — live page id48)', () => accepts('home'));
   it('ops/foo (real section)', () => accepts('ops/foo'));
   it('_sandbox/incident-2026-09-01', () => accepts('_sandbox/incident-2026-09-01'));
@@ -139,7 +139,7 @@ describe('localeUrl', () => {
   it('rejects invalid path via validatePath', () => {
     expect(() => localeUrl(BASE, 'en', 'login')).toThrow(PathValidationError);
   });
-  it('composes URL for exact top-level home (D9)', () => {
+  it('composes URL for exact top-level home', () => {
     expect(localeUrl(BASE, 'en', 'home')).toBe(`${BASE}/en/home`);
   });
 });
@@ -165,7 +165,7 @@ describe('assertLocalePair', () => {
   it('rejects invalid path', () => {
     expect(() => assertLocalePair('login', 'en', BASE)).toThrow(PathValidationError);
   });
-  it('accepts exact top-level home (D9)', () => {
+  it('accepts exact top-level home', () => {
     const pair = assertLocalePair('home', 'en', BASE);
     expect(pair.url).toBe(`${BASE}/en/home`);
     expect(pair.twinUrl).toBe(`${BASE}/zh/home`);

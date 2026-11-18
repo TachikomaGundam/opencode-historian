@@ -1,5 +1,5 @@
 /**
- * Migration engine — reformat side (plan [flow-ref]): LLM-driven genre restyle.
+ * Migration engine — reformat side: LLM-driven genre restyle.
  * The dry-run reads the page (en, else zh), classifies the genre (explicit
  * arg wins), reformats via the translate engine's Anthropic-compatible call
  * path (SAME-LANGUAGE restyle — the twin is translated at apply time, never
@@ -35,7 +35,7 @@ export interface MigrateDeps {
 export interface ReformatArgs {
   readonly path: string;
   readonly genre?: Genre;
-  /** Pilot revise-loop seam ([flow-ref]): corrective hints appended into the
+  /** Pilot revise-loop seam: corrective hints appended into the
    *  restyle user prompt when a previous draft failed checklist items. */
   readonly reviseHints?: readonly string[];
 }
@@ -105,7 +105,7 @@ export function reformatPromptFor(genre: Genre, lang: GenreLang, original: strin
   ].join('\n');
 }
 
-/** Append pilot revise-loop hints to the restyle user prompt ([flow-ref] seam);
+/** Append pilot revise-loop hints to the restyle user prompt;
  *  absent hints leave the prompt byte-identical to the pre-seam form. */
 function appendReviseHints(prompt: string, hints: readonly string[] | undefined): string {
   if (hints === undefined || hints.length === 0) return prompt;

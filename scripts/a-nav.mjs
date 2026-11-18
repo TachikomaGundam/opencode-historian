@@ -1,4 +1,4 @@
-// [flow-ref] / Issue #1: replace dynamic-mirror nav with a curated STATIC tree.
+// Nav curation: replace dynamic-mirror nav with a curated STATIC tree.
 // Read-only until --apply. Verifies via re-query after apply.
 import { liveOptions } from './live-options.mjs';
 import { readFileSync } from 'node:fs';

@@ -1,5 +1,5 @@
 /**
- * Unit tests for src/map.ts — the locale-aware page map ([flow-ref]).
+ * Unit tests for src/map.ts — the locale-aware page map.
  *
  * Coverage: twin pairing by exact path, private-namespace exclusion, path
  * sorting, per-locale list fan-out, markdown rendering (pipe escaping, '—' for
