@@ -43,7 +43,7 @@ const expectedSkillsDir = fileURLToPath(new URL('../skills/', import.meta.url));
 describe('plugin default export shape', () => {
   it('has id and server function', () => {
     expect(plugin).toBeDefined();
-    expect(plugin.id).toBe('opencode-historian');
+    expect(plugin.id).toBe('opencode-wiki-historian');
     expect(typeof plugin.server).toBe('function');
   });
 });

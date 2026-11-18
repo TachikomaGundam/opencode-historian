@@ -4,7 +4,7 @@ import plugin from '../src/index.js';
 describe('opencode-historian smoke', () => {
   it('default export has id opencode-historian when imported', () => {
     expect(plugin).toBeDefined();
-    expect(plugin.id).toBe('opencode-historian');
+    expect(plugin.id).toBe('opencode-wiki-historian');
   });
 
   it('default export has server function when imported', () => {
