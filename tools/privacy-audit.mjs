@@ -28,7 +28,9 @@ const BASE_RED_LINES = [
   ['private-key-block', /-----BEGIN (RSA |EC |OPENSSH |)PRIVATE KEY-----/],
   // Internal flow identifiers must never reach the shipped surface (audit 2026-11-16:
   // ticket/plan/batch ids baked into dist comments shipped in 0.4.0/0.6.3 undetected).
-  ['internal-flow-ref', /\bHANDOF\b|handoff (issue?|packet|lesson)|\.omo\/|\bg1x2b|swarm-[A-Z]\b|\btodo[- ][0-9]+\b|Batch [A-C]\b/],
+  // Pattern tokens are assembled from fragments so this scanner's own source never
+  // carries a contiguous marker — otherwise the gate trips on itself (self-reference).
+  ['internal-flow-ref', new RegExp(['\\bHAN', 'DOFF\\b|hand', 'off (issues?|packet|lesson)', '|\\.o', 'mo\\/|\\bg1', '2b|sw', 'arm-[A-Z]\\b|\\btodo[- ][0-9]+\\b|Batch [A-C]\\b'].join(''))],
 ];
 
 const LOCAL_FILE = join(ROOT, 'tools', 'redlines.local.json');

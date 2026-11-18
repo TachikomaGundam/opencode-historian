@@ -76,7 +76,7 @@ wiki.js key，按优先级：
 `translate.endpoint` 解析链：选项 → 环境变量 `HISTORIAN_TRANSLATE_ENDPOINT` →
 未配置。`translate.model` 同理有 `HISTORIAN_TRANSLATE_MODEL` 兜底腿。
 包内不内置任何网关地址与设备模型默认
-（设备模型不随包，[owner-decision] 2026-10-01，内部代号 [policy-code]）。
+（设备模型不随包，设备本地策略 2026-10-01 采纳）。
 
 ### 降级行为
 - wiki key 缺失：`ConfigError` 记录一次日志，插件工具全部禁用，
@@ -98,7 +98,7 @@ wiki.js key，按优先级：
 
 ### 锚印封存
 `historian_anchor`（seal/verify）：在引擎会话库中定位人类订单/批准消息，
-哈希并落证据页回执（`_evidence/anchors/`），供事后对账（内部代号 [flow-code]）。
+哈希并落证据页回执（`_evidence/anchors/`），供事后对账。
 
 ## 质量门禁
 
@@ -222,10 +222,8 @@ YAML frontmatter（API 建页不经过它）。
 
 ### 评测框架
 评测 harness 是维护方私有仓库，与插件仓同工作区，不对外公开。
-它提供 7 个行为验收场景：创建、追加、重叠整合、整理、价值门控、G1 格式、
-zh URL 报告。试点迁移 7 页 PASS。v3 插件最近一轮内部评测：7/7 PASS、
-51/58 适用分、G=1、零重试（`results/2026-09-02-v3-plugin.md`）。
-此段为维护记录声明，外部读者无法在本仓库复算，请以此为界。
+它覆盖创建、追加、重叠整合、整理、价值门控、G1 格式、zh URL 报告七类
+行为验收场景；场景清单、分数与证据留在私有侧，不在本仓库呈报。
 
 ## 开发命令
 
@@ -262,5 +260,3 @@ token）。v0.4.0 时代的人工 2FA 流程已被取代。当前已上架至 0.
 | `G6_CHECKLIST_VARIANTS` | `src/templates/genres.ts` | G6 手册变体 |
 | `mediaUpload` | `src/wiki/assets.ts` | 附件上传固定字段名 |
 | `validatePath` | 路径校验层 | 拒 locale 前缀与保留字 |
-| [policy-code] | [owner-decision] 2026-10-01 | 包内不内置设备模型默认 |
-| [flow-code] | 锚印机制代号 | `historian_anchor` seal/verify |

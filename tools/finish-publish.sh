@@ -16,7 +16,7 @@ fi
 JSONC="$HOME/.config/opencode/opencode.jsonc"
 SCRATCH="$REPO/.qa/scratch/npm-smoke"
 PKG="opencode-wiki-historian"
-EVID="$REPO/[local-ref].txt"
+EVID="$REPO/.qa/release-evidence.txt"
 
 if [[ ! "$OTP" =~ ^[0-9]{6}$ ]]; then
   echo "usage: tools/finish-publish.sh <6-digit OTP from your authenticator>" >&2

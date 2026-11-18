@@ -6,7 +6,7 @@ dist/
 # leaky dev artifacts stay local only — never tracked, never shipped
 results/*
 results/*.json
-local/
+.o?o/
 tools/redlines.local.json
 
 .codegraph

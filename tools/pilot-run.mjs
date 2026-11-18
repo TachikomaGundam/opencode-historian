@@ -36,10 +36,10 @@ const REPO = fileURLToPath(new URL('../', import.meta.url));
 const QA = join(REPO, '.qa');
 const RESULTS = join(REPO, 'results');
 const STATE_FILE = join(QA, '15-state.json');
-const LEDGER = join(QA, '15.txt');
+const LEDGER = join(QA, 'pilot-ledger.txt');
 const BEFORE_MAP = join(QA, 'before-map.json');
 const AFTER_MAP = join(QA, 'after-map.json');
-const DIFF_FILE = join(QA, '15-diff.txt');
+const DIFF_FILE = join(QA, 'pilot-diff.txt');
 const PILOT_NOW = new Date(2026, 8, 2, 12, 0, 0); // fixed: 2026-09-02 in any TZ
 const DATE_KEY = dateKey(PILOT_NOW);
 const HOME = homedir();
@@ -514,7 +514,7 @@ async function cmdDiff() {
   logLine(`DIFF rows=${changeRows.length} violations=${violations.length}`);
   for (const v of violations) logLine(`DIFF VIOLATION ${v.raw}`);
   const ok = violations.length === 0;
-  logLine(`DIFF assertion (a)+(b): ${ok ? 'PASS — every change row is a pilot path, _meta/page-map, or _sandbox/**' : 'FAIL — see [local-ref]-diff.txt'}`);
+  logLine(`DIFF assertion (a)+(b): ${ok ? 'PASS — every change row is a pilot path, _meta/page-map, or _sandbox/**' : 'FAIL — see .qa/pilot-diff.txt'}`);
   if (!ok) process.exit(1);
 }
 
@@ -579,8 +579,8 @@ async function cmdReport() {
   md.push(`- 选中：\`${section}\`（qualified 候选中路径数最少者，${state.pilot.paths.length} paths）`, '');
   md.push('## 守卫记录', '');
   md.push(`- HARD GUARD（所选章节 >15 paths → BLOCKED-selection，零写入）：所选 = ${state.pilot.paths.length} paths → ${state.pilot.paths.length > 15 ? 'GUARD TRIPPED' : '未触发'}`);
-  md.push('- 每页 ≤3 修订轮；zh 翻译失败重试 ≤3 次；用尽 → 整试点 BLOCKED（逐页原因+证据在 [local-ref].txt）');
-  md.push('- 试点内无 delete/move；试点外零写入（[local-ref]-diff.txt 证明）', '');
+  md.push('- 每页 ≤3 修订轮；zh 翻译失败重试 ≤3 次；用尽 → 整试点 BLOCKED（逐页原因+证据在 .qa/pilot-ledger.txt）');
+  md.push('- 试点内无 delete/move；试点外零写入（.qa/pilot-diff.txt 证明）', '');
   md.push('## 窗口记录', '');
   const before = existsSync(BEFORE_MAP) ? loadMap(BEFORE_MAP) : null;
   const after = existsSync(AFTER_MAP) ? loadMap(AFTER_MAP) : null;
