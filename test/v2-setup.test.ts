@@ -55,7 +55,8 @@ function fakeHost(opts: Record<string, unknown> = {}, commandList: ReadonlyArray
     command: {
       async list() {
         h.commandListCalls += 1;
-        return commandList;
+        // Real 2.3.0 host shape measured live in setup: {location, data: [...]}.
+        return { location: {}, data: commandList };
       },
       async transform(fn: (editor: { add: (d: { name: string; description: string; template: string }) => void }) => void) {
         fn({ add: (d) => h.commands.push(d) });
@@ -227,6 +228,21 @@ describe('/historian-capture command surface', () => {
     await runSetup(h);
     expect(h.commands.length).toBe(0);
     expect(h.logs.join('\n')).toContain('already defined by user config');
+  });
+
+  it('still accepts a bare-array command.list (legacy shape)', async () => {
+    const h = fakeHost(GOOD_OPTIONS, []);
+    h.ctx.command.list = async () => [] as never;
+    await runSetup(h);
+    expect(h.commands.length).toBe(1);
+  });
+
+  it('fails closed on an unrecognized command.list shape (no shadowing of user commands)', async () => {
+    const h = fakeHost(GOOD_OPTIONS, []);
+    h.ctx.command.list = async () => ({ somethingElse: true }) as never;
+    await runSetup(h);
+    expect(h.commands.length).toBe(0);
+    expect(h.logs.join('\n')).toContain('unrecognized shape');
   });
 });
 

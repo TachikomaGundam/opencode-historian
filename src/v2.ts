@@ -200,8 +200,18 @@ export async function setup(ctx: V2Ctx, deps: SetupDeps = {}): Promise<void> {
     log(`[${PLUGIN_ID}] V2 host exposes no command.transform; /${CAPTURE_COMMAND_NAME} NOT registered.`);
   } else {
     try {
-      const existing = await ctx.command.list?.();
-      if (existing?.some((c) => c.name === CAPTURE_COMMAND_NAME)) {
+      // Real host returns {location, data: Command[]}; older probes suggest a
+      // bare array may also appear. Normalize; unknown shapes stay fail-closed
+      // so a user-defined /historian-capture can never be shadowed.
+      const res = await ctx.command.list?.();
+      const known: { name?: string }[] | undefined = Array.isArray(res)
+        ? (res as { name?: string }[])
+        : Array.isArray((res as { data?: unknown } | undefined)?.data)
+          ? ((res as unknown) as { data: { name?: string }[] }).data
+          : undefined;
+      if (known === undefined) {
+        log(`[${PLUGIN_ID}] command.list() returned an unrecognized shape; /${CAPTURE_COMMAND_NAME} NOT registered (fail-closed user precedence).`);
+      } else if (known.some((c) => c.name === CAPTURE_COMMAND_NAME)) {
         log(`[${PLUGIN_ID}] /${CAPTURE_COMMAND_NAME} already defined by user config; plugin default NOT registered.`);
       } else {
         await ctx.command.transform((editor) => {
@@ -211,6 +221,7 @@ export async function setup(ctx: V2Ctx, deps: SetupDeps = {}): Promise<void> {
             template: CAPTURE_COMMAND_TEMPLATE,
           });
         });
+        log(`[${PLUGIN_ID}] /${CAPTURE_COMMAND_NAME} registered.`);
       }
     } catch (err) {
       log(`[${PLUGIN_ID}] command registration failed: ${err instanceof Error ? err.message : String(err)}`);
